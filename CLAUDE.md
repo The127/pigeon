@@ -143,3 +143,9 @@ just dev-watch        # watch mode (cargo-watch)
 - One feature at a time
 - Do not proceed to next step without explicit user approval
 - Never generate full codebase speculatively
+
+## Definition of Done
+Every change must satisfy before commit:
+- Does this have unit tests?
+- Does this have BDD scenarios if it touches domain behavior?
+- Does clippy pass?
