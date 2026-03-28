@@ -3,7 +3,7 @@ use std::sync::Arc;
 use cucumber::{given, then, when, World};
 
 use pigeon_application::commands::disable_endpoint::DisableEndpointHandler;
-use pigeon_application::ports::delivery::MockDeliveryQueue;
+use pigeon_application::ports::stores::MockDeadLetterReadStore;
 use pigeon_application::services::auto_disable_saga::AutoDisableEndpointSaga;
 use pigeon_application::services::outbox_worker::EventSubscriber;
 use pigeon_application::test_support::fakes::{
@@ -87,19 +87,18 @@ async fn when_dead_lettered(world: &mut AutoDisableWorld) {
     let app_id = world.app_id.clone().unwrap();
     let failures = world.consecutive_failures;
 
-    let mut mock_queue = MockDeliveryQueue::new();
-    mock_queue
+    let mut mock_read_store = MockDeadLetterReadStore::new();
+    mock_read_store
         .expect_consecutive_failure_count()
         .returning(move |_| Ok(failures));
 
     let log = world.log.as_ref().unwrap().clone();
     let ep_data = world.ep_data.as_ref().unwrap().clone();
     let factory = Arc::new(FakeUnitOfWorkFactory::with_endpoint_data(log, ep_data));
-    let disable_handler = DisableEndpointHandler::new(factory);
 
     let saga = AutoDisableEndpointSaga::new(
-        Arc::new(mock_queue),
-        disable_handler,
+        Arc::new(mock_read_store),
+        Arc::new(DisableEndpointHandler::new(factory)),
         world.threshold,
     );
 

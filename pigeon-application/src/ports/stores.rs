@@ -177,6 +177,16 @@ pub trait DeadLetterStore: Send + Sync {
 
 #[cfg_attr(feature = "test-support", mockall::automock)]
 #[async_trait]
+pub trait DeadLetterReadStore: Send + Sync {
+    /// Count dead letters for an endpoint since the last successful delivery.
+    async fn consecutive_failure_count(
+        &self,
+        endpoint_id: &EndpointId,
+    ) -> Result<u64, ApplicationError>;
+}
+
+#[cfg_attr(feature = "test-support", mockall::automock)]
+#[async_trait]
 pub trait OrganizationStore: Send + Sync {
     async fn insert(&mut self, organization: &Organization) -> Result<(), ApplicationError>;
     async fn find_by_id(

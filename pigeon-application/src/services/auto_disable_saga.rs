@@ -3,31 +3,32 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use tracing::{info, warn};
 
-use crate::commands::disable_endpoint::{DisableEndpoint, DisableEndpointHandler};
+use crate::commands::disable_endpoint::DisableEndpoint;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::delivery::DeliveryQueue;
+use crate::ports::stores::DeadLetterReadStore;
 use crate::services::outbox_worker::EventSubscriber;
 use pigeon_domain::event::DomainEvent;
 
 /// Saga that auto-disables endpoints after N consecutive dead letters.
 ///
 /// Subscribes to `DeadLettered` events. On each, queries the consecutive
-/// failure count for the endpoint. If it meets or exceeds the threshold,
-/// sends a `DisableEndpoint` command.
+/// failure count via `DeadLetterReadStore`. If it meets or exceeds the
+/// threshold, sends a `DisableEndpoint` command through the command handler
+/// (which goes through the full mediator pipeline when wired).
 pub struct AutoDisableEndpointSaga {
-    delivery_queue: Arc<dyn DeliveryQueue>,
-    disable_handler: DisableEndpointHandler,
+    dead_letter_read_store: Arc<dyn DeadLetterReadStore>,
+    disable_handler: Arc<dyn CommandHandler<DisableEndpoint>>,
     threshold: u64,
 }
 
 impl AutoDisableEndpointSaga {
     pub fn new(
-        delivery_queue: Arc<dyn DeliveryQueue>,
-        disable_handler: DisableEndpointHandler,
+        dead_letter_read_store: Arc<dyn DeadLetterReadStore>,
+        disable_handler: Arc<dyn CommandHandler<DisableEndpoint>>,
         threshold: u64,
     ) -> Self {
         Self {
-            delivery_queue,
+            dead_letter_read_store,
             disable_handler,
             threshold,
         }
@@ -50,7 +51,11 @@ impl EventSubscriber for AutoDisableEndpointSaga {
             return;
         }
 
-        let count = match self.delivery_queue.consecutive_failure_count(endpoint_id).await {
+        let count = match self
+            .dead_letter_read_store
+            .consecutive_failure_count(endpoint_id)
+            .await
+        {
             Ok(c) => c,
             Err(e) => {
                 warn!(error = %e, "Failed to check consecutive failure count");
