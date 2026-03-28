@@ -136,7 +136,7 @@ async fn when_worker_processes(world: &mut DeliveryWorld) {
     let success_clone = success_records.clone();
     mock_queue
         .expect_record_success()
-        .returning(move |_, code, _, dur| {
+        .returning(move |_, _, _, code, _, dur| {
             success_clone
                 .lock()
                 .unwrap()
@@ -153,7 +153,7 @@ async fn when_worker_processes(world: &mut DeliveryWorld) {
     let failure_clone = failure_records.clone();
     mock_queue
         .expect_record_failure()
-        .returning(move |_, code, _, _, next| {
+        .returning(move |_, _, _, code, _, _, next| {
             failure_clone
                 .lock()
                 .unwrap()

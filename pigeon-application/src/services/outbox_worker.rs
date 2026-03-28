@@ -100,6 +100,40 @@ impl OutboxWorkerService {
                     "Domain event: message dead-lettered"
                 );
             }
+            DomainEvent::AttemptSucceeded {
+                attempt_id,
+                message_id,
+                endpoint_id,
+                response_code,
+                duration_ms,
+            } => {
+                info!(
+                    attempt_id = ?attempt_id,
+                    message_id = ?message_id,
+                    endpoint_id = ?endpoint_id,
+                    response_code = response_code,
+                    duration_ms = duration_ms,
+                    "Domain event: attempt succeeded"
+                );
+            }
+            DomainEvent::AttemptFailed {
+                attempt_id,
+                message_id,
+                endpoint_id,
+                response_code,
+                duration_ms,
+                will_retry,
+            } => {
+                info!(
+                    attempt_id = ?attempt_id,
+                    message_id = ?message_id,
+                    endpoint_id = ?endpoint_id,
+                    response_code = ?response_code,
+                    duration_ms = duration_ms,
+                    will_retry = will_retry,
+                    "Domain event: attempt failed"
+                );
+            }
             DomainEvent::DeadLetterReplayed {
                 dead_letter_id,
                 message_id,

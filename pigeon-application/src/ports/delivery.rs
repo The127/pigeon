@@ -44,6 +44,7 @@ pub enum WebhookResult {
 /// the worker must hold locks during HTTP delivery.
 #[cfg_attr(feature = "test-support", mockall::automock)]
 #[async_trait]
+#[allow(clippy::too_many_arguments)]
 pub trait DeliveryQueue: Send + Sync {
     /// Atomically claim up to `batch_size` pending attempts.
     /// Sets status to `in_flight` and increments `attempt_number`.
@@ -53,6 +54,8 @@ pub trait DeliveryQueue: Send + Sync {
     async fn record_success(
         &self,
         attempt_id: &AttemptId,
+        message_id: &MessageId,
+        endpoint_id: &EndpointId,
         response_code: u16,
         response_body: String,
         duration_ms: i64,
@@ -63,6 +66,8 @@ pub trait DeliveryQueue: Send + Sync {
     async fn record_failure(
         &self,
         attempt_id: &AttemptId,
+        message_id: &MessageId,
+        endpoint_id: &EndpointId,
         response_code: Option<u16>,
         response_body: Option<String>,
         duration_ms: i64,

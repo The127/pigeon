@@ -154,6 +154,8 @@ impl DeliveryWorkerService {
                         .queue
                         .record_success(
                             &task.attempt_id,
+                            &task.message_id,
+                            &task.endpoint_id,
                             status_code,
                             body,
                             duration_ms,
@@ -209,6 +211,8 @@ impl DeliveryWorkerService {
             .queue
             .record_failure(
                 &task.attempt_id,
+                &task.message_id,
+                &task.endpoint_id,
                 response_code,
                 response_body.clone(),
                 duration_ms,

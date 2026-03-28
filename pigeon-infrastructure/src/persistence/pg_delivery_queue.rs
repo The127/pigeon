@@ -6,6 +6,7 @@ use pigeon_application::ports::delivery::{DeliveryQueue, DeliveryTask};
 use pigeon_domain::application::ApplicationId;
 use pigeon_domain::attempt::AttemptId;
 use pigeon_domain::endpoint::EndpointId;
+use pigeon_domain::event::DomainEvent;
 use pigeon_domain::message::MessageId;
 
 pub struct PgDeliveryQueue {
@@ -15,6 +16,22 @@ pub struct PgDeliveryQueue {
 impl PgDeliveryQueue {
     pub fn new(pool: PgPool) -> Self {
         Self { pool }
+    }
+
+    async fn insert_outbox_event(
+        tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+        event: &DomainEvent,
+    ) -> Result<(), ApplicationError> {
+        sqlx::query(
+            "INSERT INTO event_outbox (id, event_type, payload) VALUES ($1, $2, $3)",
+        )
+        .bind(uuid::Uuid::new_v4())
+        .bind(event.event_type())
+        .bind(event.to_json())
+        .execute(&mut **tx)
+        .await
+        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+        Ok(())
     }
 }
 
@@ -78,10 +95,15 @@ impl DeliveryQueue for PgDeliveryQueue {
     async fn record_success(
         &self,
         attempt_id: &AttemptId,
+        message_id: &MessageId,
+        endpoint_id: &EndpointId,
         response_code: u16,
         response_body: String,
         duration_ms: i64,
     ) -> Result<(), ApplicationError> {
+        let mut tx = self.pool.begin().await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
         sqlx::query(
             "UPDATE attempts \
              SET status = 'succeeded', \
@@ -94,11 +116,23 @@ impl DeliveryQueue for PgDeliveryQueue {
         )
         .bind(attempt_id.as_uuid())
         .bind(response_code as i16)
-        .bind(response_body)
+        .bind(&response_body)
         .bind(duration_ms)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        let event = DomainEvent::AttemptSucceeded {
+            attempt_id: attempt_id.clone(),
+            message_id: message_id.clone(),
+            endpoint_id: endpoint_id.clone(),
+            response_code,
+            duration_ms,
+        };
+        Self::insert_outbox_event(&mut tx, &event).await?;
+
+        tx.commit().await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(())
     }
@@ -106,16 +140,18 @@ impl DeliveryQueue for PgDeliveryQueue {
     async fn record_failure(
         &self,
         attempt_id: &AttemptId,
+        message_id: &MessageId,
+        endpoint_id: &EndpointId,
         response_code: Option<u16>,
         response_body: Option<String>,
         duration_ms: i64,
         next_attempt_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Result<(), ApplicationError> {
-        let status = if next_attempt_at.is_some() {
-            "pending"
-        } else {
-            "failed"
-        };
+        let will_retry = next_attempt_at.is_some();
+        let status = if will_retry { "pending" } else { "failed" };
+
+        let mut tx = self.pool.begin().await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         sqlx::query(
             "UPDATE attempts \
@@ -130,12 +166,25 @@ impl DeliveryQueue for PgDeliveryQueue {
         .bind(attempt_id.as_uuid())
         .bind(status)
         .bind(response_code.map(|c| c as i16))
-        .bind(response_body)
+        .bind(&response_body)
         .bind(duration_ms)
         .bind(next_attempt_at)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        let event = DomainEvent::AttemptFailed {
+            attempt_id: attempt_id.clone(),
+            message_id: message_id.clone(),
+            endpoint_id: endpoint_id.clone(),
+            response_code,
+            duration_ms,
+            will_retry,
+        };
+        Self::insert_outbox_event(&mut tx, &event).await?;
+
+        tx.commit().await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(())
     }

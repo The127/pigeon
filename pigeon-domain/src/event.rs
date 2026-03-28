@@ -1,6 +1,7 @@
 use uuid::Uuid;
 
 use crate::application::ApplicationId;
+use crate::attempt::AttemptId;
 use crate::dead_letter::DeadLetterId;
 use crate::endpoint::EndpointId;
 use crate::event_type::EventTypeId;
@@ -23,6 +24,21 @@ pub enum DomainEvent {
         message_id: MessageId,
         endpoint_id: EndpointId,
     },
+    AttemptSucceeded {
+        attempt_id: AttemptId,
+        message_id: MessageId,
+        endpoint_id: EndpointId,
+        response_code: u16,
+        duration_ms: i64,
+    },
+    AttemptFailed {
+        attempt_id: AttemptId,
+        message_id: MessageId,
+        endpoint_id: EndpointId,
+        response_code: Option<u16>,
+        duration_ms: i64,
+        will_retry: bool,
+    },
     EndpointUpdated {
         endpoint_id: EndpointId,
         app_id: ApplicationId,
@@ -35,6 +51,8 @@ impl DomainEvent {
         match self {
             DomainEvent::MessageCreated { .. } => "message_created",
             DomainEvent::DeadLettered { .. } => "dead_lettered",
+            DomainEvent::AttemptSucceeded { .. } => "attempt_succeeded",
+            DomainEvent::AttemptFailed { .. } => "attempt_failed",
             DomainEvent::DeadLetterReplayed { .. } => "dead_letter_replayed",
             DomainEvent::EndpointUpdated { .. } => "endpoint_updated",
         }
@@ -59,6 +77,34 @@ impl DomainEvent {
                 "message_id": message_id.as_uuid(),
                 "endpoint_id": endpoint_id.as_uuid(),
                 "app_id": app_id.as_uuid(),
+            }),
+            DomainEvent::AttemptSucceeded {
+                attempt_id,
+                message_id,
+                endpoint_id,
+                response_code,
+                duration_ms,
+            } => serde_json::json!({
+                "attempt_id": attempt_id.as_uuid(),
+                "message_id": message_id.as_uuid(),
+                "endpoint_id": endpoint_id.as_uuid(),
+                "response_code": response_code,
+                "duration_ms": duration_ms,
+            }),
+            DomainEvent::AttemptFailed {
+                attempt_id,
+                message_id,
+                endpoint_id,
+                response_code,
+                duration_ms,
+                will_retry,
+            } => serde_json::json!({
+                "attempt_id": attempt_id.as_uuid(),
+                "message_id": message_id.as_uuid(),
+                "endpoint_id": endpoint_id.as_uuid(),
+                "response_code": response_code,
+                "duration_ms": duration_ms,
+                "will_retry": will_retry,
             }),
             DomainEvent::DeadLetterReplayed {
                 dead_letter_id,
@@ -101,6 +147,39 @@ impl DomainEvent {
                     message_id: MessageId::from_uuid(message_id),
                     endpoint_id: EndpointId::from_uuid(endpoint_id),
                     app_id: ApplicationId::from_uuid(app_id),
+                })
+            }
+            "attempt_succeeded" => {
+                let attempt_id = parse_uuid(payload, "attempt_id")?;
+                let message_id = parse_uuid(payload, "message_id")?;
+                let endpoint_id = parse_uuid(payload, "endpoint_id")?;
+                let response_code = payload.get("response_code")?.as_u64()? as u16;
+                let duration_ms = payload.get("duration_ms")?.as_i64()?;
+                Some(DomainEvent::AttemptSucceeded {
+                    attempt_id: AttemptId::from_uuid(attempt_id),
+                    message_id: MessageId::from_uuid(message_id),
+                    endpoint_id: EndpointId::from_uuid(endpoint_id),
+                    response_code,
+                    duration_ms,
+                })
+            }
+            "attempt_failed" => {
+                let attempt_id = parse_uuid(payload, "attempt_id")?;
+                let message_id = parse_uuid(payload, "message_id")?;
+                let endpoint_id = parse_uuid(payload, "endpoint_id")?;
+                let response_code = payload
+                    .get("response_code")
+                    .and_then(|v| v.as_u64())
+                    .map(|v| v as u16);
+                let duration_ms = payload.get("duration_ms")?.as_i64()?;
+                let will_retry = payload.get("will_retry")?.as_bool()?;
+                Some(DomainEvent::AttemptFailed {
+                    attempt_id: AttemptId::from_uuid(attempt_id),
+                    message_id: MessageId::from_uuid(message_id),
+                    endpoint_id: EndpointId::from_uuid(endpoint_id),
+                    response_code,
+                    duration_ms,
+                    will_retry,
                 })
             }
             "dead_letter_replayed" => {
@@ -166,6 +245,50 @@ mod tests {
             dead_letter_id: DeadLetterId::new(),
             message_id: MessageId::new(),
             endpoint_id: EndpointId::new(),
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn roundtrip_attempt_succeeded() {
+        let event = DomainEvent::AttemptSucceeded {
+            attempt_id: AttemptId::new(),
+            message_id: MessageId::new(),
+            endpoint_id: EndpointId::new(),
+            response_code: 200,
+            duration_ms: 150,
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn roundtrip_attempt_failed_with_response() {
+        let event = DomainEvent::AttemptFailed {
+            attempt_id: AttemptId::new(),
+            message_id: MessageId::new(),
+            endpoint_id: EndpointId::new(),
+            response_code: Some(500),
+            duration_ms: 42,
+            will_retry: true,
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn roundtrip_attempt_failed_network_error() {
+        let event = DomainEvent::AttemptFailed {
+            attempt_id: AttemptId::new(),
+            message_id: MessageId::new(),
+            endpoint_id: EndpointId::new(),
+            response_code: None,
+            duration_ms: 5,
+            will_retry: false,
         };
         let json = event.to_json();
         let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();

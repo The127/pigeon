@@ -1472,7 +1472,7 @@ async fn delivery_queue_record_success() {
     let task = &tasks[0];
 
     queue
-        .record_success(&task.attempt_id, 200, "OK".into(), 150)
+        .record_success(&task.attempt_id, &task.message_id, &task.endpoint_id, 200, "OK".into(), 150)
         .await
         .unwrap();
 
@@ -1508,6 +1508,8 @@ async fn delivery_queue_record_failure_with_retry() {
     queue
         .record_failure(
             &task.attempt_id,
+            &task.message_id,
+            &task.endpoint_id,
             Some(500),
             Some("Internal Server Error".into()),
             42,
@@ -1539,7 +1541,7 @@ async fn delivery_queue_record_failure_final() {
     let task = &tasks[0];
 
     queue
-        .record_failure(&task.attempt_id, Some(500), Some("fail".into()), 10, None)
+        .record_failure(&task.attempt_id, &task.message_id, &task.endpoint_id, Some(500), Some("fail".into()), 10, None)
         .await
         .unwrap();
 
