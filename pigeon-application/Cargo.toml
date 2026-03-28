@@ -31,3 +31,7 @@ harness = false
 [[test]]
 name = "delivery_worker_bdd"
 harness = false
+
+[[test]]
+name = "auto_disable_bdd"
+harness = false
