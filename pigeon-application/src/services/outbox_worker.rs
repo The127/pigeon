@@ -76,6 +76,18 @@ impl OutboxWorkerService {
 
     fn handle_event(&self, event: &DomainEvent) {
         match event {
+            DomainEvent::MessageCreated {
+                message_id,
+                app_id,
+                event_type_id,
+            } => {
+                info!(
+                    message_id = ?message_id,
+                    app_id = ?app_id,
+                    event_type_id = ?event_type_id,
+                    "Domain event: message created"
+                );
+            }
             DomainEvent::DeadLettered {
                 message_id,
                 endpoint_id,
@@ -86,6 +98,30 @@ impl OutboxWorkerService {
                     endpoint_id = ?endpoint_id,
                     app_id = ?app_id,
                     "Domain event: message dead-lettered"
+                );
+            }
+            DomainEvent::DeadLetterReplayed {
+                dead_letter_id,
+                message_id,
+                endpoint_id,
+            } => {
+                info!(
+                    dead_letter_id = ?dead_letter_id,
+                    message_id = ?message_id,
+                    endpoint_id = ?endpoint_id,
+                    "Domain event: dead letter replayed"
+                );
+            }
+            DomainEvent::EndpointUpdated {
+                endpoint_id,
+                app_id,
+                enabled,
+            } => {
+                info!(
+                    endpoint_id = ?endpoint_id,
+                    app_id = ?app_id,
+                    enabled = enabled,
+                    "Domain event: endpoint updated"
                 );
             }
         }

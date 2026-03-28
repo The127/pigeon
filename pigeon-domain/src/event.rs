@@ -1,27 +1,56 @@
 use uuid::Uuid;
 
 use crate::application::ApplicationId;
+use crate::dead_letter::DeadLetterId;
 use crate::endpoint::EndpointId;
+use crate::event_type::EventTypeId;
 use crate::message::MessageId;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum DomainEvent {
+    MessageCreated {
+        message_id: MessageId,
+        app_id: ApplicationId,
+        event_type_id: EventTypeId,
+    },
     DeadLettered {
         message_id: MessageId,
         endpoint_id: EndpointId,
         app_id: ApplicationId,
+    },
+    DeadLetterReplayed {
+        dead_letter_id: DeadLetterId,
+        message_id: MessageId,
+        endpoint_id: EndpointId,
+    },
+    EndpointUpdated {
+        endpoint_id: EndpointId,
+        app_id: ApplicationId,
+        enabled: bool,
     },
 }
 
 impl DomainEvent {
     pub fn event_type(&self) -> &'static str {
         match self {
+            DomainEvent::MessageCreated { .. } => "message_created",
             DomainEvent::DeadLettered { .. } => "dead_lettered",
+            DomainEvent::DeadLetterReplayed { .. } => "dead_letter_replayed",
+            DomainEvent::EndpointUpdated { .. } => "endpoint_updated",
         }
     }
 
     pub fn to_json(&self) -> serde_json::Value {
         match self {
+            DomainEvent::MessageCreated {
+                message_id,
+                app_id,
+                event_type_id,
+            } => serde_json::json!({
+                "message_id": message_id.as_uuid(),
+                "app_id": app_id.as_uuid(),
+                "event_type_id": event_type_id.as_uuid(),
+            }),
             DomainEvent::DeadLettered {
                 message_id,
                 endpoint_id,
@@ -31,25 +60,132 @@ impl DomainEvent {
                 "endpoint_id": endpoint_id.as_uuid(),
                 "app_id": app_id.as_uuid(),
             }),
+            DomainEvent::DeadLetterReplayed {
+                dead_letter_id,
+                message_id,
+                endpoint_id,
+            } => serde_json::json!({
+                "dead_letter_id": dead_letter_id.as_uuid(),
+                "message_id": message_id.as_uuid(),
+                "endpoint_id": endpoint_id.as_uuid(),
+            }),
+            DomainEvent::EndpointUpdated {
+                endpoint_id,
+                app_id,
+                enabled,
+            } => serde_json::json!({
+                "endpoint_id": endpoint_id.as_uuid(),
+                "app_id": app_id.as_uuid(),
+                "enabled": enabled,
+            }),
         }
     }
 
-    pub fn from_outbox(
-        event_type: &str,
-        payload: &serde_json::Value,
-    ) -> Option<Self> {
+    pub fn from_outbox(event_type: &str, payload: &serde_json::Value) -> Option<Self> {
         match event_type {
+            "message_created" => {
+                let message_id = parse_uuid(payload, "message_id")?;
+                let app_id = parse_uuid(payload, "app_id")?;
+                let event_type_id = parse_uuid(payload, "event_type_id")?;
+                Some(DomainEvent::MessageCreated {
+                    message_id: MessageId::from_uuid(message_id),
+                    app_id: ApplicationId::from_uuid(app_id),
+                    event_type_id: EventTypeId::from_uuid(event_type_id),
+                })
+            }
             "dead_lettered" => {
-                let message_id = payload.get("message_id")?.as_str()?;
-                let endpoint_id = payload.get("endpoint_id")?.as_str()?;
-                let app_id = payload.get("app_id")?.as_str()?;
+                let message_id = parse_uuid(payload, "message_id")?;
+                let endpoint_id = parse_uuid(payload, "endpoint_id")?;
+                let app_id = parse_uuid(payload, "app_id")?;
                 Some(DomainEvent::DeadLettered {
-                    message_id: MessageId::from_uuid(Uuid::parse_str(message_id).ok()?),
-                    endpoint_id: EndpointId::from_uuid(Uuid::parse_str(endpoint_id).ok()?),
-                    app_id: ApplicationId::from_uuid(Uuid::parse_str(app_id).ok()?),
+                    message_id: MessageId::from_uuid(message_id),
+                    endpoint_id: EndpointId::from_uuid(endpoint_id),
+                    app_id: ApplicationId::from_uuid(app_id),
+                })
+            }
+            "dead_letter_replayed" => {
+                let dead_letter_id = parse_uuid(payload, "dead_letter_id")?;
+                let message_id = parse_uuid(payload, "message_id")?;
+                let endpoint_id = parse_uuid(payload, "endpoint_id")?;
+                Some(DomainEvent::DeadLetterReplayed {
+                    dead_letter_id: DeadLetterId::from_uuid(dead_letter_id),
+                    message_id: MessageId::from_uuid(message_id),
+                    endpoint_id: EndpointId::from_uuid(endpoint_id),
+                })
+            }
+            "endpoint_updated" => {
+                let endpoint_id = parse_uuid(payload, "endpoint_id")?;
+                let app_id = parse_uuid(payload, "app_id")?;
+                let enabled = payload.get("enabled")?.as_bool()?;
+                Some(DomainEvent::EndpointUpdated {
+                    endpoint_id: EndpointId::from_uuid(endpoint_id),
+                    app_id: ApplicationId::from_uuid(app_id),
+                    enabled,
                 })
             }
             _ => None,
         }
+    }
+}
+
+fn parse_uuid(payload: &serde_json::Value, field: &str) -> Option<Uuid> {
+    Uuid::parse_str(payload.get(field)?.as_str()?).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn roundtrip_message_created() {
+        let event = DomainEvent::MessageCreated {
+            message_id: MessageId::new(),
+            app_id: ApplicationId::new(),
+            event_type_id: EventTypeId::new(),
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn roundtrip_dead_lettered() {
+        let event = DomainEvent::DeadLettered {
+            message_id: MessageId::new(),
+            endpoint_id: EndpointId::new(),
+            app_id: ApplicationId::new(),
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn roundtrip_dead_letter_replayed() {
+        let event = DomainEvent::DeadLetterReplayed {
+            dead_letter_id: DeadLetterId::new(),
+            message_id: MessageId::new(),
+            endpoint_id: EndpointId::new(),
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn roundtrip_endpoint_updated() {
+        let event = DomainEvent::EndpointUpdated {
+            endpoint_id: EndpointId::new(),
+            app_id: ApplicationId::new(),
+            enabled: false,
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn unknown_event_type_returns_none() {
+        assert!(DomainEvent::from_outbox("unknown", &serde_json::json!({})).is_none());
     }
 }
