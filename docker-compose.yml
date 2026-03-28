@@ -53,14 +53,6 @@ services:
       KEYLINE_HOST: "http://localhost:5177"
     restart: unless-stopped
 
-  # ── Mail catcher (dev only) ────────────────────────────────────────────────
-  mailpit:
-    image: axllent/mailpit:v1.26
-    restart: unless-stopped
-    ports:
-      - "8025:8025"   # Web UI: http://localhost:8025
-      - "1025:1025"   # SMTP
-
 volumes:
   pgdata:
   keyline_db_data:
