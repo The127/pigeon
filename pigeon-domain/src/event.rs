@@ -13,6 +13,7 @@ pub enum DomainEvent {
         message_id: MessageId,
         app_id: ApplicationId,
         event_type_id: EventTypeId,
+        attempts_created: u32,
     },
     DeadLettered {
         message_id: MessageId,
@@ -64,10 +65,12 @@ impl DomainEvent {
                 message_id,
                 app_id,
                 event_type_id,
+                attempts_created,
             } => serde_json::json!({
                 "message_id": message_id.as_uuid(),
                 "app_id": app_id.as_uuid(),
                 "event_type_id": event_type_id.as_uuid(),
+                "attempts_created": attempts_created,
             }),
             DomainEvent::DeadLettered {
                 message_id,
@@ -133,10 +136,12 @@ impl DomainEvent {
                 let message_id = parse_uuid(payload, "message_id")?;
                 let app_id = parse_uuid(payload, "app_id")?;
                 let event_type_id = parse_uuid(payload, "event_type_id")?;
+                let attempts_created = payload.get("attempts_created")?.as_u64()? as u32;
                 Some(DomainEvent::MessageCreated {
                     message_id: MessageId::from_uuid(message_id),
                     app_id: ApplicationId::from_uuid(app_id),
                     event_type_id: EventTypeId::from_uuid(event_type_id),
+                    attempts_created,
                 })
             }
             "dead_lettered" => {
@@ -221,6 +226,7 @@ mod tests {
             message_id: MessageId::new(),
             app_id: ApplicationId::new(),
             event_type_id: EventTypeId::new(),
+            attempts_created: 3,
         };
         let json = event.to_json();
         let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();

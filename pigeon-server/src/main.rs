@@ -41,6 +41,7 @@ use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrgH
 use pigeon_application::queries::list_organizations::ListOrganizationsHandler;
 use pigeon_application::commands::disable_endpoint::DisableEndpointHandler;
 use pigeon_application::services::auto_disable_saga::AutoDisableEndpointSaga;
+use pigeon_application::services::delivery_projection::DeliveryProjectionSubscriber;
 use pigeon_application::services::delivery_worker::{DeliveryWorkerConfig, DeliveryWorkerService};
 use pigeon_application::services::outbox_worker::{
     EventSubscriber, LogEventSubscriber, OutboxWorkerConfig, OutboxWorkerService,
@@ -49,7 +50,7 @@ use pigeon_infrastructure::http::ReqwestWebhookClient;
 use pigeon_infrastructure::persistence::{
     PgApplicationReadStore, PgDeliveryQueue, PgEndpointReadStore, PgEventOutbox,
     PgEventTypeReadStore, PgHealthChecker, PgOidcConfigReadStore, PgOrganizationReadStore,
-    PgUnitOfWorkFactory,
+    PgProjectionStore, PgUnitOfWorkFactory,
 };
 
 mod bootstrap;
@@ -225,6 +226,8 @@ fn create_outbox_worker(pool: &PgPool, config: &PigeonConfig) -> OutboxWorkerSer
     let delivery_queue = Arc::new(PgDeliveryQueue::new(pool.clone()));
     let uow_factory = Arc::new(PgUnitOfWorkFactory::new(pool.clone()));
 
+    let projection_store = Arc::new(PgProjectionStore::new(pool.clone()));
+
     let subscribers: Vec<Arc<dyn EventSubscriber>> = vec![
         Arc::new(LogEventSubscriber),
         Arc::new(AutoDisableEndpointSaga::new(
@@ -232,6 +235,7 @@ fn create_outbox_worker(pool: &PgPool, config: &PigeonConfig) -> OutboxWorkerSer
             DisableEndpointHandler::new(uow_factory),
             config.worker_auto_disable_threshold,
         )),
+        Arc::new(DeliveryProjectionSubscriber::new(projection_store)),
     ];
 
     let outbox_config = OutboxWorkerConfig {

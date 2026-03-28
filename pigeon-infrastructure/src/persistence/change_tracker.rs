@@ -184,10 +184,16 @@ impl ChangeTracker {
         for change in &self.changes {
             match change {
                 Change::InsertMessage(msg) => {
+                    let attempts_created = self
+                        .changes
+                        .iter()
+                        .filter(|c| matches!(c, Change::InsertAttempt(a) if a.message_id() == msg.id()))
+                        .count() as u32;
                     events.push(DomainEvent::MessageCreated {
                         message_id: msg.id().clone(),
                         app_id: msg.app_id().clone(),
                         event_type_id: msg.event_type_id().clone(),
+                        attempts_created,
                     });
                 }
                 Change::InsertDeadLetter(dl) => {
@@ -246,10 +252,48 @@ mod tests {
                 message_id,
                 app_id,
                 event_type_id,
+                attempts_created,
             } => {
                 assert_eq!(message_id, msg.id());
                 assert_eq!(app_id, msg.app_id());
                 assert_eq!(event_type_id, msg.event_type_id());
+                assert_eq!(*attempts_created, 0);
+            }
+            _ => panic!("expected MessageCreated"),
+        }
+    }
+
+    #[test]
+    fn insert_message_counts_associated_attempts() {
+        let mut tracker = ChangeTracker::new();
+        let msg = Message::new(
+            ApplicationId::new(),
+            EventTypeId::new(),
+            serde_json::json!({"test": true}),
+            None,
+            chrono::Duration::hours(1),
+        )
+        .unwrap();
+
+        let a1 = pigeon_domain::attempt::Attempt::new(
+            msg.id().clone(),
+            EndpointId::new(),
+            chrono::Utc::now(),
+        );
+        let a2 = pigeon_domain::attempt::Attempt::new(
+            msg.id().clone(),
+            EndpointId::new(),
+            chrono::Utc::now(),
+        );
+
+        tracker.record(Change::InsertMessage(msg.clone()));
+        tracker.record(Change::InsertAttempt(a1));
+        tracker.record(Change::InsertAttempt(a2));
+
+        let events = tracker.collect_events();
+        match &events[0] {
+            DomainEvent::MessageCreated { attempts_created, .. } => {
+                assert_eq!(*attempts_created, 2);
             }
             _ => panic!("expected MessageCreated"),
         }
@@ -397,7 +441,7 @@ mod tests {
             None,
         );
 
-        tracker.record(Change::InsertMessage(msg));
+        tracker.record(Change::InsertMessage(msg.clone()));
         tracker.record(Change::InsertDeadLetter(dl));
 
         let events = tracker.collect_events();

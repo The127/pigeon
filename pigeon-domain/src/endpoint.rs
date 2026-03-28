@@ -7,7 +7,7 @@ use crate::application::ApplicationId;
 use crate::event_type::EventTypeId;
 use crate::version::Version;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EndpointId(Uuid);
 
 impl Default for EndpointId {

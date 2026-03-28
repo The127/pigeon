@@ -56,8 +56,8 @@ Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurab
 
 ## Priority: Medium
 
-### Read Model Projections
-Outbox handlers build denormalized views — e.g., "last N deliveries per endpoint" materialized table, updated by `AttemptSucceeded`/`AttemptFailed` events. Avoids expensive aggregate queries.
+### ~~Read Model Projections~~
+`endpoint_delivery_summary` (success/failure counts, consecutive failures, last delivery) and `message_delivery_status` (attempts created, succeeded, failed, dead lettered). Maintained by `DeliveryProjectionSubscriber` via outbox events.
 
 ### ~~Auto-disable Failing Endpoints~~
 `AutoDisableEndpointSaga` — outbox event subscriber that listens for `DeadLettered`, queries consecutive failure count, disables endpoint via `DisableEndpoint` command when threshold reached. Configurable via `PIGEON_WORKER_AUTO_DISABLE_THRESHOLD` (default 5, 0 to disable).

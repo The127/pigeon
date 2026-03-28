@@ -35,3 +35,7 @@ harness = false
 [[test]]
 name = "auto_disable_bdd"
 harness = false
+
+[[test]]
+name = "delivery_projection_bdd"
+harness = false
