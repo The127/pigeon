@@ -24,6 +24,7 @@ use pigeon_application::commands::delete_organization::DeleteOrganizationHandler
 use pigeon_application::commands::replay_dead_letter::ReplayDeadLetterHandler;
 use pigeon_application::commands::retry_attempt::RetryAttemptHandler;
 use pigeon_application::commands::send_message::SendMessageHandler;
+use pigeon_application::commands::send_test_event::SendTestEventHandler;
 use pigeon_application::commands::update_application::UpdateApplicationHandler;
 use pigeon_application::commands::update_endpoint::UpdateEndpointHandler;
 use pigeon_application::commands::update_event_type::UpdateEventTypeHandler;
@@ -272,7 +273,7 @@ async fn run_api(
         update_event_type: Arc::new(UpdateEventTypeHandler::new(uow_factory.clone())),
         delete_event_type: Arc::new(DeleteEventTypeHandler::new(uow_factory.clone())),
         get_event_type: Arc::new(GetEventTypeByIdHandler::new(event_type_read_store.clone())),
-        list_event_types: Arc::new(ListEventTypesByAppHandler::new(event_type_read_store)),
+        list_event_types: Arc::new(ListEventTypesByAppHandler::new(event_type_read_store.clone())),
         create_endpoint: Arc::new(CreateEndpointHandler::new(uow_factory.clone())),
         update_endpoint: Arc::new(UpdateEndpointHandler::new(uow_factory.clone())),
         delete_endpoint: Arc::new(DeleteEndpointHandler::new(uow_factory.clone())),
@@ -298,6 +299,10 @@ async fn run_api(
         jwks_provider: Arc::new(CachedJwksProvider::new(jwks_cache_ttl)),
         replay_dead_letter: Arc::new(ReplayDeadLetterHandler::new(uow_factory.clone())),
         retry_attempt: Arc::new(RetryAttemptHandler::new(uow_factory.clone())),
+        send_test_event: Arc::new(SendTestEventHandler::new(
+            uow_factory.clone(),
+            event_type_read_store.clone(),
+        )),
         health_checker,
         metrics_render,
         admin_org_id,

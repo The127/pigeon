@@ -47,7 +47,7 @@ impl EventTypeStore for PgEventTypeStore {
 
         // Fall back to DB with org scoping via JOIN
         let row = sqlx::query_as::<_, EventTypeRow>(
-            "SELECT et.id, et.app_id, et.name, et.schema, et.created_at, et.xmin::text::bigint AS version \
+            "SELECT et.id, et.app_id, et.name, et.schema, et.system, et.created_at, et.xmin::text::bigint AS version \
              FROM event_types et \
              JOIN applications a ON a.id = et.app_id \
              WHERE et.id = $1 AND a.org_id = $2",
@@ -84,6 +84,7 @@ struct EventTypeRow {
     app_id: uuid::Uuid,
     name: String,
     schema: Option<serde_json::Value>,
+    system: bool,
     created_at: chrono::DateTime<chrono::Utc>,
     version: i64,
 }
@@ -95,6 +96,7 @@ impl EventTypeRow {
             app_id: ApplicationId::from_uuid(self.app_id),
             name: self.name,
             schema: self.schema,
+            system: self.system,
             created_at: self.created_at,
             version: Version::new(self.version as u64),
         })

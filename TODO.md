@@ -29,10 +29,10 @@ Periodic `DELETE FROM messages WHERE idempotency_expires_at <= now()` in the del
 ### ~~Manual Retry of Specific Attempt~~
 `POST /api/v1/applications/{app_id}/attempts/{id}/retry` — sets status back to pending with `next_attempt_at = now()`. Only works on failed attempts.
 
-## Priority: Medium
+### ~~Endpoint Test Event~~
+`POST /api/v1/applications/{app_id}/endpoints/{id}/test` — sends a synthetic `pigeon.test` message to a specific endpoint. System event type auto-created per application, hidden from list/get, undeletable.
 
-### Endpoint Test Event
-"Send a test event to this endpoint" — generates a synthetic message with a known payload and delivers immediately. Useful for onboarding and debugging. Similar to Svix's test event feature.
+## Priority: Medium
 
 ### Domain Event Dispatch
 `AggregateRoot` trait and `DomainEvent` enum exist but nothing collects or dispatches events. Wire up event collection on entity mutations, dispatch after successful UoW commit. First use case: `DeadLettered` event.

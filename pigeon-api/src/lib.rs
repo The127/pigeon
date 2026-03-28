@@ -127,6 +127,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/{app_id}/attempts/{id}/retry",
             post(handlers::attempts::retry),
+        )
+        .route(
+            "/{app_id}/endpoints/{id}/test",
+            post(handlers::test_event::send_test_event),
         );
 
     // API routes protected by JWT auth middleware
@@ -228,6 +232,10 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
         .route(
             "/{app_id}/attempts/{id}/retry",
             post(handlers::attempts::retry),
+        )
+        .route(
+            "/{app_id}/endpoints/{id}/test",
+            post(handlers::test_event::send_test_event),
         );
 
     let api_routes = Router::new()

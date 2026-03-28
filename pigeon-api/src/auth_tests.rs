@@ -93,6 +93,15 @@ impl CommandHandler<pigeon_application::commands::retry_attempt::RetryAttempt> f
     }
 }
 #[async_trait]
+impl CommandHandler<pigeon_application::commands::send_test_event::SendTestEvent> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::commands::send_test_event::SendTestEvent,
+    ) -> Result<pigeon_application::commands::send_test_event::SendTestEventResult, ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
 impl QueryHandler<GetApplicationById> for S {
     async fn handle(&self, _: GetApplicationById) -> Result<Option<Application>, ApplicationError> {
         unimplemented!()
@@ -282,6 +291,7 @@ fn test_state() -> AppState {
         jwks_provider: Arc::new(StubJwksProvider),
         replay_dead_letter: Arc::new(S),
         retry_attempt: Arc::new(S),
+        send_test_event: Arc::new(S),
         metrics_render: Arc::new(|| String::new()),
         admin_org_id: None,
     }

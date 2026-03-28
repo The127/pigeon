@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::application::Application;
+use pigeon_domain::event_type::{EventType, TEST_EVENT_TYPE_NAME};
 use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
@@ -40,8 +41,12 @@ impl CommandHandler<CreateApplication> for CreateApplicationHandler {
         let app = Application::new(command.org_id, command.name, command.uid)
             .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
+        let test_event_type =
+            EventType::new_system(app.id().clone(), TEST_EVENT_TYPE_NAME.to_string());
+
         let mut uow = self.uow_factory.begin().await?;
         uow.application_store().insert(&app).await?;
+        uow.event_type_store().insert(&test_event_type).await?;
         uow.commit().await?;
 
         Ok(app)
@@ -78,6 +83,7 @@ mod tests {
             vec![
                 "uow_factory:begin",
                 "application_store:insert",
+                "event_type_store:insert",
                 "uow:commit",
             ]
         );

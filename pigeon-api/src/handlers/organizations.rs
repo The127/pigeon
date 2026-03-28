@@ -526,6 +526,7 @@ mod tests {
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),
+            send_test_event: Arc::new(StubSendTestEventHandler),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

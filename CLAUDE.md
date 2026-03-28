@@ -83,6 +83,7 @@ Organization (tenant)
 - `DELETE /api/v1/applications/{app_id}/endpoints/{id}` — delete endpoint
 - `POST /api/v1/applications/{app_id}/dead-letters/{id}/replay` — replay dead letter
 - `POST /api/v1/applications/{app_id}/attempts/{id}/retry` — retry failed attempt
+- `POST /api/v1/applications/{app_id}/endpoints/{id}/test` — send test event
 
 ### Admin API (JWT auth, bootstrap org only)
 - `POST /admin/v1/organizations` — create organization

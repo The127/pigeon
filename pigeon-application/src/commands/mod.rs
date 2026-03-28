@@ -11,6 +11,7 @@ pub mod delete_organization;
 pub mod replay_dead_letter;
 pub mod retry_attempt;
 pub mod send_message;
+pub mod send_test_event;
 pub mod update_application;
 pub mod update_endpoint;
 pub mod update_event_type;

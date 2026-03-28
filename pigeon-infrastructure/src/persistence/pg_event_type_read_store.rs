@@ -25,12 +25,34 @@ impl EventTypeReadStore for PgEventTypeReadStore {
         org_id: &OrganizationId,
     ) -> Result<Option<EventType>, ApplicationError> {
         let row = sqlx::query_as::<_, EventTypeRow>(
-            "SELECT et.id, et.app_id, et.name, et.schema, et.created_at, et.xmin::text::bigint AS version \
+            "SELECT et.id, et.app_id, et.name, et.schema, et.system, et.created_at, et.xmin::text::bigint AS version \
              FROM event_types et \
              JOIN applications a ON a.id = et.app_id \
-             WHERE et.id = $1 AND a.org_id = $2",
+             WHERE et.id = $1 AND a.org_id = $2 AND et.system = false",
         )
         .bind(id.as_uuid())
+        .bind(org_id.as_uuid())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        Ok(row.map(|r| r.into_event_type()))
+    }
+
+    async fn find_by_app_and_name(
+        &self,
+        app_id: &ApplicationId,
+        name: &str,
+        org_id: &OrganizationId,
+    ) -> Result<Option<EventType>, ApplicationError> {
+        let row = sqlx::query_as::<_, EventTypeRow>(
+            "SELECT et.id, et.app_id, et.name, et.schema, et.system, et.created_at, et.xmin::text::bigint AS version \
+             FROM event_types et \
+             JOIN applications a ON a.id = et.app_id \
+             WHERE et.app_id = $1 AND et.name = $2 AND a.org_id = $3",
+        )
+        .bind(app_id.as_uuid())
+        .bind(name)
         .bind(org_id.as_uuid())
         .fetch_optional(&self.pool)
         .await
@@ -47,10 +69,10 @@ impl EventTypeReadStore for PgEventTypeReadStore {
         limit: u64,
     ) -> Result<Vec<EventType>, ApplicationError> {
         let rows = sqlx::query_as::<_, EventTypeRow>(
-            "SELECT et.id, et.app_id, et.name, et.schema, et.created_at, et.xmin::text::bigint AS version \
+            "SELECT et.id, et.app_id, et.name, et.schema, et.system, et.created_at, et.xmin::text::bigint AS version \
              FROM event_types et \
              JOIN applications a ON a.id = et.app_id \
-             WHERE et.app_id = $1 AND a.org_id = $2 \
+             WHERE et.app_id = $1 AND a.org_id = $2 AND et.system = false \
              ORDER BY et.created_at DESC \
              LIMIT $3 OFFSET $4",
         )
@@ -74,7 +96,7 @@ impl EventTypeReadStore for PgEventTypeReadStore {
             sqlx::query_as(
                 "SELECT COUNT(*) FROM event_types et \
                  JOIN applications a ON a.id = et.app_id \
-                 WHERE et.app_id = $1 AND a.org_id = $2",
+                 WHERE et.app_id = $1 AND a.org_id = $2 AND et.system = false",
             )
                 .bind(app_id.as_uuid())
                 .bind(org_id.as_uuid())
@@ -92,6 +114,7 @@ struct EventTypeRow {
     app_id: uuid::Uuid,
     name: String,
     schema: Option<serde_json::Value>,
+    system: bool,
     created_at: chrono::DateTime<chrono::Utc>,
     version: i64,
 }
@@ -103,6 +126,7 @@ impl EventTypeRow {
             app_id: ApplicationId::from_uuid(self.app_id),
             name: self.name,
             schema: self.schema,
+            system: self.system,
             created_at: self.created_at,
             version: Version::new(self.version as u64),
         })

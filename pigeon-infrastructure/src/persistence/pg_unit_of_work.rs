@@ -112,13 +112,14 @@ impl UnitOfWork for PgUnitOfWork {
                 }
                 Change::InsertEventType(et) => {
                     sqlx::query(
-                        "INSERT INTO event_types (id, app_id, name, schema, created_at) \
-                         VALUES ($1, $2, $3, $4, $5)",
+                        "INSERT INTO event_types (id, app_id, name, schema, system, created_at) \
+                         VALUES ($1, $2, $3, $4, $5, $6)",
                     )
                     .bind(et.id().as_uuid())
                     .bind(et.app_id().as_uuid())
                     .bind(et.name())
                     .bind(et.schema())
+                    .bind(et.system())
                     .bind(et.created_at())
                     .execute(&mut *tx)
                     .await

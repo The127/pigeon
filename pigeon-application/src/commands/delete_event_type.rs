@@ -41,10 +41,13 @@ impl CommandHandler<DeleteEventType> for DeleteEventTypeHandler {
         let existing = uow
             .event_type_store()
             .find_by_id(&command.id, &command.org_id)
-            .await?;
+            .await?
+            .ok_or(ApplicationError::NotFound)?;
 
-        if existing.is_none() {
-            return Err(ApplicationError::NotFound);
+        if existing.system() {
+            return Err(ApplicationError::Validation(
+                "System event types cannot be deleted".to_string(),
+            ));
         }
 
         uow.event_type_store().delete(&command.id).await?;

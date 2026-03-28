@@ -8,6 +8,7 @@ pub mod messages;
 pub mod metrics;
 pub(crate) mod oidc_configs;
 pub mod organizations;
+pub mod test_event;
 
 use pigeon_application::error::ApplicationError;
 use pigeon_application::ports::stores::ApplicationReadStore;

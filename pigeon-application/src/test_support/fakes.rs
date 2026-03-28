@@ -264,6 +264,21 @@ impl EventTypeReadStore for FakeEventTypeReadStore {
         Ok(ets.iter().find(|et| et.id() == id).cloned())
     }
 
+    async fn find_by_app_and_name(
+        &self,
+        app_id: &ApplicationId,
+        name: &str,
+        _org_id: &OrganizationId,
+    ) -> Result<Option<EventType>, ApplicationError> {
+        self.log
+            .record("event_type_read_store:find_by_app_and_name");
+        let ets = self.data.event_types.lock().unwrap();
+        Ok(ets
+            .iter()
+            .find(|et| et.app_id() == app_id && et.name() == name)
+            .cloned())
+    }
+
     async fn list_by_app(
         &self,
         app_id: &ApplicationId,

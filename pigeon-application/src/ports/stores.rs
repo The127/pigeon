@@ -138,6 +138,12 @@ pub trait EventTypeReadStore: Send + Sync {
         id: &EventTypeId,
         org_id: &OrganizationId,
     ) -> Result<Option<EventType>, ApplicationError>;
+    async fn find_by_app_and_name(
+        &self,
+        app_id: &ApplicationId,
+        name: &str,
+        org_id: &OrganizationId,
+    ) -> Result<Option<EventType>, ApplicationError>;
     async fn list_by_app(
         &self,
         app_id: &ApplicationId,

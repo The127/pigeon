@@ -36,9 +36,12 @@ pub struct EventType {
     app_id: ApplicationId,
     name: String,
     schema: Option<Value>,
+    system: bool,
     created_at: DateTime<Utc>,
     version: Version,
 }
+
+pub const TEST_EVENT_TYPE_NAME: &str = "pigeon.test";
 
 #[derive(Debug, thiserror::Error)]
 pub enum EventTypeError {
@@ -61,9 +64,22 @@ impl EventType {
             app_id,
             name,
             schema,
+            system: false,
             created_at: Utc::now(),
             version: Version::new(0),
         })
+    }
+
+    pub fn new_system(app_id: ApplicationId, name: String) -> Self {
+        Self {
+            id: EventTypeId::new(),
+            app_id,
+            name,
+            schema: None,
+            system: true,
+            created_at: Utc::now(),
+            version: Version::new(0),
+        }
     }
 
     pub fn id(&self) -> &EventTypeId {
@@ -84,6 +100,10 @@ impl EventType {
 
     pub fn created_at(&self) -> &DateTime<Utc> {
         &self.created_at
+    }
+
+    pub fn system(&self) -> bool {
+        self.system
     }
 
     pub fn version(&self) -> Version {
@@ -167,6 +187,7 @@ mod tests {
             app_id: state.app_id.clone(),
             name: state.name.clone(),
             schema: state.schema.clone(),
+            system: state.system,
             created_at: state.created_at,
             version: state.version,
         });
@@ -175,6 +196,7 @@ mod tests {
         assert_eq!(*et.app_id(), state.app_id);
         assert_eq!(et.name(), state.name);
         assert_eq!(et.schema(), state.schema.as_ref());
+        assert_eq!(et.system(), state.system);
         assert_eq!(*et.created_at(), state.created_at);
         assert_eq!(et.version(), state.version);
     }

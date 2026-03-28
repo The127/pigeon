@@ -35,6 +35,7 @@ impl EventTypeState {
             app_id: ApplicationId::new(),
             name: format!("event.{}", Uuid::new_v4()),
             schema: None,
+            system: false,
             created_at: chrono::Utc::now(),
             version: Version::new(0),
         }
