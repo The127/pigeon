@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+    "pigeon-macros",
+    "pigeon-domain",
+    "pigeon-application",
+    "pigeon-infrastructure",
+    "pigeon-api",
+    "pigeon-server",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"

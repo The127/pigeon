@@ -1,0 +1,32 @@
+[package]
+name = "pigeon-application"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+mockall = { version = "0.13", optional = true }
+pigeon-domain = { path = "../pigeon-domain" }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["sync", "time", "macros"] }
+tracing = "0.1"
+
+[features]
+test-support = ["pigeon-domain/test-support", "mockall"]
+
+[dev-dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+pigeon-application = { path = ".", features = ["test-support"] }
+cucumber = "0.21"
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt", "rt-multi-thread"] }
+
+[[test]]
+name = "bdd"
+harness = false
+
+[[test]]
+name = "delivery_worker_bdd"
+harness = false

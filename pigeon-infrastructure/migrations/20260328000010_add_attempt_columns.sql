@@ -1,0 +1,2 @@
+ALTER TABLE attempts ADD COLUMN attempt_number INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE attempts ADD COLUMN duration_ms BIGINT;

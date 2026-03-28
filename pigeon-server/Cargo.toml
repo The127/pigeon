@@ -1,0 +1,23 @@
+[package]
+name = "pigeon-server"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+pigeon-domain = { path = "../pigeon-domain" }
+pigeon-application = { path = "../pigeon-application" }
+pigeon-infrastructure = { path = "../pigeon-infrastructure" }
+pigeon-api = { path = "../pigeon-api" }
+anyhow = "1"
+axum = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+clap = { version = "4", features = ["derive"] }
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "migrate"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+pigeon-application = { path = "../pigeon-application", features = ["test-support"] }
+pigeon-domain = { path = "../pigeon-domain", features = ["test-support"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

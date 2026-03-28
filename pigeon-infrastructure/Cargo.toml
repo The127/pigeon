@@ -1,0 +1,26 @@
+[package]
+name = "pigeon-infrastructure"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+hex = "0.4"
+hmac = "0.12"
+pigeon-application = { path = "../pigeon-application" }
+pigeon-domain = { path = "../pigeon-domain" }
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+serde_json = "1"
+sha2 = "0.10"
+sqlx = { version = "0.8", features = ["runtime-tokio", "tls-rustls", "postgres", "uuid", "chrono", "json"] }
+tokio = { version = "1", features = ["time"] }
+uuid = { version = "1", features = ["v4"] }
+
+[dev-dependencies]
+mockall = "0.13"
+mockito = "1"
+serde_json = "1"
+testcontainers = "0.23"
+testcontainers-modules = { version = "0.11", features = ["postgres"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }

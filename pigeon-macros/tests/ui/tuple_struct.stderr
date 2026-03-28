@@ -1,0 +1,5 @@
+error: Reconstitute only supports structs with named fields, not tuple structs
+ --> tests/ui/tuple_struct.rs:4:12
+  |
+4 | pub struct BadTuple(u64, String);
+  |            ^^^^^^^^

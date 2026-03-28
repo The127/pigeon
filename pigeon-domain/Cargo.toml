@@ -1,0 +1,15 @@
+[package]
+name = "pigeon-domain"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+pigeon-macros = { path = "../pigeon-macros" }
+fake = { version = "3", features = ["derive", "chrono", "uuid"], optional = true }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4"] }
+
+[features]
+test-support = ["fake"]

@@ -1,0 +1,65 @@
+use std::sync::Arc;
+
+use pigeon_application::commands::create_application::CreateApplication;
+use pigeon_application::commands::create_endpoint::CreateEndpoint;
+use pigeon_application::commands::create_event_type::CreateEventType;
+use pigeon_application::commands::create_oidc_config::CreateOidcConfig;
+use pigeon_application::commands::create_organization::CreateOrganization;
+use pigeon_application::commands::delete_application::DeleteApplication;
+use pigeon_application::commands::delete_endpoint::DeleteEndpoint;
+use pigeon_application::commands::delete_event_type::DeleteEventType;
+use pigeon_application::commands::delete_oidc_config::DeleteOidcConfig;
+use pigeon_application::commands::delete_organization::DeleteOrganization;
+use pigeon_application::commands::send_message::SendMessage;
+use pigeon_application::commands::update_application::UpdateApplication;
+use pigeon_application::commands::update_endpoint::UpdateEndpoint;
+use pigeon_application::commands::update_event_type::UpdateEventType;
+use pigeon_application::commands::update_organization::UpdateOrganization;
+use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
+use pigeon_application::ports::health::HealthChecker;
+use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore};
+use pigeon_application::queries::get_application_by_id::GetApplicationById;
+use pigeon_application::queries::get_endpoint_by_id::GetEndpointById;
+use pigeon_application::queries::get_event_type_by_id::GetEventTypeById;
+use pigeon_application::queries::get_oidc_config_by_id::GetOidcConfigById;
+use pigeon_application::queries::get_organization_by_id::GetOrganizationById;
+use pigeon_application::queries::list_applications::ListApplications;
+use pigeon_application::queries::list_endpoints_by_app::ListEndpointsByApp;
+use pigeon_application::queries::list_event_types_by_app::ListEventTypesByApp;
+use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrg;
+use pigeon_application::queries::list_organizations::ListOrganizations;
+
+use crate::auth::JwksProvider;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub create_application: Arc<dyn CommandHandler<CreateApplication>>,
+    pub update_application: Arc<dyn CommandHandler<UpdateApplication>>,
+    pub delete_application: Arc<dyn CommandHandler<DeleteApplication>>,
+    pub send_message: Arc<dyn CommandHandler<SendMessage>>,
+    pub get_application: Arc<dyn QueryHandler<GetApplicationById>>,
+    pub list_applications: Arc<dyn QueryHandler<ListApplications>>,
+    pub create_event_type: Arc<dyn CommandHandler<CreateEventType>>,
+    pub update_event_type: Arc<dyn CommandHandler<UpdateEventType>>,
+    pub delete_event_type: Arc<dyn CommandHandler<DeleteEventType>>,
+    pub get_event_type: Arc<dyn QueryHandler<GetEventTypeById>>,
+    pub list_event_types: Arc<dyn QueryHandler<ListEventTypesByApp>>,
+    pub create_endpoint: Arc<dyn CommandHandler<CreateEndpoint>>,
+    pub update_endpoint: Arc<dyn CommandHandler<UpdateEndpoint>>,
+    pub delete_endpoint: Arc<dyn CommandHandler<DeleteEndpoint>>,
+    pub get_endpoint: Arc<dyn QueryHandler<GetEndpointById>>,
+    pub list_endpoints: Arc<dyn QueryHandler<ListEndpointsByApp>>,
+    pub health_checker: Arc<dyn HealthChecker>,
+    pub create_organization: Arc<dyn CommandHandler<CreateOrganization>>,
+    pub update_organization: Arc<dyn CommandHandler<UpdateOrganization>>,
+    pub delete_organization: Arc<dyn CommandHandler<DeleteOrganization>>,
+    pub get_organization: Arc<dyn QueryHandler<GetOrganizationById>>,
+    pub list_organizations: Arc<dyn QueryHandler<ListOrganizations>>,
+    pub create_oidc_config: Arc<dyn CommandHandler<CreateOidcConfig>>,
+    pub delete_oidc_config: Arc<dyn CommandHandler<DeleteOidcConfig>>,
+    pub get_oidc_config: Arc<dyn QueryHandler<GetOidcConfigById>>,
+    pub list_oidc_configs: Arc<dyn QueryHandler<ListOidcConfigsByOrg>>,
+    pub oidc_config_read_store: Arc<dyn OidcConfigReadStore>,
+    pub app_read_store: Arc<dyn ApplicationReadStore>,
+    pub jwks_provider: Arc<dyn JwksProvider>,
+}
