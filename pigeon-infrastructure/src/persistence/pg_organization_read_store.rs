@@ -33,6 +33,22 @@ impl OrganizationReadStore for PgOrganizationReadStore {
         Ok(row.map(|r| r.into_organization()))
     }
 
+    async fn find_by_slug(
+        &self,
+        slug: &str,
+    ) -> Result<Option<Organization>, ApplicationError> {
+        let row = sqlx::query_as::<_, OrganizationRow>(
+            "SELECT id, name, slug, created_at, xmin::text::bigint AS version \
+             FROM organizations WHERE slug = $1",
+        )
+        .bind(slug)
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        Ok(row.map(|r| r.into_organization()))
+    }
+
     async fn list(
         &self,
         offset: u64,

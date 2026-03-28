@@ -78,6 +78,13 @@ pub trait DeliveryQueue: Send + Sync {
         last_response_code: Option<u16>,
         last_response_body: Option<String>,
     ) -> Result<(), ApplicationError>;
+
+    /// Delete messages whose idempotency keys have expired.
+    /// Returns the number of expired messages removed.
+    async fn expire_idempotency_keys(
+        &self,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<u64, ApplicationError>;
 }
 
 /// Port for HTTP webhook delivery.

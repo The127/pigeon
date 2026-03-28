@@ -8,6 +8,7 @@ pub mod delete_endpoint;
 pub mod delete_event_type;
 pub mod delete_oidc_config;
 pub mod delete_organization;
+pub mod replay_dead_letter;
 pub mod send_message;
 pub mod update_application;
 pub mod update_endpoint;

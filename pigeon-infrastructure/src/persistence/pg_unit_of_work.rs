@@ -9,6 +9,7 @@ use sqlx::PgPool;
 use super::change_tracker::{Change, ChangeTracker};
 use super::pg_application_store::PgApplicationStore;
 use super::pg_attempt_store::PgAttemptStore;
+use super::pg_dead_letter_store::PgDeadLetterStore;
 use super::pg_endpoint_store::PgEndpointStore;
 use super::pg_event_type_store::PgEventTypeStore;
 use super::pg_message_store::PgMessageStore;
@@ -23,6 +24,7 @@ pub(crate) struct PgUnitOfWork {
     endpoint_store: PgEndpointStore,
     message_store: PgMessageStore,
     attempt_store: PgAttemptStore,
+    dead_letter_store: PgDeadLetterStore,
     organization_store: PgOrganizationStore,
     oidc_config_store: PgOidcConfigStore,
 }
@@ -35,6 +37,7 @@ impl PgUnitOfWork {
         let endpoint_store = PgEndpointStore::new(pool.clone(), Arc::clone(&tracker));
         let message_store = PgMessageStore::new(pool.clone(), Arc::clone(&tracker));
         let attempt_store = PgAttemptStore::new(Arc::clone(&tracker));
+        let dead_letter_store = PgDeadLetterStore::new(pool.clone(), Arc::clone(&tracker));
         let organization_store = PgOrganizationStore::new(pool.clone(), Arc::clone(&tracker));
         let oidc_config_store = PgOidcConfigStore::new(pool.clone(), Arc::clone(&tracker));
         Self {
@@ -45,6 +48,7 @@ impl PgUnitOfWork {
             endpoint_store,
             message_store,
             attempt_store,
+            dead_letter_store,
             organization_store,
             oidc_config_store,
         }
@@ -321,6 +325,40 @@ impl UnitOfWork for PgUnitOfWork {
                     .await
                     .map_err(|e| ApplicationError::UnitOfWork(e.to_string()))?;
                 }
+                Change::InsertDeadLetter(dl) => {
+                    sqlx::query(
+                        "INSERT INTO dead_letters \
+                         (id, message_id, endpoint_id, app_id, last_response_code, \
+                          last_response_body, dead_lettered_at) \
+                         VALUES ($1, $2, $3, $4, $5, $6, $7)",
+                    )
+                    .bind(dl.id().as_uuid())
+                    .bind(dl.message_id().as_uuid())
+                    .bind(dl.endpoint_id().as_uuid())
+                    .bind(dl.app_id().as_uuid())
+                    .bind(dl.last_response_code().map(|c| c as i16))
+                    .bind(dl.last_response_body())
+                    .bind(dl.dead_lettered_at())
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| ApplicationError::UnitOfWork(e.to_string()))?;
+                }
+                Change::SaveDeadLetter(dl) => {
+                    let rows = sqlx::query(
+                        "UPDATE dead_letters SET replayed_at = $2 \
+                         WHERE id = $1 AND xmin::text::bigint = $3",
+                    )
+                    .bind(dl.id().as_uuid())
+                    .bind(dl.replayed_at())
+                    .bind(dl.version().as_u64() as i64)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| ApplicationError::UnitOfWork(e.to_string()))?;
+
+                    if rows.rows_affected() == 0 {
+                        return Err(ApplicationError::Conflict);
+                    }
+                }
             }
         }
 
@@ -353,7 +391,7 @@ impl UnitOfWork for PgUnitOfWork {
     }
 
     fn dead_letter_store(&mut self) -> &mut dyn DeadLetterStore {
-        todo!("DeadLetterStore not yet implemented")
+        &mut self.dead_letter_store
     }
 
     fn endpoint_store(&mut self) -> &mut dyn EndpointStore {

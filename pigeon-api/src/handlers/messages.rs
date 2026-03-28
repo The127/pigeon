@@ -47,6 +47,13 @@ pub async fn send_message(
 
     let result = state.send_message.handle(command).await.map_err(ApiError)?;
     let was_duplicate = result.was_duplicate;
+
+    if was_duplicate {
+        metrics::counter!("pigeon_messages_total", "status" => "duplicate").increment(1);
+    } else {
+        metrics::counter!("pigeon_messages_total", "status" => "new").increment(1);
+    }
+
     let response = SendMessageResponse::from(result);
 
     let status = if was_duplicate {
@@ -356,6 +363,9 @@ mod tests {
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             app_read_store,
             jwks_provider: Arc::new(StubJwksProvider),
+            replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
+            metrics_render: Arc::new(|| String::new()),
+            admin_org_id: None,
         }
     }
 

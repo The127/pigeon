@@ -1,8 +1,10 @@
 pub mod applications;
+pub mod dead_letters;
 pub mod endpoints;
 pub mod event_types;
 pub mod health;
 pub mod messages;
+pub mod metrics;
 pub(crate) mod oidc_configs;
 pub mod organizations;
 

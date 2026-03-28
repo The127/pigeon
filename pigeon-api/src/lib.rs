@@ -3,6 +3,7 @@ pub mod dto;
 pub mod error;
 pub mod extractors;
 pub mod handlers;
+pub mod middleware;
 pub mod state;
 
 #[cfg(test)]
@@ -118,7 +119,11 @@ pub fn router(state: AppState) -> Router {
                 .put(endpoints::update_endpoint)
                 .delete(endpoints::delete_endpoint),
         )
-        .route("/{app_id}/messages", post(messages::send_message));
+        .route("/{app_id}/messages", post(messages::send_message))
+        .route(
+            "/{app_id}/dead-letters/{id}/replay",
+            post(handlers::dead_letters::replay),
+        );
 
     // API routes protected by JWT auth middleware
     let api_routes = Router::new()
@@ -128,8 +133,6 @@ pub fn router(state: AppState) -> Router {
             auth::auth_middleware,
         ));
 
-    // Admin routes for organizations (no auth for now)
-    // TODO: Add admin route authentication
     let org_routes = Router::new()
         .route(
             "/",
@@ -142,8 +145,6 @@ pub fn router(state: AppState) -> Router {
                 .delete(organizations::delete_organization),
         );
 
-    // Admin routes for OIDC configs (no auth for now)
-    // TODO: Add admin route authentication
     let oidc_config_routes = Router::new()
         .route(
             "/",
@@ -154,13 +155,31 @@ pub fn router(state: AppState) -> Router {
             get(oidc_configs::get_oidc_config).delete(oidc_configs::delete_oidc_config),
         );
 
+    // Admin routes: JWT auth + bootstrap org restriction.
+    // Layers execute bottom-to-top: JWT auth runs first, then org check.
+    let admin_routes = Router::new()
+        .nest("/admin/v1/organizations", org_routes)
+        .nest(
+            "/admin/v1/organizations/{org_id}/oidc-configs",
+            oidc_config_routes,
+        )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth::admin_org_middleware,
+        ))
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            auth::auth_middleware,
+        ));
+
     Router::new()
         .merge(api_routes)
-        .nest("/admin/v1/organizations", org_routes)
-        .nest("/admin/v1/organizations/{org_id}/oidc-configs", oidc_config_routes)
+        .merge(admin_routes)
         .route("/api/openapi.json", get(|| async { axum::Json(ApiDoc::openapi()) }))
         .route("/health", get(health::liveness))
         .route("/health/ready", get(health::readiness))
+        .route("/metrics", get(handlers::metrics::render))
+        .layer(axum::middleware::from_fn(middleware::request_id))
         .with_state(state)
 }
 
@@ -197,7 +216,11 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
                 .put(endpoints::update_endpoint)
                 .delete(endpoints::delete_endpoint),
         )
-        .route("/{app_id}/messages", post(messages::send_message));
+        .route("/{app_id}/messages", post(messages::send_message))
+        .route(
+            "/{app_id}/dead-letters/{id}/replay",
+            post(handlers::dead_letters::replay),
+        );
 
     let api_routes = Router::new()
         .nest("/api/v1/applications", app_routes)
@@ -234,5 +257,7 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
         .route("/api/openapi.json", get(|| async { axum::Json(ApiDoc::openapi()) }))
         .route("/health", get(health::liveness))
         .route("/health/ready", get(health::readiness))
+        .route("/metrics", get(handlers::metrics::render))
+        .layer(axum::middleware::from_fn(middleware::request_id))
         .with_state(state)
 }

@@ -1,5 +1,6 @@
 use pigeon_domain::application::{Application, ApplicationId};
 use pigeon_domain::attempt::Attempt;
+use pigeon_domain::dead_letter::DeadLetter;
 use pigeon_domain::endpoint::{Endpoint, EndpointId};
 use pigeon_domain::event_type::{EventType, EventTypeId};
 use pigeon_domain::message::Message;
@@ -18,6 +19,8 @@ pub(crate) enum Change {
     DeleteEndpoint(EndpointId),
     InsertMessage(Message),
     InsertAttempt(Attempt),
+    InsertDeadLetter(DeadLetter),
+    SaveDeadLetter(DeadLetter),
     InsertOrganization(Organization),
     SaveOrganization(Organization),
     DeleteOrganization(OrganizationId),

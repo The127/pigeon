@@ -3,9 +3,11 @@ use std::sync::Arc;
 use anyhow::Context;
 use chrono::Duration;
 use clap::{Parser, Subcommand};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use sqlx::PgPool;
 use tokio::sync::watch;
-use tracing::info;
+use pigeon_application::ports::stores::OrganizationReadStore;
+use tracing::{info, warn};
 
 use pigeon_api::auth::CachedJwksProvider;
 use pigeon_api::state::AppState;
@@ -19,6 +21,7 @@ use pigeon_application::commands::delete_endpoint::DeleteEndpointHandler;
 use pigeon_application::commands::delete_event_type::DeleteEventTypeHandler;
 use pigeon_application::commands::delete_oidc_config::DeleteOidcConfigHandler;
 use pigeon_application::commands::delete_organization::DeleteOrganizationHandler;
+use pigeon_application::commands::replay_dead_letter::ReplayDeadLetterHandler;
 use pigeon_application::commands::send_message::SendMessageHandler;
 use pigeon_application::commands::update_application::UpdateApplicationHandler;
 use pigeon_application::commands::update_endpoint::UpdateEndpointHandler;
@@ -78,11 +81,21 @@ async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
     let config = PigeonConfig::from_env()?;
 
+    // Install Prometheus metrics recorder (global, used by all crates via metrics facade)
+    let prometheus_handle = PrometheusBuilder::new()
+        .install_recorder()
+        .context("Failed to install Prometheus metrics recorder")?;
+    let metrics_render: Arc<dyn Fn() -> String + Send + Sync> = {
+        let handle = prometheus_handle;
+        Arc::new(move || handle.render())
+    };
+
     match cli.command {
         Commands::Serve => {
             let pool = create_pool(&config).await?;
             run_migrations(&pool).await?;
             run_bootstrap(&pool, &config).await?;
+            let admin_org_id = resolve_admin_org(&pool, &config).await?;
 
             let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
@@ -90,9 +103,10 @@ async fn main() -> anyhow::Result<()> {
             let api_config = config.listen_addr.clone();
             let jwks_ttl = config.jwks_cache_ttl;
             let api_shutdown_rx = shutdown_rx.clone();
+            let api_metrics = metrics_render.clone();
 
             let api_handle = tokio::spawn(async move {
-                run_api(api_pool, &api_config, jwks_ttl, api_shutdown_rx).await
+                run_api(api_pool, &api_config, jwks_ttl, admin_org_id, api_shutdown_rx, api_metrics).await
             });
 
             let worker = create_worker(&pool, &config);
@@ -113,8 +127,10 @@ async fn main() -> anyhow::Result<()> {
 
             let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
+            let admin_org_id = resolve_admin_org(&pool, &config).await?;
+
             let api_handle = tokio::spawn(async move {
-                run_api(pool, &config.listen_addr, config.jwks_cache_ttl, shutdown_rx).await
+                run_api(pool, &config.listen_addr, config.jwks_cache_ttl, admin_org_id, shutdown_rx, metrics_render).await
             });
 
             tokio::signal::ctrl_c()
@@ -182,16 +198,53 @@ fn create_worker(pool: &PgPool, config: &PigeonConfig) -> DeliveryWorkerService 
         max_retries: config.worker_max_retries,
         backoff_base_secs: config.worker_backoff_base_secs,
         max_backoff_secs: config.worker_max_backoff_secs,
+        cleanup_interval: std::time::Duration::from_secs(config.worker_cleanup_interval_secs),
     };
 
     DeliveryWorkerService::new(queue, http_client, worker_config)
+}
+
+/// Look up the bootstrap organization by slug if bootstrap is enabled.
+async fn resolve_admin_org(
+    pool: &PgPool,
+    config: &PigeonConfig,
+) -> anyhow::Result<Option<pigeon_domain::organization::OrganizationId>> {
+    if !config.bootstrap_org_enabled {
+        return Ok(None);
+    }
+
+    let org_read_store = PgOrganizationReadStore::new(pool.clone());
+    let org = org_read_store
+        .find_by_slug(&config.bootstrap_org_slug)
+        .await
+        .map_err(|e| anyhow::anyhow!("Failed to look up admin org: {e}"))?;
+
+    match org {
+        Some(o) => {
+            info!(
+                org_id = %o.id().as_uuid(),
+                slug = %o.slug(),
+                "Admin org resolved"
+            );
+            Ok(Some(o.id().clone()))
+        }
+        None => {
+            warn!(
+                slug = %config.bootstrap_org_slug,
+                "Bootstrap org slug configured but org not found — admin API will be disabled"
+            );
+            Ok(None)
+        }
+    }
 }
 
 async fn run_api(
     pool: PgPool,
     listen_addr: &str,
     jwks_cache_ttl: std::time::Duration,
+    admin_org_id: Option<pigeon_domain::organization::OrganizationId>,
     mut shutdown: watch::Receiver<bool>,
+    metrics_render: Arc<dyn Fn() -> String + Send + Sync>,
 ) -> anyhow::Result<()> {
     let uow_factory = Arc::new(PgUnitOfWorkFactory::new(pool.clone()));
     let read_store = Arc::new(PgApplicationReadStore::new(pool.clone()));
@@ -232,7 +285,7 @@ async fn run_api(
         )),
         list_organizations: Arc::new(ListOrganizationsHandler::new(organization_read_store)),
         create_oidc_config: Arc::new(CreateOidcConfigHandler::new(uow_factory.clone())),
-        delete_oidc_config: Arc::new(DeleteOidcConfigHandler::new(uow_factory)),
+        delete_oidc_config: Arc::new(DeleteOidcConfigHandler::new(uow_factory.clone())),
         get_oidc_config: Arc::new(GetOidcConfigByIdHandler::new(
             oidc_config_read_store.clone(),
         )),
@@ -242,7 +295,10 @@ async fn run_api(
         oidc_config_read_store,
         app_read_store: read_store.clone(),
         jwks_provider: Arc::new(CachedJwksProvider::new(jwks_cache_ttl)),
+        replay_dead_letter: Arc::new(ReplayDeadLetterHandler::new(uow_factory.clone())),
         health_checker,
+        metrics_render,
+        admin_org_id,
     };
 
     let router = pigeon_api::router(state);

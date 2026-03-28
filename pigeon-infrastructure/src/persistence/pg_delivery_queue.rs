@@ -165,4 +165,17 @@ impl DeliveryQueue for PgDeliveryQueue {
 
         Ok(())
     }
+
+    async fn expire_idempotency_keys(
+        &self,
+        now: chrono::DateTime<chrono::Utc>,
+    ) -> Result<u64, ApplicationError> {
+        let result = sqlx::query("DELETE FROM messages WHERE idempotency_expires_at <= $1")
+            .bind(now)
+            .execute(&self.pool)
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        Ok(result.rows_affected())
+    }
 }

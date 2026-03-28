@@ -564,6 +564,15 @@ impl OrganizationReadStore for FakeOrganizationReadStore {
         Ok(orgs.iter().find(|o| o.id() == id).cloned())
     }
 
+    async fn find_by_slug(
+        &self,
+        slug: &str,
+    ) -> Result<Option<Organization>, ApplicationError> {
+        self.log.record("organization_read_store:find_by_slug");
+        let orgs = self.data.organizations.lock().unwrap();
+        Ok(orgs.iter().find(|o| o.slug() == slug).cloned())
+    }
+
     async fn list(
         &self,
         offset: u64,
@@ -629,37 +638,46 @@ impl OidcConfigStore for FakeOidcConfigStore {
     }
 }
 
+#[derive(Default, Clone)]
+pub struct SharedDeadLetterData {
+    pub dead_letters: Arc<std::sync::Mutex<Vec<DeadLetter>>>,
+}
+
 pub struct FakeDeadLetterStore {
     log: OperationLog,
+    data: SharedDeadLetterData,
 }
 
 impl FakeDeadLetterStore {
-    pub(crate) fn new(log: OperationLog) -> Self {
-        Self { log }
+    pub(crate) fn new(log: OperationLog, data: SharedDeadLetterData) -> Self {
+        Self { log, data }
     }
 }
 
 #[async_trait]
 impl DeadLetterStore for FakeDeadLetterStore {
-    async fn insert(&mut self, _dead_letter: &DeadLetter) -> Result<(), ApplicationError> {
+    async fn insert(&mut self, dead_letter: &DeadLetter) -> Result<(), ApplicationError> {
         self.log.record("dead_letter_store:insert");
+        self.data.dead_letters.lock().unwrap().push(dead_letter.clone());
         Ok(())
     }
 
-    async fn list_by_app(
+    async fn find_by_id(
         &self,
-        _app_id: &ApplicationId,
-    ) -> Result<Vec<DeadLetter>, ApplicationError> {
-        self.log.record("dead_letter_store:list_by_app");
-        Ok(vec![])
+        id: &DeadLetterId,
+        _org_id: &OrganizationId,
+    ) -> Result<Option<DeadLetter>, ApplicationError> {
+        self.log.record("dead_letter_store:find_by_id");
+        let dls = self.data.dead_letters.lock().unwrap();
+        Ok(dls.iter().find(|dl| dl.id() == id).cloned())
     }
 
-    async fn mark_replayed(
-        &mut self,
-        _id: &DeadLetterId,
-        _replayed_at: DateTime<Utc>,
-    ) -> Result<(), ApplicationError> {
-        self.log.record("dead_letter_store:mark_replayed");
+    async fn save(&mut self, dead_letter: &DeadLetter) -> Result<(), ApplicationError> {
+        self.log.record("dead_letter_store:save");
+        let mut dls = self.data.dead_letters.lock().unwrap();
+        if let Some(existing) = dls.iter_mut().find(|dl| dl.id() == dead_letter.id()) {
+            *existing = dead_letter.clone();
+        }
         Ok(())
     }
 }
@@ -706,6 +724,7 @@ impl FakeUnitOfWork {
         et_data: SharedEventTypeData,
         ep_data: SharedEndpointData,
         msg_data: SharedMessageData,
+        dl_data: SharedDeadLetterData,
         org_data: SharedOrganizationData,
         oidc_data: SharedOidcConfigData,
     ) -> Self {
@@ -715,7 +734,7 @@ impl FakeUnitOfWork {
             endpoint_store: FakeEndpointStore::new(log.clone(), ep_data),
             message_store: FakeMessageStore::new(log.clone(), msg_data),
             attempt_store: FakeAttemptStore::new(log.clone()),
-            dead_letter_store: FakeDeadLetterStore::new(log.clone()),
+            dead_letter_store: FakeDeadLetterStore::new(log.clone(), dl_data),
             organization_store: FakeOrganizationStore::new(log.clone(), org_data),
             oidc_config_store: FakeOidcConfigStore::new(log.clone(), oidc_data),
             log,
@@ -776,6 +795,7 @@ pub struct FakeUnitOfWorkFactory {
     et_data: SharedEventTypeData,
     ep_data: SharedEndpointData,
     msg_data: SharedMessageData,
+    dl_data: SharedDeadLetterData,
     org_data: SharedOrganizationData,
     oidc_data: SharedOidcConfigData,
 }
@@ -788,6 +808,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
         }
@@ -800,6 +821,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
         }
@@ -812,6 +834,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data,
+            dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
         }
@@ -827,6 +850,7 @@ impl FakeUnitOfWorkFactory {
             et_data,
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
         }
@@ -842,6 +866,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data,
             msg_data: SharedMessageData::default(),
+            dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
         }
@@ -857,6 +882,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            dl_data: SharedDeadLetterData::default(),
             org_data,
             oidc_data: SharedOidcConfigData::default(),
         }
@@ -872,6 +898,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data,
         }
@@ -893,6 +920,26 @@ impl FakeUnitOfWorkFactory {
         &self.ep_data
     }
 
+    pub fn with_dead_letter_data(
+        log: OperationLog,
+        dl_data: SharedDeadLetterData,
+    ) -> Self {
+        Self {
+            log,
+            app_data: SharedApplicationData::default(),
+            et_data: SharedEventTypeData::default(),
+            ep_data: SharedEndpointData::default(),
+            msg_data: SharedMessageData::default(),
+            dl_data,
+            org_data: SharedOrganizationData::default(),
+            oidc_data: SharedOidcConfigData::default(),
+        }
+    }
+
+    pub fn dead_letter_data(&self) -> &SharedDeadLetterData {
+        &self.dl_data
+    }
+
     pub fn organization_data(&self) -> &SharedOrganizationData {
         &self.org_data
     }
@@ -908,6 +955,7 @@ impl UnitOfWorkFactory for FakeUnitOfWorkFactory {
             self.et_data.clone(),
             self.ep_data.clone(),
             self.msg_data.clone(),
+            self.dl_data.clone(),
             self.org_data.clone(),
             self.oidc_data.clone(),
         )))

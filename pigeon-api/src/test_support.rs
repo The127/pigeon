@@ -4,6 +4,8 @@ use axum::middleware::Next;
 use axum::response::Response;
 use pigeon_application::commands::create_oidc_config::CreateOidcConfig;
 use pigeon_application::commands::delete_oidc_config::DeleteOidcConfig;
+use pigeon_application::commands::replay_dead_letter::ReplayDeadLetter;
+use pigeon_domain::dead_letter::DeadLetter;
 use pigeon_application::error::ApplicationError;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
 use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore};
@@ -194,4 +196,12 @@ pub(crate) async fn test_auth_middleware(
         }
     }
     next.run(request).await
+}
+
+pub(crate) struct StubReplayDeadLetterHandler;
+#[async_trait]
+impl CommandHandler<ReplayDeadLetter> for StubReplayDeadLetterHandler {
+    async fn handle(&self, _c: ReplayDeadLetter) -> Result<DeadLetter, ApplicationError> {
+        Err(ApplicationError::Internal("stub".into()))
+    }
 }

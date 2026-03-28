@@ -205,6 +205,7 @@ async fn when_worker_processes(world: &mut DeliveryWorld) {
         max_retries: world.max_retries,
         backoff_base_secs: 30,
         max_backoff_secs: 3600,
+        cleanup_interval: std::time::Duration::from_secs(3600),
     };
 
     let service = DeliveryWorkerService::new(

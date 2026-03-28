@@ -77,6 +77,7 @@ mod tests {
             worker_backoff_base_secs: 30,
             worker_max_backoff_secs: 3600,
             worker_http_timeout: Duration::from_secs(30),
+            worker_cleanup_interval_secs: 3600,
         }
     }
 

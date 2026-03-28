@@ -150,15 +150,12 @@ pub trait EventTypeReadStore: Send + Sync {
 #[async_trait]
 pub trait DeadLetterStore: Send + Sync {
     async fn insert(&mut self, dead_letter: &DeadLetter) -> Result<(), ApplicationError>;
-    async fn list_by_app(
+    async fn find_by_id(
         &self,
-        app_id: &ApplicationId,
-    ) -> Result<Vec<DeadLetter>, ApplicationError>;
-    async fn mark_replayed(
-        &mut self,
         id: &DeadLetterId,
-        replayed_at: DateTime<Utc>,
-    ) -> Result<(), ApplicationError>;
+        org_id: &OrganizationId,
+    ) -> Result<Option<DeadLetter>, ApplicationError>;
+    async fn save(&mut self, dead_letter: &DeadLetter) -> Result<(), ApplicationError>;
 }
 
 #[cfg_attr(feature = "test-support", mockall::automock)]
@@ -179,6 +176,10 @@ pub trait OrganizationReadStore: Send + Sync {
     async fn find_by_id(
         &self,
         id: &OrganizationId,
+    ) -> Result<Option<Organization>, ApplicationError>;
+    async fn find_by_slug(
+        &self,
+        slug: &str,
     ) -> Result<Option<Organization>, ApplicationError>;
     async fn list(
         &self,

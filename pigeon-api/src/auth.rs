@@ -180,6 +180,33 @@ impl Audience {
     }
 }
 
+/// Axum middleware that restricts access to the bootstrap organization.
+///
+/// Must be layered **after** `auth_middleware` (so AuthContext is available).
+/// Checks that the authenticated org_id matches the configured admin org.
+/// Returns 403 if the org doesn't match or admin access is not configured.
+pub async fn admin_org_middleware(
+    State(state): State<AppState>,
+    request: Request,
+    next: Next,
+) -> Result<Response, (StatusCode, &'static str)> {
+    let admin_org_id = state
+        .admin_org_id
+        .as_ref()
+        .ok_or((StatusCode::FORBIDDEN, "Admin API is not configured"))?;
+
+    let auth_context = request
+        .extensions()
+        .get::<AuthContext>()
+        .ok_or((StatusCode::UNAUTHORIZED, "Missing auth context"))?;
+
+    if &auth_context.org_id != admin_org_id {
+        return Err((StatusCode::FORBIDDEN, "Not authorized for admin access"));
+    }
+
+    Ok(next.run(request).await)
+}
+
 /// Axum middleware that validates JWT tokens against registered OIDC configs.
 ///
 /// Steps:

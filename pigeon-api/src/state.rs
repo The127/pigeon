@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use pigeon_application::commands::create_application::CreateApplication;
+use pigeon_application::commands::replay_dead_letter::ReplayDeadLetter;
+use pigeon_domain::organization::OrganizationId;
 use pigeon_application::commands::create_endpoint::CreateEndpoint;
 use pigeon_application::commands::create_event_type::CreateEventType;
 use pigeon_application::commands::create_oidc_config::CreateOidcConfig;
@@ -49,6 +51,7 @@ pub struct AppState {
     pub delete_endpoint: Arc<dyn CommandHandler<DeleteEndpoint>>,
     pub get_endpoint: Arc<dyn QueryHandler<GetEndpointById>>,
     pub list_endpoints: Arc<dyn QueryHandler<ListEndpointsByApp>>,
+    pub replay_dead_letter: Arc<dyn CommandHandler<ReplayDeadLetter>>,
     pub health_checker: Arc<dyn HealthChecker>,
     pub create_organization: Arc<dyn CommandHandler<CreateOrganization>>,
     pub update_organization: Arc<dyn CommandHandler<UpdateOrganization>>,
@@ -62,4 +65,6 @@ pub struct AppState {
     pub oidc_config_read_store: Arc<dyn OidcConfigReadStore>,
     pub app_read_store: Arc<dyn ApplicationReadStore>,
     pub jwks_provider: Arc<dyn JwksProvider>,
+    pub metrics_render: Arc<dyn Fn() -> String + Send + Sync>,
+    pub admin_org_id: Option<OrganizationId>,
 }

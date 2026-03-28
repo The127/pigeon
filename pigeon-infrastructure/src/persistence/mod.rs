@@ -2,6 +2,7 @@ mod change_tracker;
 mod pg_application_read_store;
 mod pg_application_store;
 mod pg_attempt_store;
+mod pg_dead_letter_store;
 mod pg_delivery_queue;
 mod pg_endpoint_read_store;
 mod pg_endpoint_store;

@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
 use chrono::Utc;
-use tracing::{info, warn};
+use metrics::{counter, gauge, histogram};
+use tracing::{info, warn, Instrument};
 
 use crate::ports::delivery::{DeliveryQueue, DeliveryTask, WebhookHttpClient, WebhookResult};
 
@@ -13,6 +14,8 @@ pub struct DeliveryWorkerConfig {
     pub max_retries: u32,
     pub backoff_base_secs: u64,
     pub max_backoff_secs: u64,
+    /// How often to run the idempotency key cleanup job.
+    pub cleanup_interval: std::time::Duration,
 }
 
 impl Default for DeliveryWorkerConfig {
@@ -23,6 +26,7 @@ impl Default for DeliveryWorkerConfig {
             max_retries: 5,
             backoff_base_secs: 30,
             max_backoff_secs: 3600,
+            cleanup_interval: std::time::Duration::from_secs(3600),
         }
     }
 }
@@ -58,9 +62,17 @@ impl DeliveryWorkerService {
             "Delivery worker started"
         );
 
+        let mut last_cleanup = tokio::time::Instant::now();
+
         loop {
             if *shutdown.borrow() {
                 break;
+            }
+
+            // Periodic idempotency key cleanup
+            if last_cleanup.elapsed() >= self.config.cleanup_interval {
+                self.run_cleanup().await;
+                last_cleanup = tokio::time::Instant::now();
             }
 
             match self.poll_and_deliver().await {
@@ -87,15 +99,35 @@ impl DeliveryWorkerService {
         info!("Delivery worker stopped");
     }
 
+    async fn run_cleanup(&self) {
+        match self.queue.expire_idempotency_keys(Utc::now()).await {
+            Ok(0) => {}
+            Ok(expired) => {
+                info!(expired, "Expired idempotency keys cleaned up");
+            }
+            Err(e) => {
+                warn!(error = %e, "Failed to clean up idempotency keys");
+            }
+        }
+    }
+
     /// Dequeue a batch and deliver each task. Returns the number of tasks processed.
     pub async fn poll_and_deliver(
         &self,
     ) -> Result<usize, crate::error::ApplicationError> {
         let tasks = self.queue.dequeue(self.config.batch_size).await?;
         let count = tasks.len();
+        gauge!("pigeon_queue_depth").set(count as f64);
 
         for task in tasks {
-            self.deliver_one(task).await;
+            let span = tracing::info_span!(
+                "deliver",
+                attempt_id = ?task.attempt_id,
+                message_id = ?task.message_id,
+                endpoint_id = ?task.endpoint_id,
+                attempt_number = task.attempt_number,
+            );
+            self.deliver_one(task).instrument(span).await;
         }
 
         Ok(count)
@@ -113,7 +145,11 @@ impl DeliveryWorkerService {
                 body,
                 duration_ms,
             } => {
+                histogram!("pigeon_delivery_duration_seconds")
+                    .record(duration_ms as f64 / 1000.0);
+
                 if (200..300).contains(&status_code) {
+                    counter!("pigeon_delivery_total", "status" => "success").increment(1);
                     if let Err(e) = self
                         .queue
                         .record_success(
@@ -140,6 +176,8 @@ impl DeliveryWorkerService {
                 message,
                 duration_ms,
             } => {
+                histogram!("pigeon_delivery_duration_seconds")
+                    .record(duration_ms as f64 / 1000.0);
                 warn!(
                     attempt_id = ?task.attempt_id,
                     error = %message,
@@ -165,6 +203,8 @@ impl DeliveryWorkerService {
             Some(self.compute_next_attempt(task.attempt_number))
         };
 
+        counter!("pigeon_delivery_total", "status" => "failure").increment(1);
+
         if let Err(e) = self
             .queue
             .record_failure(
@@ -181,6 +221,7 @@ impl DeliveryWorkerService {
         }
 
         if retries_exhausted {
+            counter!("pigeon_delivery_total", "status" => "dead_letter").increment(1);
             info!(
                 attempt_id = ?task.attempt_id,
                 attempt_number = task.attempt_number,

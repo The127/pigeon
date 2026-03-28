@@ -457,6 +457,9 @@ mod tests {
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             app_read_store: Arc::new(StubApplicationReadStore),
             jwks_provider: Arc::new(StubJwksProvider),
+            replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
+            metrics_render: Arc::new(|| String::new()),
+            admin_org_id: None,
         }
     }
 

@@ -16,6 +16,7 @@ pub(crate) struct PigeonConfig {
     pub(crate) worker_backoff_base_secs: u64,
     pub(crate) worker_max_backoff_secs: u64,
     pub(crate) worker_http_timeout: Duration,
+    pub(crate) worker_cleanup_interval_secs: u64,
 }
 
 impl PigeonConfig {
@@ -71,6 +72,11 @@ impl PigeonConfig {
             .parse()
             .context("PIGEON_WORKER_HTTP_TIMEOUT_SECS must be a valid integer")?;
 
+        let worker_cleanup_interval_secs: u64 = std::env::var("PIGEON_WORKER_CLEANUP_INTERVAL_SECS")
+            .unwrap_or_else(|_| "3600".to_string())
+            .parse()
+            .context("PIGEON_WORKER_CLEANUP_INTERVAL_SECS must be a valid integer")?;
+
         Ok(Self {
             database_url,
             listen_addr,
@@ -84,6 +90,7 @@ impl PigeonConfig {
             worker_backoff_base_secs,
             worker_max_backoff_secs,
             worker_http_timeout: Duration::from_secs(worker_http_timeout_secs),
+            worker_cleanup_interval_secs,
         })
     }
 }
@@ -109,6 +116,7 @@ mod tests {
             worker_backoff_base_secs: 30,
             worker_max_backoff_secs: 3600,
             worker_http_timeout: Duration::from_secs(30),
+            worker_cleanup_interval_secs: 3600,
         };
 
         assert!(!config.bootstrap_org_enabled);
@@ -122,5 +130,6 @@ mod tests {
         assert_eq!(config.worker_backoff_base_secs, 30);
         assert_eq!(config.worker_max_backoff_secs, 3600);
         assert_eq!(config.worker_http_timeout, Duration::from_secs(30));
+        assert_eq!(config.worker_cleanup_interval_secs, 3600);
     }
 }

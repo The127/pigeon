@@ -40,8 +40,9 @@ Organization (tenant)
 - **Tenant scoping:** org_id from JWT (never from URL), cross-tenant access returns NotFound (not Forbidden)
 - **SQL-level org enforcement:** all child entity queries JOIN through `applications WHERE org_id = $org_id`. No load-then-check pattern — the SQL itself enforces tenant isolation. If the app doesn't belong to the org, the query returns no rows.
 - **Bootstrap org:** `PIGEON_BOOTSTRAP_ORG_ENABLED=true` creates a "system" org on startup if none exist (idempotent)
-- **Admin API:** `/admin/v1/` for org + OIDC config management (TODO: admin auth)
+- **Admin API:** `/admin/v1/` for org + OIDC config management, protected by JWT auth + bootstrap org restriction
 - **Tenant API:** `/api/v1/` for application data, requires JWT auth
+- **Observability:** `metrics` facade for Prometheus counters/histograms/gauges, `GET /metrics` endpoint, `x-request-id` correlation header + tracing spans per request and per delivery attempt
 
 ### Visibility
 `pub(crate)` / `pub(super)` by default. `pub` only at crate boundaries where needed.
@@ -80,8 +81,9 @@ Organization (tenant)
 - `GET /api/v1/applications/{app_id}/endpoints/{id}` — get endpoint
 - `PUT /api/v1/applications/{app_id}/endpoints/{id}` — update endpoint
 - `DELETE /api/v1/applications/{app_id}/endpoints/{id}` — delete endpoint
+- `POST /api/v1/applications/{app_id}/dead-letters/{id}/replay` — replay dead letter
 
-### Admin API (TODO: admin auth)
+### Admin API (JWT auth, bootstrap org only)
 - `POST /admin/v1/organizations` — create organization
 - `GET /admin/v1/organizations` — list organizations
 - `GET /admin/v1/organizations/{id}` — get organization
@@ -131,6 +133,7 @@ just dev-watch        # watch mode (cargo-watch)
 - `PIGEON_WORKER_BACKOFF_BASE_SECS` — exponential backoff base (default `30`)
 - `PIGEON_WORKER_MAX_BACKOFF_SECS` — backoff cap (default `3600`)
 - `PIGEON_WORKER_HTTP_TIMEOUT_SECS` — webhook HTTP request timeout (default `30`)
+- `PIGEON_WORKER_CLEANUP_INTERVAL_SECS` — idempotency key cleanup interval (default `3600`)
 
 ## Conventions
 - Manual constructor injection, composition root in pigeon-server
