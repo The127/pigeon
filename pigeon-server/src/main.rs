@@ -40,10 +40,12 @@ use pigeon_application::queries::list_event_types_by_app::ListEventTypesByAppHan
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrgHandler;
 use pigeon_application::queries::list_organizations::ListOrganizationsHandler;
 use pigeon_application::services::delivery_worker::{DeliveryWorkerConfig, DeliveryWorkerService};
+use pigeon_application::services::outbox_worker::{OutboxWorkerConfig, OutboxWorkerService};
 use pigeon_infrastructure::http::ReqwestWebhookClient;
 use pigeon_infrastructure::persistence::{
-    PgApplicationReadStore, PgDeliveryQueue, PgEndpointReadStore, PgEventTypeReadStore,
-    PgHealthChecker, PgOidcConfigReadStore, PgOrganizationReadStore, PgUnitOfWorkFactory,
+    PgApplicationReadStore, PgDeliveryQueue, PgEndpointReadStore, PgEventOutbox,
+    PgEventTypeReadStore, PgHealthChecker, PgOidcConfigReadStore, PgOrganizationReadStore,
+    PgUnitOfWorkFactory,
 };
 
 mod bootstrap;
@@ -112,7 +114,11 @@ async fn main() -> anyhow::Result<()> {
             });
 
             let worker = create_worker(&pool, &config);
-            let worker_handle = tokio::spawn(async move { worker.run(shutdown_rx).await });
+            let worker_shutdown = shutdown_rx.clone();
+            let worker_handle = tokio::spawn(async move { worker.run(worker_shutdown).await });
+
+            let outbox = create_outbox_worker(&pool, &config);
+            let outbox_handle = tokio::spawn(async move { outbox.run(shutdown_rx).await });
 
             tokio::signal::ctrl_c()
                 .await
@@ -120,7 +126,7 @@ async fn main() -> anyhow::Result<()> {
             info!("Shutdown signal received");
             let _ = shutdown_tx.send(true);
 
-            let (api_result, _) = tokio::join!(api_handle, worker_handle);
+            let (api_result, _, _) = tokio::join!(api_handle, worker_handle, outbox_handle);
             api_result??;
         }
         Commands::Api => {
@@ -149,7 +155,11 @@ async fn main() -> anyhow::Result<()> {
             let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
             let worker = create_worker(&pool, &config);
-            let worker_handle = tokio::spawn(async move { worker.run(shutdown_rx).await });
+            let worker_shutdown = shutdown_rx.clone();
+            let worker_handle = tokio::spawn(async move { worker.run(worker_shutdown).await });
+
+            let outbox = create_outbox_worker(&pool, &config);
+            let outbox_handle = tokio::spawn(async move { outbox.run(shutdown_rx).await });
 
             tokio::signal::ctrl_c()
                 .await
@@ -157,7 +167,7 @@ async fn main() -> anyhow::Result<()> {
             info!("Shutdown signal received");
             let _ = shutdown_tx.send(true);
 
-            worker_handle.await?;
+            let (_, _) = tokio::join!(worker_handle, outbox_handle);
         }
         Commands::Migrate => {
             let pool = create_pool(&config).await?;
@@ -204,6 +214,15 @@ fn create_worker(pool: &PgPool, config: &PigeonConfig) -> DeliveryWorkerService 
     };
 
     DeliveryWorkerService::new(queue, http_client, worker_config)
+}
+
+fn create_outbox_worker(pool: &PgPool, config: &PigeonConfig) -> OutboxWorkerService {
+    let outbox = Arc::new(PgEventOutbox::new(pool.clone()));
+    let outbox_config = OutboxWorkerConfig {
+        poll_interval: config.worker_poll_interval,
+        batch_size: 50,
+    };
+    OutboxWorkerService::new(outbox, outbox_config)
 }
 
 /// Look up the bootstrap organization by slug if bootstrap is enabled.

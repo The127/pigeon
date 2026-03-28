@@ -4,6 +4,7 @@ mod pg_application_store;
 mod pg_attempt_store;
 mod pg_dead_letter_store;
 mod pg_delivery_queue;
+mod pg_event_outbox;
 mod pg_endpoint_read_store;
 mod pg_endpoint_store;
 mod pg_event_type_read_store;
@@ -19,6 +20,7 @@ mod pg_unit_of_work_factory;
 
 pub use pg_application_read_store::PgApplicationReadStore;
 pub use pg_delivery_queue::PgDeliveryQueue;
+pub use pg_event_outbox::PgEventOutbox;
 pub use pg_endpoint_read_store::PgEndpointReadStore;
 pub use pg_event_type_read_store::PgEventTypeReadStore;
 pub use pg_health_checker::PgHealthChecker;

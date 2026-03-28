@@ -32,10 +32,10 @@ Periodic `DELETE FROM messages WHERE idempotency_expires_at <= now()` in the del
 ### ~~Endpoint Test Event~~
 `POST /api/v1/applications/{app_id}/endpoints/{id}/test` — sends a synthetic `pigeon.test` message to a specific endpoint. System event type auto-created per application, hidden from list/get, undeletable.
 
-## Priority: Medium
+### ~~Domain Event Dispatch~~
+Transactional outbox pattern: events are INSERT'd into `event_outbox` table inside the same DB transaction as domain changes. Outbox worker polls and processes events. First event: `DeadLettered` on dead letter insertion.
 
-### Domain Event Dispatch
-`AggregateRoot` trait and `DomainEvent` enum exist but nothing collects or dispatches events. Wire up event collection on entity mutations, dispatch after successful UoW commit. First use case: `DeadLettered` event.
+## Priority: Medium
 
 ### ~~Integration Tests~~
 Cross-tenant SQL isolation tests for applications, endpoints, event types, and OIDC configs. OidcConfig CRUD, SendMessage, and delivery queue flows were already covered.

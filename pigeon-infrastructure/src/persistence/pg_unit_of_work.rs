@@ -58,9 +58,14 @@ impl PgUnitOfWork {
 #[async_trait]
 impl UnitOfWork for PgUnitOfWork {
     async fn commit(self: Box<Self>) -> Result<(), ApplicationError> {
-        let changes = self.tracker.lock().unwrap().drain();
+        let (changes, events) = {
+            let mut tracker = self.tracker.lock().unwrap();
+            let events = tracker.collect_events();
+            let changes = tracker.drain();
+            (changes, events)
+        };
 
-        if changes.is_empty() {
+        if changes.is_empty() && events.is_empty() {
             return Ok(());
         }
 
@@ -385,6 +390,20 @@ impl UnitOfWork for PgUnitOfWork {
                     }
                 }
             }
+        }
+
+        // Insert domain events into outbox (same transaction)
+        for event in &events {
+            sqlx::query(
+                "INSERT INTO event_outbox (id, event_type, payload) \
+                 VALUES ($1, $2, $3)",
+            )
+            .bind(uuid::Uuid::new_v4())
+            .bind(event.event_type())
+            .bind(event.to_json())
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| ApplicationError::UnitOfWork(e.to_string()))?;
         }
 
         tx.commit()

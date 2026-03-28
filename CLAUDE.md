@@ -32,7 +32,7 @@ Organization (tenant)
 - **Idempotency** — `IdempotencyKey` newtype on messages, `insert_or_get_existing` with `ON CONFLICT DO NOTHING`
 - **Dead letters** — first-class `DeadLetter` entity after retry exhaustion
 - **Delivery worker** — `DeliveryWorkerService` polls `DeliveryQueue` port, delivers via `WebhookHttpClient` port. Uses direct SQL (not UoW) — `SELECT ... FOR UPDATE SKIP LOCKED` dequeue, HMAC-SHA256 signing (`X-Pigeon-Signature`), exponential backoff retry, dead lettering. Runs as `pigeon worker` or alongside API via `pigeon serve`
-- **Domain events** — `AggregateRoot` trait, `DomainEvent` enum (collection defined, dispatch not yet wired)
+- **Domain events** — transactional outbox: events INSERT'd into `event_outbox` table during UoW commit (same tx), outbox worker polls and processes. First event: `DeadLettered`
 
 ### Multitenancy
 - **Tenant = Organization**, identified by OIDC (issuer_url, audience) pair

@@ -2,6 +2,7 @@ use pigeon_domain::application::{Application, ApplicationId};
 use pigeon_domain::attempt::Attempt;
 use pigeon_domain::dead_letter::DeadLetter;
 use pigeon_domain::endpoint::{Endpoint, EndpointId};
+use pigeon_domain::event::DomainEvent;
 use pigeon_domain::event_type::{EventType, EventTypeId};
 use pigeon_domain::message::Message;
 use pigeon_domain::oidc_config::{OidcConfig, OidcConfigId};
@@ -174,5 +175,21 @@ impl ChangeTracker {
             }
         }
         None
+    }
+
+    /// Extract domain events from pending changes.
+    /// Called during UoW commit to populate the transactional outbox.
+    pub(crate) fn collect_events(&self) -> Vec<DomainEvent> {
+        let mut events = Vec::new();
+        for change in &self.changes {
+            if let Change::InsertDeadLetter(dl) = change {
+                events.push(DomainEvent::DeadLettered {
+                    message_id: dl.message_id().clone(),
+                    endpoint_id: dl.endpoint_id().clone(),
+                    app_id: dl.app_id().clone(),
+                });
+            }
+        }
+        events
     }
 }

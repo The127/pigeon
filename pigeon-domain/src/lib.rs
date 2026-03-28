@@ -8,6 +8,7 @@ pub mod event;
 pub mod event_type;
 pub mod message;
 pub mod oidc_config;
+pub mod outbox;
 pub mod organization;
 pub mod version;
 
