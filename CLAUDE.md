@@ -96,10 +96,12 @@ Organization (tenant)
 - `GET /admin/v1/organizations/{org_id}/oidc-configs/{id}` — get OIDC config
 - `DELETE /admin/v1/organizations/{org_id}/oidc-configs/{id}` — delete OIDC config
 
-### Health (no auth)
+### Public (no auth)
+- `GET /api/v1/auth/config` — OIDC config for current tenant (subdomain or single-tenant mode)
 - `GET /health` — liveness (always 200)
 - `GET /health/ready` — readiness (200 if DB reachable, 503 if not)
 - `GET /api/openapi.json` — OpenAPI spec
+- `GET /metrics` — Prometheus metrics
 
 ## Build & run (justfile)
 ```sh

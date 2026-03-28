@@ -323,7 +323,7 @@ async fn run_api(
         get_organization: Arc::new(GetOrganizationByIdHandler::new(
             organization_read_store.clone(),
         )),
-        list_organizations: Arc::new(ListOrganizationsHandler::new(organization_read_store)),
+        list_organizations: Arc::new(ListOrganizationsHandler::new(organization_read_store.clone())),
         create_oidc_config: Arc::new(CreateOidcConfigHandler::new(uow_factory.clone())),
         delete_oidc_config: Arc::new(DeleteOidcConfigHandler::new(uow_factory.clone())),
         get_oidc_config: Arc::new(GetOidcConfigByIdHandler::new(
@@ -333,6 +333,7 @@ async fn run_api(
             oidc_config_read_store.clone(),
         )),
         oidc_config_read_store,
+        org_read_store: organization_read_store,
         app_read_store: read_store.clone(),
         jwks_provider: Arc::new(CachedJwksProvider::new(jwks_cache_ttl)),
         replay_dead_letter: Arc::new(ReplayDeadLetterHandler::new(uow_factory.clone())),

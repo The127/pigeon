@@ -11,7 +11,8 @@ use pigeon_domain::attempt::Attempt;
 use pigeon_domain::dead_letter::DeadLetter;
 use pigeon_application::error::ApplicationError;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
-use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore};
+use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore, OrganizationReadStore};
+use pigeon_domain::organization::Organization;
 use pigeon_application::queries::get_oidc_config_by_id::GetOidcConfigById;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrg;
 use pigeon_application::queries::PaginatedResult;
@@ -147,6 +148,33 @@ impl ApplicationReadStore for StubApplicationReadStore {
         &self,
         _org_id: &OrganizationId,
     ) -> Result<u64, ApplicationError> {
+        Ok(0)
+    }
+}
+
+pub(crate) struct StubOrganizationReadStore;
+#[async_trait]
+impl OrganizationReadStore for StubOrganizationReadStore {
+    async fn find_by_id(
+        &self,
+        _id: &OrganizationId,
+    ) -> Result<Option<Organization>, ApplicationError> {
+        Ok(None)
+    }
+    async fn find_by_slug(
+        &self,
+        _slug: &str,
+    ) -> Result<Option<Organization>, ApplicationError> {
+        Ok(None)
+    }
+    async fn list(
+        &self,
+        _offset: u64,
+        _limit: u64,
+    ) -> Result<Vec<Organization>, ApplicationError> {
+        Ok(vec![])
+    }
+    async fn count(&self) -> Result<u64, ApplicationError> {
         Ok(0)
     }
 }
