@@ -68,6 +68,12 @@ pub trait MessageStore: Send + Sync {
 #[async_trait]
 pub trait AttemptStore: Send + Sync {
     async fn insert(&mut self, attempt: &Attempt) -> Result<(), ApplicationError>;
+    async fn find_by_id(
+        &self,
+        id: &pigeon_domain::attempt::AttemptId,
+        org_id: &OrganizationId,
+    ) -> Result<Option<Attempt>, ApplicationError>;
+    async fn save(&mut self, attempt: &Attempt) -> Result<(), ApplicationError>;
 }
 
 #[cfg_attr(feature = "test-support", mockall::automock)]

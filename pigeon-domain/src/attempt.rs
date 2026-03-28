@@ -78,6 +78,11 @@ impl Attempt {
         self.status = AttemptStatus::InFlight;
     }
 
+    pub fn mark_for_retry(&mut self, next_attempt_at: DateTime<Utc>) {
+        self.status = AttemptStatus::Pending;
+        self.next_attempt_at = Some(next_attempt_at);
+    }
+
     pub fn record_success(
         &mut self,
         response_code: u16,

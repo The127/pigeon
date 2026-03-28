@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use pigeon_application::commands::create_application::CreateApplication;
 use pigeon_application::commands::replay_dead_letter::ReplayDeadLetter;
+use pigeon_application::commands::retry_attempt::RetryAttempt;
 use pigeon_domain::organization::OrganizationId;
 use pigeon_application::commands::create_endpoint::CreateEndpoint;
 use pigeon_application::commands::create_event_type::CreateEventType;
@@ -52,6 +53,7 @@ pub struct AppState {
     pub get_endpoint: Arc<dyn QueryHandler<GetEndpointById>>,
     pub list_endpoints: Arc<dyn QueryHandler<ListEndpointsByApp>>,
     pub replay_dead_letter: Arc<dyn CommandHandler<ReplayDeadLetter>>,
+    pub retry_attempt: Arc<dyn CommandHandler<RetryAttempt>>,
     pub health_checker: Arc<dyn HealthChecker>,
     pub create_organization: Arc<dyn CommandHandler<CreateOrganization>>,
     pub update_organization: Arc<dyn CommandHandler<UpdateOrganization>>,

@@ -22,6 +22,7 @@ use pigeon_application::commands::delete_event_type::DeleteEventTypeHandler;
 use pigeon_application::commands::delete_oidc_config::DeleteOidcConfigHandler;
 use pigeon_application::commands::delete_organization::DeleteOrganizationHandler;
 use pigeon_application::commands::replay_dead_letter::ReplayDeadLetterHandler;
+use pigeon_application::commands::retry_attempt::RetryAttemptHandler;
 use pigeon_application::commands::send_message::SendMessageHandler;
 use pigeon_application::commands::update_application::UpdateApplicationHandler;
 use pigeon_application::commands::update_endpoint::UpdateEndpointHandler;
@@ -296,6 +297,7 @@ async fn run_api(
         app_read_store: read_store.clone(),
         jwks_provider: Arc::new(CachedJwksProvider::new(jwks_cache_ttl)),
         replay_dead_letter: Arc::new(ReplayDeadLetterHandler::new(uow_factory.clone())),
+        retry_attempt: Arc::new(RetryAttemptHandler::new(uow_factory.clone())),
         health_checker,
         metrics_render,
         admin_org_id,

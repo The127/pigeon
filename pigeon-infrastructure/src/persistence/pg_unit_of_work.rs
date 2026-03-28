@@ -36,7 +36,7 @@ impl PgUnitOfWork {
         let event_type_store = PgEventTypeStore::new(pool.clone(), Arc::clone(&tracker));
         let endpoint_store = PgEndpointStore::new(pool.clone(), Arc::clone(&tracker));
         let message_store = PgMessageStore::new(pool.clone(), Arc::clone(&tracker));
-        let attempt_store = PgAttemptStore::new(Arc::clone(&tracker));
+        let attempt_store = PgAttemptStore::new(pool.clone(), Arc::clone(&tracker));
         let dead_letter_store = PgDeadLetterStore::new(pool.clone(), Arc::clone(&tracker));
         let organization_store = PgOrganizationStore::new(pool.clone(), Arc::clone(&tracker));
         let oidc_config_store = PgOidcConfigStore::new(pool.clone(), Arc::clone(&tracker));
@@ -324,6 +324,30 @@ impl UnitOfWork for PgUnitOfWork {
                     .execute(&mut *tx)
                     .await
                     .map_err(|e| ApplicationError::UnitOfWork(e.to_string()))?;
+                }
+                Change::SaveAttempt(attempt) => {
+                    let status_str = match attempt.status() {
+                        pigeon_domain::attempt::AttemptStatus::Pending => "pending",
+                        pigeon_domain::attempt::AttemptStatus::InFlight => "in_flight",
+                        pigeon_domain::attempt::AttemptStatus::Succeeded => "succeeded",
+                        pigeon_domain::attempt::AttemptStatus::Failed => "failed",
+                    };
+                    let rows = sqlx::query(
+                        "UPDATE attempts \
+                         SET status = $2, next_attempt_at = $3 \
+                         WHERE id = $1 AND xmin::text::bigint = $4",
+                    )
+                    .bind(attempt.id().as_uuid())
+                    .bind(status_str)
+                    .bind(attempt.next_attempt_at())
+                    .bind(attempt.version().as_u64() as i64)
+                    .execute(&mut *tx)
+                    .await
+                    .map_err(|e| ApplicationError::UnitOfWork(e.to_string()))?;
+
+                    if rows.rows_affected() == 0 {
+                        return Err(ApplicationError::Conflict);
+                    }
                 }
                 Change::InsertDeadLetter(dl) => {
                     sqlx::query(

@@ -351,20 +351,46 @@ impl MessageStore for FakeMessageStore {
     }
 }
 
+#[derive(Default, Clone)]
+pub struct SharedAttemptData {
+    pub attempts: Arc<std::sync::Mutex<Vec<Attempt>>>,
+}
+
 pub struct FakeAttemptStore {
     log: OperationLog,
+    data: SharedAttemptData,
 }
 
 impl FakeAttemptStore {
-    pub(crate) fn new(log: OperationLog) -> Self {
-        Self { log }
+    pub(crate) fn new(log: OperationLog, data: SharedAttemptData) -> Self {
+        Self { log, data }
     }
 }
 
 #[async_trait]
 impl AttemptStore for FakeAttemptStore {
-    async fn insert(&mut self, _attempt: &Attempt) -> Result<(), ApplicationError> {
+    async fn insert(&mut self, attempt: &Attempt) -> Result<(), ApplicationError> {
         self.log.record("attempt_store:insert");
+        self.data.attempts.lock().unwrap().push(attempt.clone());
+        Ok(())
+    }
+
+    async fn find_by_id(
+        &self,
+        id: &pigeon_domain::attempt::AttemptId,
+        _org_id: &OrganizationId,
+    ) -> Result<Option<Attempt>, ApplicationError> {
+        self.log.record("attempt_store:find_by_id");
+        let attempts = self.data.attempts.lock().unwrap();
+        Ok(attempts.iter().find(|a| a.id() == id).cloned())
+    }
+
+    async fn save(&mut self, attempt: &Attempt) -> Result<(), ApplicationError> {
+        self.log.record("attempt_store:save");
+        let mut attempts = self.data.attempts.lock().unwrap();
+        if let Some(existing) = attempts.iter_mut().find(|a| a.id() == attempt.id()) {
+            *existing = attempt.clone();
+        }
         Ok(())
     }
 }
@@ -724,6 +750,7 @@ impl FakeUnitOfWork {
         et_data: SharedEventTypeData,
         ep_data: SharedEndpointData,
         msg_data: SharedMessageData,
+        att_data: SharedAttemptData,
         dl_data: SharedDeadLetterData,
         org_data: SharedOrganizationData,
         oidc_data: SharedOidcConfigData,
@@ -733,7 +760,7 @@ impl FakeUnitOfWork {
             event_type_store: FakeEventTypeStore::new(log.clone(), et_data),
             endpoint_store: FakeEndpointStore::new(log.clone(), ep_data),
             message_store: FakeMessageStore::new(log.clone(), msg_data),
-            attempt_store: FakeAttemptStore::new(log.clone()),
+            attempt_store: FakeAttemptStore::new(log.clone(), att_data),
             dead_letter_store: FakeDeadLetterStore::new(log.clone(), dl_data),
             organization_store: FakeOrganizationStore::new(log.clone(), org_data),
             oidc_config_store: FakeOidcConfigStore::new(log.clone(), oidc_data),
@@ -795,6 +822,7 @@ pub struct FakeUnitOfWorkFactory {
     et_data: SharedEventTypeData,
     ep_data: SharedEndpointData,
     msg_data: SharedMessageData,
+    att_data: SharedAttemptData,
     dl_data: SharedDeadLetterData,
     org_data: SharedOrganizationData,
     oidc_data: SharedOidcConfigData,
@@ -808,6 +836,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            att_data: SharedAttemptData::default(),
             dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
@@ -821,6 +850,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            att_data: SharedAttemptData::default(),
             dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
@@ -834,6 +864,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data,
+            att_data: SharedAttemptData::default(),
             dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
@@ -850,6 +881,7 @@ impl FakeUnitOfWorkFactory {
             et_data,
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            att_data: SharedAttemptData::default(),
             dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
@@ -866,6 +898,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data,
             msg_data: SharedMessageData::default(),
+            att_data: SharedAttemptData::default(),
             dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
@@ -882,6 +915,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            att_data: SharedAttemptData::default(),
             dl_data: SharedDeadLetterData::default(),
             org_data,
             oidc_data: SharedOidcConfigData::default(),
@@ -898,6 +932,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            att_data: SharedAttemptData::default(),
             dl_data: SharedDeadLetterData::default(),
             org_data: SharedOrganizationData::default(),
             oidc_data,
@@ -930,6 +965,7 @@ impl FakeUnitOfWorkFactory {
             et_data: SharedEventTypeData::default(),
             ep_data: SharedEndpointData::default(),
             msg_data: SharedMessageData::default(),
+            att_data: SharedAttemptData::default(),
             dl_data,
             org_data: SharedOrganizationData::default(),
             oidc_data: SharedOidcConfigData::default(),
@@ -955,6 +991,7 @@ impl UnitOfWorkFactory for FakeUnitOfWorkFactory {
             self.et_data.clone(),
             self.ep_data.clone(),
             self.msg_data.clone(),
+            self.att_data.clone(),
             self.dl_data.clone(),
             self.org_data.clone(),
             self.oidc_data.clone(),

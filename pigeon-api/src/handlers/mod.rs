@@ -1,4 +1,5 @@
 pub mod applications;
+pub mod attempts;
 pub mod dead_letters;
 pub mod endpoints;
 pub mod event_types;

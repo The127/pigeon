@@ -26,15 +26,10 @@ Periodic `DELETE FROM messages WHERE idempotency_expires_at <= now()` in the del
 ### ~~ReplayDeadLetter Command~~
 `POST /api/v1/applications/{app_id}/dead-letters/{id}/replay` — marks dead letter as replayed, creates new pending attempt. Rejects if already replayed.
 
-## Priority: High
-
-### `Message.delivered_at`
-Denormalized timestamp updated on last successful delivery for any endpoint. Avoids expensive `SELECT MAX(attempted_at) FROM attempts WHERE message_id = $1 AND status = 'succeeded'` queries. Add to domain entity + migration.
+### ~~Manual Retry of Specific Attempt~~
+`POST /api/v1/applications/{app_id}/attempts/{id}/retry` — sets status back to pending with `next_attempt_at = now()`. Only works on failed attempts.
 
 ## Priority: Medium
-
-### Manual Retry of Specific Attempt
-Different from replay — "retry this attempt now" before it's dead-lettered. Sets `next_attempt_at = now()` and `status = pending` on an existing failed attempt. Useful for operators investigating delivery issues.
 
 ### Endpoint Test Event
 "Send a test event to this endpoint" — generates a synthetic message with a known payload and delivers immediately. Useful for onboarding and debugging. Similar to Svix's test event feature.

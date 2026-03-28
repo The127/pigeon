@@ -19,6 +19,7 @@ pub(crate) enum Change {
     DeleteEndpoint(EndpointId),
     InsertMessage(Message),
     InsertAttempt(Attempt),
+    SaveAttempt(Attempt),
     InsertDeadLetter(DeadLetter),
     SaveDeadLetter(DeadLetter),
     InsertOrganization(Organization),

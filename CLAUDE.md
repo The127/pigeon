@@ -82,6 +82,7 @@ Organization (tenant)
 - `PUT /api/v1/applications/{app_id}/endpoints/{id}` — update endpoint
 - `DELETE /api/v1/applications/{app_id}/endpoints/{id}` — delete endpoint
 - `POST /api/v1/applications/{app_id}/dead-letters/{id}/replay` — replay dead letter
+- `POST /api/v1/applications/{app_id}/attempts/{id}/retry` — retry failed attempt
 
 ### Admin API (JWT auth, bootstrap org only)
 - `POST /admin/v1/organizations` — create organization
