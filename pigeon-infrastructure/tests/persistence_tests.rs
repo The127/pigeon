@@ -1591,3 +1591,215 @@ async fn delivery_queue_empty_returns_empty_vec() {
     let tasks = queue.dequeue(10).await.unwrap();
     assert!(tasks.is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// Cross-tenant SQL isolation tests
+// ---------------------------------------------------------------------------
+
+#[tokio::test]
+async fn cross_tenant_application_isolation() {
+    let (pool, _container) = setup().await;
+    let factory = PgUnitOfWorkFactory::new(pool.clone());
+    let read_store = PgApplicationReadStore::new(pool.clone());
+
+    let org_a = insert_org(&factory).await;
+    let org_b = insert_org(&factory).await;
+
+    let app_a = any_application_for_org(&org_a, "app-a");
+    let app_b = any_application_for_org(&org_b, "app-b");
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.application_store().insert(&app_a).await.unwrap();
+        uow.application_store().insert(&app_b).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    // Org A can see its own app
+    let found = read_store.find_by_id(app_a.id()).await.unwrap();
+    assert!(found.is_some());
+
+    // Org A's list only returns its own apps
+    let list_a = read_store.list_by_org(&org_a, 0, 100).await.unwrap();
+    assert_eq!(list_a.len(), 1);
+    assert_eq!(list_a[0].name(), "app-a");
+
+    // Org B's list only returns its own apps
+    let list_b = read_store.list_by_org(&org_b, 0, 100).await.unwrap();
+    assert_eq!(list_b.len(), 1);
+    assert_eq!(list_b[0].name(), "app-b");
+}
+
+#[tokio::test]
+async fn cross_tenant_endpoint_isolation() {
+    let (pool, _container) = setup().await;
+    let factory = PgUnitOfWorkFactory::new(pool.clone());
+    let ep_read_store = PgEndpointReadStore::new(pool.clone());
+
+    let org_a = insert_org(&factory).await;
+    let org_b = insert_org(&factory).await;
+
+    let app_a = any_application_for_org(&org_a, "app-a");
+    let app_b = any_application_for_org(&org_b, "app-b");
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.application_store().insert(&app_a).await.unwrap();
+        uow.application_store().insert(&app_b).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    let et_a = EventType::new(app_a.id().clone(), "test.event".into(), None).unwrap();
+    let et_b = EventType::new(app_b.id().clone(), "test.event".into(), None).unwrap();
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.event_type_store().insert(&et_a).await.unwrap();
+        uow.event_type_store().insert(&et_b).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    let ep_a = Endpoint::new(
+        app_a.id().clone(),
+        "https://a.com/hook".into(),
+        "whsec_a".into(),
+        vec![et_a.id().clone()],
+    )
+    .unwrap();
+
+    let ep_b = Endpoint::new(
+        app_b.id().clone(),
+        "https://b.com/hook".into(),
+        "whsec_b".into(),
+        vec![et_b.id().clone()],
+    )
+    .unwrap();
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.endpoint_store().insert(&ep_a).await.unwrap();
+        uow.endpoint_store().insert(&ep_b).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    // Org A can find its own endpoint
+    let found = ep_read_store.find_by_id(ep_a.id(), &org_a).await.unwrap();
+    assert!(found.is_some());
+
+    // Org A cannot find org B's endpoint
+    let cross = ep_read_store.find_by_id(ep_b.id(), &org_a).await.unwrap();
+    assert!(cross.is_none());
+
+    // Org A's list only returns its own endpoints
+    let list_a = ep_read_store
+        .list_by_app(app_a.id(), &org_a, 0, 100)
+        .await
+        .unwrap();
+    assert_eq!(list_a.len(), 1);
+    assert_eq!(list_a[0].url(), "https://a.com/hook");
+
+    // Org A cannot list org B's app's endpoints
+    let cross_list = ep_read_store
+        .list_by_app(app_b.id(), &org_a, 0, 100)
+        .await
+        .unwrap();
+    assert!(cross_list.is_empty());
+}
+
+#[tokio::test]
+async fn cross_tenant_event_type_isolation() {
+    let (pool, _container) = setup().await;
+    let factory = PgUnitOfWorkFactory::new(pool.clone());
+    let et_read_store = PgEventTypeReadStore::new(pool.clone());
+
+    let org_a = insert_org(&factory).await;
+    let org_b = insert_org(&factory).await;
+
+    let app_a = any_application_for_org(&org_a, "app-a");
+    let app_b = any_application_for_org(&org_b, "app-b");
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.application_store().insert(&app_a).await.unwrap();
+        uow.application_store().insert(&app_b).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    let et_a = EventType::new(app_a.id().clone(), "a.event".into(), None).unwrap();
+    let et_b = EventType::new(app_b.id().clone(), "b.event".into(), None).unwrap();
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.event_type_store().insert(&et_a).await.unwrap();
+        uow.event_type_store().insert(&et_b).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    // Org A can find its own event type
+    let found = et_read_store
+        .find_by_id(et_a.id(), &org_a)
+        .await
+        .unwrap();
+    assert!(found.is_some());
+
+    // Org A cannot find org B's event type
+    let cross = et_read_store
+        .find_by_id(et_b.id(), &org_a)
+        .await
+        .unwrap();
+    assert!(cross.is_none());
+
+    // Org A's list only returns its own event types
+    let list_a = et_read_store
+        .list_by_app(app_a.id(), &org_a, 0, 100)
+        .await
+        .unwrap();
+    assert_eq!(list_a.len(), 1);
+    assert_eq!(list_a[0].name(), "a.event");
+}
+
+#[tokio::test]
+async fn cross_tenant_oidc_config_isolation() {
+    let (pool, _container) = setup().await;
+    let factory = PgUnitOfWorkFactory::new(pool.clone());
+    let oidc_read_store = PgOidcConfigReadStore::new(pool.clone());
+
+    let org_a = insert_org(&factory).await;
+    let org_b = insert_org(&factory).await;
+
+    let config_a = OidcConfig::new(
+        org_a.clone(),
+        "https://auth-a.example.com".into(),
+        "audience-a".into(),
+        "https://auth-a.example.com/.well-known/jwks.json".into(),
+    )
+    .unwrap();
+
+    let config_b = OidcConfig::new(
+        org_b.clone(),
+        "https://auth-b.example.com".into(),
+        "audience-b".into(),
+        "https://auth-b.example.com/.well-known/jwks.json".into(),
+    )
+    .unwrap();
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.oidc_config_store().insert(&config_a).await.unwrap();
+        uow.oidc_config_store().insert(&config_b).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    // Org A's configs don't include org B's
+    let list_a = oidc_read_store.list_by_org(&org_a, 0, 100).await.unwrap();
+    assert_eq!(list_a.len(), 1);
+    assert_eq!(list_a[0].issuer_url(), "https://auth-a.example.com");
+
+    let count_a = oidc_read_store.count_by_org(&org_a).await.unwrap();
+    assert_eq!(count_a, 1);
+
+    // Org B's configs don't include org A's
+    let list_b = oidc_read_store.list_by_org(&org_b, 0, 100).await.unwrap();
+    assert_eq!(list_b.len(), 1);
+    assert_eq!(list_b[0].issuer_url(), "https://auth-b.example.com");
+}

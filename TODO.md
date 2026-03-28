@@ -37,12 +37,8 @@ Periodic `DELETE FROM messages WHERE idempotency_expires_at <= now()` in the del
 ### Domain Event Dispatch
 `AggregateRoot` trait and `DomainEvent` enum exist but nothing collects or dispatches events. Wire up event collection on entity mutations, dispatch after successful UoW commit. First use case: `DeadLettered` event.
 
-### Integration Tests for Newer Features
-Missing Postgres-level tests for:
-- OidcConfig CRUD + unique constraint on (issuer_url, audience)
-- Cross-tenant SQL isolation (org A can't query org B's data via JOIN)
-- SendMessage full flow (message + attempts + idempotency against real Postgres)
-- Delivery queue full flow (dequeue + deliver + record against real Postgres)
+### ~~Integration Tests~~
+Cross-tenant SQL isolation tests for applications, endpoints, event types, and OIDC configs. OidcConfig CRUD, SendMessage, and delivery queue flows were already covered.
 
 ### Signing Secret Rotation
 No mechanism to rotate an endpoint's `signing_secret` without breaking in-flight deliveries. Design: dual-secret window — deliver signed with new secret, but during a configurable transition period include both old and new signatures so consumers can verify with either.
