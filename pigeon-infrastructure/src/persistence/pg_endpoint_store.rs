@@ -81,6 +81,51 @@ impl EndpointStore for PgEndpointStore {
         }
     }
 
+    async fn find_by_app_and_id(
+        &self,
+        id: &EndpointId,
+        app_id: &ApplicationId,
+    ) -> Result<Option<Endpoint>, ApplicationError> {
+        {
+            let tracker = self.tracker.lock().unwrap();
+            if let Some(pending) = tracker.find_pending_endpoint(id) {
+                return Ok(pending.cloned());
+            }
+        }
+
+        let row = sqlx::query_as::<_, EndpointRow>(
+            "SELECT id, app_id, url, signing_secret, enabled, created_at, \
+             xmin::text::bigint AS version \
+             FROM endpoints \
+             WHERE id = $1 AND app_id = $2",
+        )
+        .bind(id.as_uuid())
+        .bind(app_id.as_uuid())
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        match row {
+            Some(row) => {
+                let event_type_ids = sqlx::query_scalar::<_, uuid::Uuid>(
+                    "SELECT event_type_id FROM endpoint_events WHERE endpoint_id = $1",
+                )
+                .bind(row.id)
+                .fetch_all(&self.pool)
+                .await
+                .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+                Ok(Some(row.into_endpoint(
+                    event_type_ids
+                        .into_iter()
+                        .map(EventTypeId::from_uuid)
+                        .collect(),
+                )))
+            }
+            None => Ok(None),
+        }
+    }
+
     async fn save(&mut self, endpoint: &Endpoint) -> Result<(), ApplicationError> {
         self.tracker
             .lock()

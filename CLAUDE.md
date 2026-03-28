@@ -136,6 +136,7 @@ just dev-watch        # watch mode (cargo-watch)
 - `PIGEON_WORKER_MAX_BACKOFF_SECS` — backoff cap (default `3600`)
 - `PIGEON_WORKER_HTTP_TIMEOUT_SECS` — webhook HTTP request timeout (default `30`)
 - `PIGEON_WORKER_CLEANUP_INTERVAL_SECS` — idempotency key cleanup interval (default `3600`)
+- `PIGEON_WORKER_AUTO_DISABLE_THRESHOLD` — consecutive dead letters before auto-disabling endpoint (default `5`, `0` to disable)
 
 ## Conventions
 - Manual constructor injection, composition root in pigeon-server

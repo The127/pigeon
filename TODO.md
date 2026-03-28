@@ -59,8 +59,8 @@ Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurab
 ### Read Model Projections
 Outbox handlers build denormalized views — e.g., "last N deliveries per endpoint" materialized table, updated by `AttemptSucceeded`/`AttemptFailed` events. Avoids expensive aggregate queries.
 
-### Auto-disable Failing Endpoints
-Saga: after N consecutive `DeadLettered` events for the same endpoint, auto-disable it. Prevents queue poisoning from permanently broken endpoints. Re-enable via API.
+### ~~Auto-disable Failing Endpoints~~
+`AutoDisableEndpointSaga` — outbox event subscriber that listens for `DeadLettered`, queries consecutive failure count, disables endpoint via `DisableEndpoint` command when threshold reached. Configurable via `PIGEON_WORKER_AUTO_DISABLE_THRESHOLD` (default 5, 0 to disable).
 
 ### Signing Secret Rotation
 No mechanism to rotate an endpoint's `signing_secret` without breaking in-flight deliveries. Design: dual-secret window — deliver signed with new secret, but during a configurable transition period include both old and new signatures so consumers can verify with either.

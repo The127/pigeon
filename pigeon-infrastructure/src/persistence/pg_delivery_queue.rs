@@ -215,6 +215,27 @@ impl DeliveryQueue for PgDeliveryQueue {
         Ok(())
     }
 
+    async fn consecutive_failure_count(
+        &self,
+        endpoint_id: &EndpointId,
+    ) -> Result<u64, ApplicationError> {
+        let row: (i64,) = sqlx::query_as(
+            "SELECT COUNT(*) FROM dead_letters \
+             WHERE endpoint_id = $1 \
+               AND dead_lettered_at > COALESCE( \
+                   (SELECT MAX(attempted_at) FROM attempts \
+                    WHERE endpoint_id = $1 AND status = 'succeeded'), \
+                   '1970-01-01'::timestamptz \
+               )",
+        )
+        .bind(endpoint_id.as_uuid())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        Ok(row.0 as u64)
+    }
+
     async fn expire_idempotency_keys(
         &self,
         now: chrono::DateTime<chrono::Utc>,

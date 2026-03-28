@@ -1,9 +1,16 @@
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use tracing::{info, warn};
 
 use crate::ports::event_dispatcher::EventOutbox;
 use pigeon_domain::event::DomainEvent;
+
+/// A subscriber that reacts to domain events.
+#[async_trait]
+pub trait EventSubscriber: Send + Sync {
+    async fn handle(&self, event: &DomainEvent);
+}
 
 /// Configuration for the outbox worker.
 #[derive(Debug, Clone)]
@@ -23,16 +30,28 @@ impl Default for OutboxWorkerConfig {
 
 pub struct OutboxWorkerService {
     outbox: Arc<dyn EventOutbox>,
+    subscribers: Vec<Arc<dyn EventSubscriber>>,
     config: OutboxWorkerConfig,
 }
 
 impl OutboxWorkerService {
-    pub fn new(outbox: Arc<dyn EventOutbox>, config: OutboxWorkerConfig) -> Self {
-        Self { outbox, config }
+    pub fn new(
+        outbox: Arc<dyn EventOutbox>,
+        subscribers: Vec<Arc<dyn EventSubscriber>>,
+        config: OutboxWorkerConfig,
+    ) -> Self {
+        Self {
+            outbox,
+            subscribers,
+            config,
+        }
     }
 
     pub async fn run(&self, mut shutdown: tokio::sync::watch::Receiver<bool>) {
-        info!("Outbox worker started");
+        info!(
+            subscribers = self.subscribers.len(),
+            "Outbox worker started"
+        );
 
         loop {
             if *shutdown.borrow() {
@@ -67,97 +86,26 @@ impl OutboxWorkerService {
         let count = entries.len();
 
         for entry in entries {
-            self.handle_event(&entry.event);
+            for subscriber in &self.subscribers {
+                subscriber.handle(&entry.event).await;
+            }
             self.outbox.mark_processed(&entry.id).await?;
         }
 
         Ok(count)
     }
+}
 
-    fn handle_event(&self, event: &DomainEvent) {
-        match event {
-            DomainEvent::MessageCreated {
-                message_id,
-                app_id,
-                event_type_id,
-            } => {
-                info!(
-                    message_id = ?message_id,
-                    app_id = ?app_id,
-                    event_type_id = ?event_type_id,
-                    "Domain event: message created"
-                );
-            }
-            DomainEvent::DeadLettered {
-                message_id,
-                endpoint_id,
-                app_id,
-            } => {
-                info!(
-                    message_id = ?message_id,
-                    endpoint_id = ?endpoint_id,
-                    app_id = ?app_id,
-                    "Domain event: message dead-lettered"
-                );
-            }
-            DomainEvent::AttemptSucceeded {
-                attempt_id,
-                message_id,
-                endpoint_id,
-                response_code,
-                duration_ms,
-            } => {
-                info!(
-                    attempt_id = ?attempt_id,
-                    message_id = ?message_id,
-                    endpoint_id = ?endpoint_id,
-                    response_code = response_code,
-                    duration_ms = duration_ms,
-                    "Domain event: attempt succeeded"
-                );
-            }
-            DomainEvent::AttemptFailed {
-                attempt_id,
-                message_id,
-                endpoint_id,
-                response_code,
-                duration_ms,
-                will_retry,
-            } => {
-                info!(
-                    attempt_id = ?attempt_id,
-                    message_id = ?message_id,
-                    endpoint_id = ?endpoint_id,
-                    response_code = ?response_code,
-                    duration_ms = duration_ms,
-                    will_retry = will_retry,
-                    "Domain event: attempt failed"
-                );
-            }
-            DomainEvent::DeadLetterReplayed {
-                dead_letter_id,
-                message_id,
-                endpoint_id,
-            } => {
-                info!(
-                    dead_letter_id = ?dead_letter_id,
-                    message_id = ?message_id,
-                    endpoint_id = ?endpoint_id,
-                    "Domain event: dead letter replayed"
-                );
-            }
-            DomainEvent::EndpointUpdated {
-                endpoint_id,
-                app_id,
-                enabled,
-            } => {
-                info!(
-                    endpoint_id = ?endpoint_id,
-                    app_id = ?app_id,
-                    enabled = enabled,
-                    "Domain event: endpoint updated"
-                );
-            }
-        }
+/// Simple subscriber that logs all domain events.
+pub struct LogEventSubscriber;
+
+#[async_trait]
+impl EventSubscriber for LogEventSubscriber {
+    async fn handle(&self, event: &DomainEvent) {
+        info!(
+            event_type = event.event_type(),
+            payload = %event.to_json(),
+            "Domain event"
+        );
     }
 }

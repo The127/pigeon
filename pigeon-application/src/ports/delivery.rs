@@ -84,6 +84,14 @@ pub trait DeliveryQueue: Send + Sync {
         last_response_body: Option<String>,
     ) -> Result<(), ApplicationError>;
 
+    /// Count dead letters for an endpoint since the last successful delivery.
+    /// Returns the number of consecutive failures (dead letters with no
+    /// intervening successful attempt).
+    async fn consecutive_failure_count(
+        &self,
+        endpoint_id: &EndpointId,
+    ) -> Result<u64, ApplicationError>;
+
     /// Delete messages whose idempotency keys have expired.
     /// Returns the number of expired messages removed.
     async fn expire_idempotency_keys(

@@ -17,6 +17,7 @@ pub(crate) struct PigeonConfig {
     pub(crate) worker_max_backoff_secs: u64,
     pub(crate) worker_http_timeout: Duration,
     pub(crate) worker_cleanup_interval_secs: u64,
+    pub(crate) worker_auto_disable_threshold: u64,
 }
 
 impl PigeonConfig {
@@ -72,6 +73,11 @@ impl PigeonConfig {
             .parse()
             .context("PIGEON_WORKER_HTTP_TIMEOUT_SECS must be a valid integer")?;
 
+        let worker_auto_disable_threshold: u64 = std::env::var("PIGEON_WORKER_AUTO_DISABLE_THRESHOLD")
+            .unwrap_or_else(|_| "5".to_string())
+            .parse()
+            .context("PIGEON_WORKER_AUTO_DISABLE_THRESHOLD must be a valid integer")?;
+
         let worker_cleanup_interval_secs: u64 = std::env::var("PIGEON_WORKER_CLEANUP_INTERVAL_SECS")
             .unwrap_or_else(|_| "3600".to_string())
             .parse()
@@ -91,6 +97,7 @@ impl PigeonConfig {
             worker_max_backoff_secs,
             worker_http_timeout: Duration::from_secs(worker_http_timeout_secs),
             worker_cleanup_interval_secs,
+            worker_auto_disable_threshold,
         })
     }
 }
@@ -117,6 +124,7 @@ mod tests {
             worker_max_backoff_secs: 3600,
             worker_http_timeout: Duration::from_secs(30),
             worker_cleanup_interval_secs: 3600,
+            worker_auto_disable_threshold: 5,
         };
 
         assert!(!config.bootstrap_org_enabled);

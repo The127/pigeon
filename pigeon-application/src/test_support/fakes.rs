@@ -445,6 +445,19 @@ impl EndpointStore for FakeEndpointStore {
         Ok(eps.iter().find(|ep| ep.id() == id).cloned())
     }
 
+    async fn find_by_app_and_id(
+        &self,
+        id: &EndpointId,
+        app_id: &pigeon_domain::application::ApplicationId,
+    ) -> Result<Option<Endpoint>, ApplicationError> {
+        self.log.record("endpoint_store:find_by_app_and_id");
+        let eps = self.data.endpoints.lock().unwrap();
+        Ok(eps
+            .iter()
+            .find(|ep| ep.id() == id && ep.app_id() == app_id)
+            .cloned())
+    }
+
     async fn save(&mut self, endpoint: &Endpoint) -> Result<(), ApplicationError> {
         self.log.record("endpoint_store:save");
         let mut eps = self.data.endpoints.lock().unwrap();

@@ -39,8 +39,12 @@ use pigeon_application::queries::list_endpoints_by_app::ListEndpointsByAppHandle
 use pigeon_application::queries::list_event_types_by_app::ListEventTypesByAppHandler;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrgHandler;
 use pigeon_application::queries::list_organizations::ListOrganizationsHandler;
+use pigeon_application::commands::disable_endpoint::DisableEndpointHandler;
+use pigeon_application::services::auto_disable_saga::AutoDisableEndpointSaga;
 use pigeon_application::services::delivery_worker::{DeliveryWorkerConfig, DeliveryWorkerService};
-use pigeon_application::services::outbox_worker::{OutboxWorkerConfig, OutboxWorkerService};
+use pigeon_application::services::outbox_worker::{
+    EventSubscriber, LogEventSubscriber, OutboxWorkerConfig, OutboxWorkerService,
+};
 use pigeon_infrastructure::http::ReqwestWebhookClient;
 use pigeon_infrastructure::persistence::{
     PgApplicationReadStore, PgDeliveryQueue, PgEndpointReadStore, PgEventOutbox,
@@ -218,11 +222,23 @@ fn create_worker(pool: &PgPool, config: &PigeonConfig) -> DeliveryWorkerService 
 
 fn create_outbox_worker(pool: &PgPool, config: &PigeonConfig) -> OutboxWorkerService {
     let outbox = Arc::new(PgEventOutbox::new(pool.clone()));
+    let delivery_queue = Arc::new(PgDeliveryQueue::new(pool.clone()));
+    let uow_factory = Arc::new(PgUnitOfWorkFactory::new(pool.clone()));
+
+    let subscribers: Vec<Arc<dyn EventSubscriber>> = vec![
+        Arc::new(LogEventSubscriber),
+        Arc::new(AutoDisableEndpointSaga::new(
+            delivery_queue,
+            DisableEndpointHandler::new(uow_factory),
+            config.worker_auto_disable_threshold,
+        )),
+    ];
+
     let outbox_config = OutboxWorkerConfig {
         poll_interval: config.worker_poll_interval,
         batch_size: 50,
     };
-    OutboxWorkerService::new(outbox, outbox_config)
+    OutboxWorkerService::new(outbox, subscribers, outbox_config)
 }
 
 /// Look up the bootstrap organization by slug if bootstrap is enabled.

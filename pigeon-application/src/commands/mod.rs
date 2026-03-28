@@ -5,6 +5,7 @@ pub mod create_oidc_config;
 pub mod create_organization;
 pub mod delete_application;
 pub mod delete_endpoint;
+pub mod disable_endpoint;
 pub mod delete_event_type;
 pub mod delete_oidc_config;
 pub mod delete_organization;

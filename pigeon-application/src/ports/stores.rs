@@ -85,6 +85,11 @@ pub trait EndpointStore: Send + Sync {
         id: &EndpointId,
         org_id: &OrganizationId,
     ) -> Result<Option<Endpoint>, ApplicationError>;
+    async fn find_by_app_and_id(
+        &self,
+        id: &EndpointId,
+        app_id: &ApplicationId,
+    ) -> Result<Option<Endpoint>, ApplicationError>;
     async fn save(&mut self, endpoint: &Endpoint) -> Result<(), ApplicationError>;
     async fn delete(&mut self, id: &EndpointId) -> Result<(), ApplicationError>;
 }
