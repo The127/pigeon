@@ -1,6 +1,8 @@
 services:
+  # ── Pigeon database ────────────────────────────────────────────────────────
   postgres:
-    image: postgres:17
+    image: postgres:17-alpine
+    restart: unless-stopped
     ports:
       - "5432:5432"
     environment:
@@ -9,6 +11,57 @@ services:
       POSTGRES_DB: pigeon
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pigeon"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
+  # ── Keyline OIDC provider ──────────────────────────────────────────────────
+  keyline-db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: keyline
+      POSTGRES_PASSWORD: keyline
+      POSTGRES_DB: keyline
+    volumes:
+      - keyline_db_data:/var/lib/postgresql/data
+
+  keyline-api:
+    image: ghcr.io/the127/keyline:dev-618
+    platform: linux/amd64
+    container_name: keyline-api
+    ports:
+      - "8081:8081"
+    command: ["/app/api", "--config", "/app/config.yaml"]
+    volumes:
+      - ./keyline-config.yaml:/app/config.yaml:Z
+      - keyline_keys:/app/keys
+    depends_on:
+      - keyline-db
+    restart: unless-stopped
+
+  keyline-ui:
+    image: ghcr.io/the127/keyline-ui:v0.2.0
+    platform: linux/amd64
+    container_name: keyline-ui
+    ports:
+      - "5177:80"
+    environment:
+      KEYLINE_API_URL: "http://localhost:8081"
+      KEYLINE_HOST: "http://localhost:5177"
+    restart: unless-stopped
+
+  # ── Mail catcher (dev only) ────────────────────────────────────────────────
+  mailpit:
+    image: axllent/mailpit:v1.26
+    restart: unless-stopped
+    ports:
+      - "8025:8025"   # Web UI: http://localhost:8025
+      - "1025:1025"   # SMTP
 
 volumes:
   pgdata:
+  keyline_db_data:
+  keyline_keys:
