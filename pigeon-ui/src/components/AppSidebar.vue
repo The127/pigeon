@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft } from 'lucide-vue-next'
+import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Monitor } from 'lucide-vue-next'
 import { useAuth } from '@/auth'
+import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { Button } from '@/components/ui/button'
 import PigeonLogo from '@/components/PigeonLogo.vue'
 import { Separator } from '@/components/ui/separator'
@@ -16,6 +17,7 @@ const collapsed = defineModel<boolean>('collapsed', { default: false })
 
 const route = useRoute()
 const { user, logout } = useAuth()
+const { mode, setMode } = useTheme()
 
 const nav = [
   { name: 'Applications', to: '/apps', icon: LayoutGrid },
@@ -28,6 +30,26 @@ function isActive(path: string) {
 const displayName = () => {
   if (!user.value) return 'Sign out'
   return user.value.profile.email || user.value.profile.name || 'Sign out'
+}
+
+const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
+  { value: 'auto', icon: Monitor, label: 'System' },
+  { value: 'light', icon: Sun, label: 'Light' },
+  { value: 'dark', icon: Moon, label: 'Dark' },
+]
+
+function cycleTheme() {
+  const order: ThemeMode[] = ['auto', 'light', 'dark']
+  const next = order[(order.indexOf(mode.value) + 1) % order.length]
+  setMode(next)
+}
+
+const currentThemeIcon = () => {
+  return themeOptions.find(o => o.value === mode.value)?.icon || Monitor
+}
+
+const currentThemeLabel = () => {
+  return themeOptions.find(o => o.value === mode.value)?.label || 'System'
 }
 </script>
 
@@ -91,7 +113,27 @@ const displayName = () => {
       <Separator class="bg-sidebar-border" />
 
       <!-- Footer -->
-      <div class="p-2">
+      <div class="space-y-1 p-2">
+        <!-- Theme toggle -->
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              :class="collapsed ? 'justify-center px-0' : 'justify-start'"
+              @click="cycleTheme"
+            >
+              <component :is="currentThemeIcon()" class="h-4 w-4 shrink-0" />
+              <span v-show="!collapsed" class="ml-2">{{ currentThemeLabel() }}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent v-if="collapsed" side="right">
+            Theme: {{ currentThemeLabel() }}
+          </TooltipContent>
+        </Tooltip>
+
+        <!-- Sign out -->
         <Tooltip>
           <TooltipTrigger as-child>
             <Button
