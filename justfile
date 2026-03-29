@@ -74,6 +74,10 @@ dev: dev-up
     cd pigeon-ui && npm run dev &
     wait
 
+# Test webhook endpoint (logs + verifies signatures)
+dev-endpoint port="8888" secret="test-secret":
+    python3 dev/test-endpoint.py {{ port }} {{ secret }}
+
 # Watch mode: re-check on file changes (requires cargo-watch)
 dev-watch:
     cargo watch -c -x 'check --workspace'
