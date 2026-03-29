@@ -223,6 +223,7 @@ pub trait MessageReadStore: Send + Sync {
         app_id: &ApplicationId,
         org_id: &OrganizationId,
         event_type_id: Option<EventTypeId>,
+        status: Option<String>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<MessageWithStatus>, ApplicationError>;
@@ -231,6 +232,7 @@ pub trait MessageReadStore: Send + Sync {
         app_id: &ApplicationId,
         org_id: &OrganizationId,
         event_type_id: Option<EventTypeId>,
+        status: Option<String>,
     ) -> Result<u64, ApplicationError>;
 }
 

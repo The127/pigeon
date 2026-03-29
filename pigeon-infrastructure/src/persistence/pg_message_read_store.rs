@@ -68,6 +68,23 @@ const SELECT_WITH_STATUS: &str = "\
     JOIN applications a ON a.id = m.app_id \
     LEFT JOIN message_delivery_status mds ON mds.message_id = m.id";
 
+/// Returns an SQL fragment (starting with ` AND ...`) that filters messages
+/// by derived delivery status.  The fragment references the `mds` alias which
+/// is already LEFT JOIN'd in both the list and count queries.
+fn status_sql_condition(status: &str) -> String {
+    match status {
+        "delivered" => " AND mds.succeeded >= mds.attempts_created AND mds.attempts_created > 0".to_string(),
+        "pending" => " AND mds.attempts_created > 0 \
+                        AND mds.succeeded < mds.attempts_created \
+                        AND COALESCE(mds.dead_lettered, 0) = 0 \
+                        AND COALESCE(mds.failed, 0) = 0".to_string(),
+        "failed" => " AND mds.failed > 0 AND COALESCE(mds.succeeded, 0) = 0".to_string(),
+        "dead_lettered" => " AND mds.dead_lettered > 0 AND COALESCE(mds.succeeded, 0) = 0".to_string(),
+        "no_endpoints" => " AND COALESCE(mds.attempts_created, 0) = 0".to_string(),
+        _ => String::new(), // unknown status — no filter
+    }
+}
+
 #[async_trait]
 impl MessageReadStore for PgMessageReadStore {
     async fn find_by_id(
@@ -91,6 +108,7 @@ impl MessageReadStore for PgMessageReadStore {
         app_id: &ApplicationId,
         org_id: &OrganizationId,
         event_type_id: Option<EventTypeId>,
+        status: Option<String>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<MessageWithStatus>, ApplicationError> {
@@ -101,6 +119,9 @@ impl MessageReadStore for PgMessageReadStore {
         if event_type_id.is_some() {
             sql.push_str(&format!(" AND m.event_type_id = ${param_idx}"));
             param_idx += 1;
+        }
+        if let Some(ref s) = status {
+            sql.push_str(&status_sql_condition(s));
         }
         sql.push_str(&format!(
             " ORDER BY m.created_at DESC LIMIT ${} OFFSET ${}",
@@ -129,14 +150,22 @@ impl MessageReadStore for PgMessageReadStore {
         app_id: &ApplicationId,
         org_id: &OrganizationId,
         event_type_id: Option<EventTypeId>,
+        status: Option<String>,
     ) -> Result<u64, ApplicationError> {
         let mut sql = String::from(
             "SELECT COUNT(*) FROM messages m \
              JOIN applications a ON a.id = m.app_id \
+             LEFT JOIN message_delivery_status mds ON mds.message_id = m.id \
              WHERE m.app_id = $1 AND a.org_id = $2",
         );
+        let mut param_idx = 3u32;
         if event_type_id.is_some() {
-            sql.push_str(" AND m.event_type_id = $3");
+            sql.push_str(&format!(" AND m.event_type_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        let _ = param_idx;
+        if let Some(ref s) = status {
+            sql.push_str(&status_sql_condition(s));
         }
 
         let mut q = sqlx::query_as::<_, (i64,)>(&sql)

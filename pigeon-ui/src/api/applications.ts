@@ -409,12 +409,13 @@ export function useRetriggerMessage(appId: Ref<string>) {
   })
 }
 
-export function useMessages(appId: Ref<string>, eventTypeId: Ref<string>) {
+export function useMessages(appId: Ref<string>, eventTypeId: Ref<string>, status: Ref<string>) {
   return useQuery({
-    queryKey: ['applications', appId, 'messages', eventTypeId],
+    queryKey: ['applications', appId, 'messages', eventTypeId, status],
     queryFn: () => {
       const params = new URLSearchParams({ limit: '50' })
       if (eventTypeId.value) params.set('event_type_id', eventTypeId.value)
+      if (status.value) params.set('status', status.value)
       return apiFetch<{ items: MessageResponse[]; total: number }>(
         `/applications/${appId.value}/messages?${params}`,
       )

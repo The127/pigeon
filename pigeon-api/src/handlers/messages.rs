@@ -101,6 +101,7 @@ pub async fn list_messages(
             app_id,
             org_id,
             event_type_id: query.event_type_id.map(EventTypeId::from_uuid),
+            status: query.status,
             offset: query.offset.unwrap_or(0),
             limit: query.limit.unwrap_or(20),
         })

@@ -21,6 +21,7 @@ pub struct MessageListQuery {
     pub offset: Option<u64>,
     pub limit: Option<u64>,
     pub event_type_id: Option<uuid::Uuid>,
+    pub status: Option<String>,
 }
 
 #[derive(Debug, Deserialize, IntoParams)]

@@ -47,6 +47,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import FilterSelect from '@/components/FilterSelect.vue'
 import PageHeader from '@/components/PageHeader.vue'
 import FormField from '@/components/FormField.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -69,6 +70,23 @@ const updateApp = useUpdateApplication(appId)
 const deleteApp = useDeleteApplication()
 const { data: eventTypesData, isLoading: etLoading } = useEventTypes(appId)
 const { data: endpointsData, isLoading: epLoading } = useEndpoints(appId)
+
+// --- Client-side search for event types & endpoints ---
+const etSearch = ref('')
+const filteredEventTypes = computed(() => {
+  const items = eventTypesData.value?.items || []
+  if (!etSearch.value) return items
+  const q = etSearch.value.toLowerCase()
+  return items.filter(et => et.name.toLowerCase().includes(q))
+})
+
+const epSearch = ref('')
+const filteredEndpoints = computed(() => {
+  const items = endpointsData.value?.items || []
+  if (!epSearch.value) return items
+  const q = epSearch.value.toLowerCase()
+  return items.filter(ep => ep.name.toLowerCase().includes(q) || ep.url.toLowerCase().includes(q))
+})
 
 // --- Edit Application ---
 const editDialogOpen = ref(false)
@@ -220,7 +238,8 @@ const payloadValid = computed(() => {
 
 // --- Messages ---
 const msgEventTypeFilter = ref('')
-const { data: messagesData, isLoading: msgLoading } = useMessages(appId, msgEventTypeFilter)
+const msgStatusFilter = ref('')
+const { data: messagesData, isLoading: msgLoading } = useMessages(appId, msgEventTypeFilter, msgStatusFilter)
 const retriggerMsg = useRetriggerMessage(appId)
 const expandedMessageId = ref<string | null>(null)
 const { data: attemptsData, isLoading: attLoading } = useAttempts(appId, expandedMessageId)
@@ -461,7 +480,8 @@ function handleReplay(deadLetterId: string) {
 
         <!-- Event Types Tab -->
         <TabsContent value="event-types" class="space-y-4">
-          <div class="flex justify-end">
+          <div class="flex items-center justify-between gap-2">
+            <Input v-model="etSearch" placeholder="Search event types..." class="max-w-xs" />
             <Dialog v-model:open="etDialogOpen">
               <DialogTrigger as-child>
                 <Button size="sm">
@@ -503,6 +523,13 @@ function handleReplay(deadLetterId: string) {
             </Button>
           </EmptyState>
 
+          <EmptyState
+            v-else-if="!filteredEventTypes.length"
+            :icon="Zap"
+            title="No matching event types"
+            description="Try a different search term."
+          />
+
           <Table v-else>
             <TableHeader>
               <TableRow>
@@ -513,7 +540,7 @@ function handleReplay(deadLetterId: string) {
             </TableHeader>
             <TableBody>
               <TableRow
-                v-for="et in eventTypesData.items"
+                v-for="et in filteredEventTypes"
                 :key="et.id"
                 class="cursor-pointer"
                 @click="$router.push(`/apps/${appId}/event-types/${et.id}`)"
@@ -549,7 +576,8 @@ function handleReplay(deadLetterId: string) {
 
         <!-- Endpoints Tab -->
         <TabsContent value="endpoints" class="space-y-4">
-          <div class="flex justify-end">
+          <div class="flex items-center justify-between gap-2">
+            <Input v-model="epSearch" placeholder="Search endpoints..." class="max-w-xs" />
             <Dialog v-model:open="epDialogOpen">
               <DialogTrigger as-child>
                 <Button size="sm">
@@ -611,6 +639,13 @@ function handleReplay(deadLetterId: string) {
             </Button>
           </EmptyState>
 
+          <EmptyState
+            v-else-if="!filteredEndpoints.length"
+            :icon="Globe"
+            title="No matching endpoints"
+            description="Try a different search term."
+          />
+
           <Table v-else>
             <TableHeader>
               <TableRow>
@@ -623,7 +658,7 @@ function handleReplay(deadLetterId: string) {
             </TableHeader>
             <TableBody>
               <TableRow
-                v-for="ep in endpointsData.items"
+                v-for="ep in filteredEndpoints"
                 :key="ep.id"
                 class="cursor-pointer"
                 @click="$router.push(`/apps/${appId}/endpoints/${ep.id}`)"
@@ -675,19 +710,22 @@ function handleReplay(deadLetterId: string) {
         <!-- Messages Tab -->
         <TabsContent value="messages" class="space-y-4">
           <div class="flex gap-2">
-            <select
+            <FilterSelect
               v-model="msgEventTypeFilter"
-              class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="">All event types</option>
-              <option
-                v-for="et in eventTypesData?.items"
-                :key="et.id"
-                :value="et.id"
-              >
-                {{ et.name }}
-              </option>
-            </select>
+              placeholder="All event types"
+              :options="(eventTypesData?.items || []).map(et => ({ value: et.id, label: et.name }))"
+            />
+            <FilterSelect
+              v-model="msgStatusFilter"
+              placeholder="All statuses"
+              :options="[
+                { value: 'delivered', label: 'Delivered' },
+                { value: 'pending', label: 'Pending' },
+                { value: 'failed', label: 'Failed' },
+                { value: 'dead_lettered', label: 'Dead lettered' },
+                { value: 'no_endpoints', label: 'No endpoints' },
+              ]"
+            />
           </div>
 
           <LoadingState v-if="msgLoading" message="Loading messages..." />
@@ -794,27 +832,16 @@ function handleReplay(deadLetterId: string) {
         <!-- Dead Letters Tab -->
         <TabsContent value="dead-letters" class="space-y-4">
           <div class="flex gap-2">
-            <select
+            <FilterSelect
               v-model="dlEndpointFilter"
-              class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="">All endpoints</option>
-              <option
-                v-for="ep in endpointsData?.items"
-                :key="ep.id"
-                :value="ep.id"
-              >
-                {{ ep.name }}
-              </option>
-            </select>
-            <select
+              placeholder="All endpoints"
+              :options="(endpointsData?.items || []).map(ep => ({ value: ep.id, label: ep.name }))"
+            />
+            <FilterSelect
               v-model="dlReplayedFilter"
-              class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <option value="">All statuses</option>
-              <option value="false">Unreplayed</option>
-              <option value="true">Replayed</option>
-            </select>
+              placeholder="All statuses"
+              :options="[{ value: 'false', label: 'Unreplayed' }, { value: 'true', label: 'Replayed' }]"
+            />
           </div>
 
           <LoadingState v-if="dlLoading" message="Loading dead letters..." />
