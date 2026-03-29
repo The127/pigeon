@@ -1,12 +1,16 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   useApplication,
+  useUpdateApplication,
+  useDeleteApplication,
   useEventTypes,
   useEndpoints,
   useCreateEventType,
+  useDeleteEventType,
   useCreateEndpoint,
+  useDeleteEndpoint,
 } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +23,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -34,14 +54,44 @@ import FormField from '@/components/FormField.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import ErrorState from '@/components/ErrorState.vue'
-import { Plus, Zap, Globe, ArrowLeft } from 'lucide-vue-next'
+import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil } from 'lucide-vue-next'
 
 const route = useRoute()
+const router = useRouter()
 const appId = computed(() => route.params.id as string)
 
 const { data: app, isLoading, error } = useApplication(appId)
+const updateApp = useUpdateApplication(appId)
+const deleteApp = useDeleteApplication()
 const { data: eventTypesData, isLoading: etLoading } = useEventTypes(appId)
 const { data: endpointsData, isLoading: epLoading } = useEndpoints(appId)
+
+// --- Edit Application ---
+const editDialogOpen = ref(false)
+const editName = ref('')
+
+function openEditDialog() {
+  if (!app.value) return
+  editName.value = app.value.name
+  editDialogOpen.value = true
+}
+
+function handleUpdateApp() {
+  if (!app.value) return
+  updateApp.mutate(
+    { name: editName.value, version: app.value.version },
+    { onSuccess: () => { editDialogOpen.value = false } },
+  )
+}
+
+// --- Delete Application ---
+const deleteAppOpen = ref(false)
+
+function handleDeleteApp() {
+  deleteApp.mutate(appId.value, {
+    onSuccess: () => router.push('/apps'),
+  })
+}
 
 // --- Create Event Type ---
 const etDialogOpen = ref(false)
@@ -51,13 +101,19 @@ const createEt = useCreateEventType(appId)
 function handleCreateEventType() {
   createEt.mutate(
     { name: etName.value },
-    {
-      onSuccess: () => {
-        etDialogOpen.value = false
-        etName.value = ''
-      },
-    },
+    { onSuccess: () => { etDialogOpen.value = false; etName.value = '' } },
   )
+}
+
+// --- Delete Event Type ---
+const deleteEt = useDeleteEventType(appId)
+const deleteEtTarget = ref<{ id: string; name: string } | null>(null)
+
+function handleDeleteEventType() {
+  if (!deleteEtTarget.value) return
+  deleteEt.mutate(deleteEtTarget.value.id, {
+    onSuccess: () => { deleteEtTarget.value = null },
+  })
 }
 
 // --- Create Endpoint ---
@@ -69,11 +125,7 @@ const createEp = useCreateEndpoint(appId)
 
 function handleCreateEndpoint() {
   createEp.mutate(
-    {
-      url: epUrl.value,
-      signing_secret: epSecret.value,
-      event_type_ids: epEventTypeIds.value,
-    },
+    { url: epUrl.value, signing_secret: epSecret.value, event_type_ids: epEventTypeIds.value },
     {
       onSuccess: () => {
         epDialogOpen.value = false
@@ -87,11 +139,19 @@ function handleCreateEndpoint() {
 
 function toggleEventType(id: string) {
   const idx = epEventTypeIds.value.indexOf(id)
-  if (idx >= 0) {
-    epEventTypeIds.value.splice(idx, 1)
-  } else {
-    epEventTypeIds.value.push(id)
-  }
+  if (idx >= 0) epEventTypeIds.value.splice(idx, 1)
+  else epEventTypeIds.value.push(id)
+}
+
+// --- Delete Endpoint ---
+const deleteEp = useDeleteEndpoint(appId)
+const deleteEpTarget = ref<{ id: string; url: string } | null>(null)
+
+function handleDeleteEndpoint() {
+  if (!deleteEpTarget.value) return
+  deleteEp.mutate(deleteEpTarget.value.id, {
+    onSuccess: () => { deleteEpTarget.value = null },
+  })
 }
 </script>
 
@@ -110,8 +170,62 @@ function toggleEventType(id: string) {
           Applications
         </RouterLink>
 
-        <PageHeader :title="app.name" :description="`UID: ${app.uid}`" />
+        <PageHeader :title="app.name" :description="`UID: ${app.uid}`">
+          <template #actions>
+            <Button variant="outline" size="sm" @click="openEditDialog">
+              <Pencil class="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            <Button variant="outline" size="sm" class="text-destructive hover:text-destructive" @click="deleteAppOpen = true">
+              <Trash2 class="mr-2 h-4 w-4" />
+              Delete
+            </Button>
+          </template>
+        </PageHeader>
       </div>
+
+      <!-- Edit Application Dialog -->
+      <Dialog v-model:open="editDialogOpen">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Application</DialogTitle>
+            <DialogDescription>Update the application name.</DialogDescription>
+          </DialogHeader>
+          <form class="space-y-4" @submit.prevent="handleUpdateApp">
+            <FormField label="Name" html-for="edit-name">
+              <Input id="edit-name" v-model="editName" />
+            </FormField>
+            <DialogFooter>
+              <Button type="submit" :disabled="updateApp.isPending.value || !editName">
+                {{ updateApp.isPending.value ? 'Saving...' : 'Save' }}
+              </Button>
+            </DialogFooter>
+          </form>
+          <ErrorState v-if="updateApp.error.value" :message="updateApp.error.value.message" />
+        </DialogContent>
+      </Dialog>
+
+      <!-- Delete Application Dialog -->
+      <AlertDialog v-model:open="deleteAppOpen">
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete application</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{{ app.name }}</strong>?
+              This will remove all event types, endpoints, and message history.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              @click="handleDeleteApp"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Tabs default-value="event-types">
         <TabsList>
@@ -142,9 +256,7 @@ function toggleEventType(id: string) {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add Event Type</DialogTitle>
-                  <DialogDescription>
-                    Define an event type that endpoints can subscribe to.
-                  </DialogDescription>
+                  <DialogDescription>Define an event type that endpoints can subscribe to.</DialogDescription>
                 </DialogHeader>
                 <form class="space-y-4" @submit.prevent="handleCreateEventType">
                   <FormField label="Name" html-for="et-name" description="e.g. order.placed, user.created">
@@ -180,6 +292,7 @@ function toggleEventType(id: string) {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead class="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -189,6 +302,24 @@ function toggleEventType(id: string) {
                 </TableCell>
                 <TableCell class="text-muted-foreground">
                   {{ new Date(et.created_at).toLocaleDateString() }}
+                </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon" class="h-8 w-8">
+                        <MoreHorizontal class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        class="text-destructive"
+                        @click="deleteEtTarget = { id: et.id, name: et.name }"
+                      >
+                        <Trash2 class="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </TableCell>
               </TableRow>
             </TableBody>
@@ -208,9 +339,7 @@ function toggleEventType(id: string) {
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Add Endpoint</DialogTitle>
-                  <DialogDescription>
-                    Configure a URL to receive webhook deliveries.
-                  </DialogDescription>
+                  <DialogDescription>Configure a URL to receive webhook deliveries.</DialogDescription>
                 </DialogHeader>
                 <form class="space-y-4" @submit.prevent="handleCreateEndpoint">
                   <FormField label="URL" html-for="ep-url">
@@ -227,9 +356,7 @@ function toggleEventType(id: string) {
                         type="button"
                         @click="toggleEventType(et.id)"
                       >
-                        <Badge
-                          :variant="epEventTypeIds.includes(et.id) ? 'default' : 'outline'"
-                        >
+                        <Badge :variant="epEventTypeIds.includes(et.id) ? 'default' : 'outline'">
                           {{ et.name }}
                         </Badge>
                       </button>
@@ -267,6 +394,7 @@ function toggleEventType(id: string) {
                 <TableHead>Events</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
+                <TableHead class="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -274,11 +402,7 @@ function toggleEventType(id: string) {
                 <TableCell class="font-medium font-mono text-sm">{{ ep.url }}</TableCell>
                 <TableCell>
                   <div class="flex flex-wrap gap-1">
-                    <Badge
-                      v-for="etId in ep.event_type_ids"
-                      :key="etId"
-                      variant="outline"
-                    >
+                    <Badge v-for="etId in ep.event_type_ids" :key="etId" variant="outline">
                       {{ eventTypesData?.items.find(e => e.id === etId)?.name || etId.slice(0, 8) }}
                     </Badge>
                     <span v-if="!ep.event_type_ids.length" class="text-muted-foreground text-sm">All events</span>
@@ -292,11 +416,71 @@ function toggleEventType(id: string) {
                 <TableCell class="text-muted-foreground">
                   {{ new Date(ep.created_at).toLocaleDateString() }}
                 </TableCell>
+                <TableCell>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                      <Button variant="ghost" size="icon" class="h-8 w-8">
+                        <MoreHorizontal class="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        class="text-destructive"
+                        @click="deleteEpTarget = { id: ep.id, url: ep.url }"
+                      >
+                        <Trash2 class="mr-2 h-4 w-4" />
+                        Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
         </TabsContent>
       </Tabs>
+
+      <!-- Delete Event Type confirmation -->
+      <AlertDialog :open="!!deleteEtTarget" @update:open="(v: boolean) => { if (!v) deleteEtTarget = null }">
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete event type</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong>{{ deleteEtTarget?.name }}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              @click="handleDeleteEventType"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <!-- Delete Endpoint confirmation -->
+      <AlertDialog :open="!!deleteEpTarget" @update:open="(v: boolean) => { if (!v) deleteEpTarget = null }">
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete endpoint</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete <strong class="font-mono">{{ deleteEpTarget?.url }}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              @click="handleDeleteEndpoint"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </template>
   </div>
 </template>

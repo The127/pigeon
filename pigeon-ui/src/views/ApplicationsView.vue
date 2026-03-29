@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useApplications, useCreateApplication } from '@/api/applications'
+import { useRouter } from 'vue-router'
+import { useApplications, useCreateApplication, useDeleteApplication } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -11,6 +12,22 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
   Table,
@@ -26,15 +43,19 @@ import EmptyState from '@/components/EmptyState.vue'
 import FormField from '@/components/FormField.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import ErrorState from '@/components/ErrorState.vue'
-import { Plus, LayoutGrid } from 'lucide-vue-next'
+import { Plus, LayoutGrid, MoreHorizontal, Trash2 } from 'lucide-vue-next'
 
+const router = useRouter()
 const { data, isLoading, error } = useApplications()
 const createApp = useCreateApplication()
+const deleteApp = useDeleteApplication()
 
 const dialogOpen = ref(false)
 const newName = ref('')
 const newUid = ref('')
 const uidTouched = ref(false)
+
+const deleteTarget = ref<{ id: string; name: string } | null>(null)
 
 function slugify(value: string): string {
   return value
@@ -62,6 +83,15 @@ function handleCreate() {
       },
     },
   )
+}
+
+function handleDelete() {
+  if (!deleteTarget.value) return
+  deleteApp.mutate(deleteTarget.value.id, {
+    onSuccess: () => {
+      deleteTarget.value = null
+    },
+  })
 }
 </script>
 
@@ -152,6 +182,7 @@ function handleCreate() {
           <TableHead>Name</TableHead>
           <TableHead>UID</TableHead>
           <TableHead>Created</TableHead>
+          <TableHead class="w-12" />
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -159,7 +190,7 @@ function handleCreate() {
           v-for="app in data.items"
           :key="app.id"
           class="cursor-pointer"
-          @click="$router.push(`/apps/${app.id}`)"
+          @click="router.push(`/apps/${app.id}`)"
         >
           <TableCell>
             <span class="font-medium text-primary underline-offset-4 hover:underline">{{ app.name }}</span>
@@ -170,8 +201,48 @@ function handleCreate() {
           <TableCell class="text-muted-foreground">
             {{ new Date(app.created_at).toLocaleDateString() }}
           </TableCell>
+          <TableCell @click.stop>
+            <DropdownMenu>
+              <DropdownMenuTrigger as-child>
+                <Button variant="ghost" size="icon" class="h-8 w-8">
+                  <MoreHorizontal class="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  class="text-destructive"
+                  @click="deleteTarget = { id: app.id, name: app.name }"
+                >
+                  <Trash2 class="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
         </TableRow>
       </TableBody>
     </Table>
+
+    <!-- Delete confirmation -->
+    <AlertDialog :open="!!deleteTarget" @update:open="(v: boolean) => { if (!v) deleteTarget = null }">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete application</AlertDialogTitle>
+          <AlertDialogDescription>
+            Are you sure you want to delete <strong>{{ deleteTarget?.name }}</strong>?
+            This will remove all event types, endpoints, and message history.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            @click="handleDelete"
+          >
+            Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </div>
 </template>
