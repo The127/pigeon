@@ -40,31 +40,8 @@ const features = [
   <div class="grid min-h-screen lg:grid-cols-2">
     <!-- Left: Hero panel -->
     <div class="relative hidden overflow-hidden bg-primary lg:flex lg:flex-col lg:justify-between">
-      <!-- Animated delivery lines -->
-      <div class="absolute inset-0 overflow-hidden opacity-[0.07]">
-        <svg class="h-full w-full" xmlns="http://www.w3.org/2000/svg">
-          <line
-            v-for="i in 12"
-            :key="i"
-            :x1="60 + (i % 3) * 30 + '%'"
-            y1="0%"
-            :x2="10 + (i % 4) * 20 + '%'"
-            y2="100%"
-            stroke="currentColor"
-            stroke-width="1"
-            class="text-primary-foreground"
-          >
-            <animate
-              attributeName="stroke-dashoffset"
-              :from="800 + i * 40"
-              to="0"
-              :dur="3 + (i % 3) * 0.7 + 's'"
-              repeatCount="indefinite"
-            />
-            <set attributeName="stroke-dasharray" to="4 12" />
-          </line>
-        </svg>
-      </div>
+      <!-- Animated background -->
+      <div class="login-bg absolute inset-0" />
 
       <!-- Content -->
       <div class="relative z-10 flex flex-1 flex-col justify-center px-12 xl:px-16">
@@ -193,6 +170,35 @@ const features = [
   to {
     opacity: 1;
     transform: translateX(0);
+  }
+}
+
+.login-bg {
+  background:
+    radial-gradient(
+      ellipse 80% 50% at 20% 40%,
+      rgba(255, 255, 255, 0.04) 0%,
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 60% 40% at 80% 70%,
+      rgba(255, 255, 255, 0.03) 0%,
+      transparent 60%
+    );
+  animation: bg-drift 20s ease-in-out infinite alternate;
+}
+
+@keyframes bg-drift {
+  0% {
+    background-position: 0% 0%, 100% 100%;
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    background-position: 30% 60%, 70% 30%;
+    opacity: 0.6;
   }
 }
 </style>
