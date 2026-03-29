@@ -1,15 +1,8 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Monitor, ScrollText } from 'lucide-vue-next'
+import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, ScrollText, Settings } from 'lucide-vue-next'
 import { useAuth } from '@/auth'
-import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import PigeonLogo from '@/components/PigeonLogo.vue'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -23,7 +16,6 @@ const collapsed = defineModel<boolean>('collapsed', { default: false })
 
 const route = useRoute()
 const { user, logout } = useAuth()
-const { mode, setMode } = useTheme()
 
 const nav = [
   { name: 'Applications', to: '/apps', icon: LayoutGrid },
@@ -38,15 +30,6 @@ const displayName = () => {
   if (!user.value) return 'Sign out'
   return user.value.profile.email || user.value.profile.name || 'Sign out'
 }
-
-const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
-  { value: 'auto', icon: Monitor, label: 'System' },
-  { value: 'light', icon: Sun, label: 'Light' },
-  { value: 'dark', icon: Moon, label: 'Dark' },
-]
-
-const currentThemeIcon = () => themeOptions.find(o => o.value === mode.value)?.icon || Monitor
-const currentThemeLabel = () => themeOptions.find(o => o.value === mode.value)?.label || 'System'
 </script>
 
 <template>
@@ -110,38 +93,27 @@ const currentThemeLabel = () => themeOptions.find(o => o.value === mode.value)?.
 
       <!-- Footer -->
       <div class="space-y-1 p-2">
-        <!-- Theme toggle -->
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <DropdownMenuTrigger as-child>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  class="w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                  :class="collapsed ? 'justify-center px-0' : 'justify-start'"
-                >
-                  <component :is="currentThemeIcon()" class="h-4 w-4 shrink-0" />
-                  <span v-show="!collapsed" class="ml-2">{{ currentThemeLabel() }}</span>
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent v-if="collapsed" side="right">
-              Theme
-            </TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent :side="collapsed ? 'right' : 'top'" align="start">
-            <DropdownMenuItem
-              v-for="opt in themeOptions"
-              :key="opt.value"
-              :class="mode === opt.value ? 'bg-accent' : ''"
-              @click="setMode(opt.value)"
+        <!-- Settings -->
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <RouterLink
+              to="/settings"
+              class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+              :class="[
+                isActive('/settings')
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                collapsed ? 'justify-center px-0' : '',
+              ]"
             >
-              <component :is="opt.icon" class="mr-2 h-4 w-4" />
-              {{ opt.label }}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+              <Settings class="h-4 w-4 shrink-0" />
+              <span v-show="!collapsed">Settings</span>
+            </RouterLink>
+          </TooltipTrigger>
+          <TooltipContent v-if="collapsed" side="right">
+            Settings
+          </TooltipContent>
+        </Tooltip>
 
         <!-- Sign out -->
         <Tooltip>

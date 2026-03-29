@@ -21,6 +21,11 @@ const router = createRouter({
       redirect: '/apps',
     },
     {
+      path: '/settings',
+      name: 'settings',
+      component: () => import('@/views/SettingsView.vue'),
+    },
+    {
       path: '/audit-log',
       name: 'audit-log',
       component: () => import('@/views/AuditLogView.vue'),
