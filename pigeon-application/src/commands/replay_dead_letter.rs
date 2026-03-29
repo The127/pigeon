@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use chrono::Utc;
 use pigeon_domain::attempt::Attempt;
 use pigeon_domain::dead_letter::{DeadLetter, DeadLetterId};
+use pigeon_domain::event::DomainEvent;
 use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
@@ -65,6 +66,11 @@ impl CommandHandler<ReplayDeadLetter> for ReplayDeadLetterHandler {
 
         uow.dead_letter_store().save(&dead_letter).await?;
         uow.attempt_store().insert(&attempt).await?;
+        uow.emit_event(DomainEvent::DeadLetterReplayed {
+            dead_letter_id: dead_letter.id().clone(),
+            message_id: dead_letter.message_id().clone(),
+            endpoint_id: dead_letter.endpoint_id().clone(),
+        });
         uow.commit().await?;
 
         Ok(dead_letter)

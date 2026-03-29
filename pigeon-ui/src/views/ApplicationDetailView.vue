@@ -624,6 +624,7 @@ const replayDl = useReplayDeadLetter(appId)
               <TableRow>
                 <TableHead class="w-8" />
                 <TableHead>Event Type</TableHead>
+                <TableHead>Idempotency Key</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Attempts</TableHead>
                 <TableHead>Created</TableHead>
@@ -642,6 +643,9 @@ const replayDl = useReplayDeadLetter(appId)
                   <TableCell>
                     <Badge variant="outline">{{ eventTypeName(msg.event_type_id) }}</Badge>
                   </TableCell>
+                  <TableCell class="font-mono text-xs text-muted-foreground">
+                    {{ msg.idempotency_key }}
+                  </TableCell>
                   <TableCell>
                     <Badge :variant="messageStatus(msg).variant">{{ messageStatus(msg).label }}</Badge>
                   </TableCell>
@@ -656,7 +660,7 @@ const replayDl = useReplayDeadLetter(appId)
 
                 <!-- Expanded: Attempts -->
                 <TableRow v-if="expandedMessageId === msg.id" class="bg-muted/30">
-                  <TableCell :colspan="5" class="p-0">
+                  <TableCell :colspan="6" class="p-0">
                     <div class="px-6 py-4 space-y-3">
                       <LoadingState v-if="attLoading" message="Loading attempts..." />
                       <p v-else-if="!attemptsData?.length" class="text-sm text-muted-foreground">

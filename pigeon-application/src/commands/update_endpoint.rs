@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::endpoint::{Endpoint, EndpointId};
+use pigeon_domain::event::DomainEvent;
 use pigeon_domain::event_type::EventTypeId;
 use pigeon_domain::organization::OrganizationId;
 use pigeon_domain::version::Version;
@@ -59,6 +60,11 @@ impl CommandHandler<UpdateEndpoint> for UpdateEndpointHandler {
             .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
         uow.endpoint_store().save(&endpoint).await?;
+        uow.emit_event(DomainEvent::EndpointUpdated {
+            endpoint_id: endpoint.id().clone(),
+            app_id: endpoint.app_id().clone(),
+            enabled: endpoint.enabled(),
+        });
         uow.commit().await?;
 
         Ok(endpoint)
@@ -118,6 +124,7 @@ mod tests {
                 "uow_factory:begin",
                 "endpoint_store:find_by_id",
                 "endpoint_store:save",
+                "uow:emit_event:endpoint_updated",
                 "uow:commit",
             ]
         );

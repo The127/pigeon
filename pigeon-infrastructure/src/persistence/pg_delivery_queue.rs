@@ -197,6 +197,12 @@ impl DeliveryQueue for PgDeliveryQueue {
         last_response_code: Option<u16>,
         last_response_body: Option<String>,
     ) -> Result<(), ApplicationError> {
+        let mut tx = self
+            .pool
+            .begin()
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
         sqlx::query(
             "INSERT INTO dead_letters \
              (id, message_id, endpoint_id, app_id, last_response_code, last_response_body, dead_lettered_at) \
@@ -208,9 +214,20 @@ impl DeliveryQueue for PgDeliveryQueue {
         .bind(app_id.as_uuid())
         .bind(last_response_code.map(|c| c as i16))
         .bind(last_response_body)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        let event = DomainEvent::DeadLettered {
+            message_id: message_id.clone(),
+            endpoint_id: endpoint_id.clone(),
+            app_id: app_id.clone(),
+        };
+        Self::insert_outbox_event(&mut tx, &event).await?;
+
+        tx.commit()
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(())
     }

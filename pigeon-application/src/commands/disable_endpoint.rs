@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use pigeon_domain::application::ApplicationId;
 use pigeon_domain::endpoint::EndpointId;
+use pigeon_domain::event::DomainEvent;
 
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
@@ -52,6 +53,11 @@ impl CommandHandler<DisableEndpoint> for DisableEndpointHandler {
 
         endpoint.disable();
         uow.endpoint_store().save(&endpoint).await?;
+        uow.emit_event(DomainEvent::EndpointUpdated {
+            endpoint_id: endpoint.id().clone(),
+            app_id: endpoint.app_id().clone(),
+            enabled: false,
+        });
         uow.commit().await?;
 
         Ok(())

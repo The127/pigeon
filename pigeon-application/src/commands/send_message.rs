@@ -4,6 +4,7 @@ use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use pigeon_domain::application::ApplicationId;
 use pigeon_domain::attempt::Attempt;
+use pigeon_domain::event::DomainEvent;
 use pigeon_domain::event_type::EventTypeId;
 use pigeon_domain::message::Message;
 use pigeon_domain::organization::OrganizationId;
@@ -103,6 +104,13 @@ impl CommandHandler<SendMessage> for SendMessageHandler {
             );
             uow.attempt_store().insert(&attempt).await?;
         }
+
+        uow.emit_event(DomainEvent::MessageCreated {
+            message_id: result.message.id().clone(),
+            app_id: command.app_id,
+            event_type_id: command.event_type_id,
+            attempts_created: attempts_created as u32,
+        });
 
         uow.commit().await?;
 

@@ -178,238 +178,44 @@ impl ChangeTracker {
         None
     }
 
-    /// Extract domain events from pending changes.
+    /// Collect explicitly emitted domain events.
     /// Called during UoW commit to populate the transactional outbox.
+    /// Handlers are responsible for emitting events via `emit_event()`.
     pub(crate) fn collect_events(&self) -> Vec<DomainEvent> {
-        let mut events = Vec::new();
-        for change in &self.changes {
-            match change {
-                Change::ExplicitEvent(event) => {
-                    events.push(event.clone());
-                }
-                Change::InsertMessage(msg) => {
-                    let attempts_created = self
-                        .changes
-                        .iter()
-                        .filter(|c| matches!(c, Change::InsertAttempt(a) if a.message_id() == msg.id()))
-                        .count() as u32;
-                    events.push(DomainEvent::MessageCreated {
-                        message_id: msg.id().clone(),
-                        app_id: msg.app_id().clone(),
-                        event_type_id: msg.event_type_id().clone(),
-                        attempts_created,
-                    });
-                }
-                Change::InsertDeadLetter(dl) => {
-                    events.push(DomainEvent::DeadLettered {
-                        message_id: dl.message_id().clone(),
-                        endpoint_id: dl.endpoint_id().clone(),
-                        app_id: dl.app_id().clone(),
-                    });
-                }
-                Change::SaveDeadLetter(dl) if dl.replayed_at().is_some() => {
-                    events.push(DomainEvent::DeadLetterReplayed {
-                        dead_letter_id: dl.id().clone(),
-                        message_id: dl.message_id().clone(),
-                        endpoint_id: dl.endpoint_id().clone(),
-                    });
-                }
-                Change::SaveEndpoint(ep) => {
-                    events.push(DomainEvent::EndpointUpdated {
-                        endpoint_id: ep.id().clone(),
-                        app_id: ep.app_id().clone(),
-                        enabled: ep.enabled(),
-                    });
-                }
-                _ => {}
-            }
-        }
-        events
+        self.changes
+            .iter()
+            .filter_map(|change| match change {
+                Change::ExplicitEvent(event) => Some(event.clone()),
+                _ => None,
+            })
+            .collect()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use pigeon_domain::dead_letter::DeadLetter;
-    use pigeon_domain::endpoint::Endpoint;
-    use pigeon_domain::message::Message;
+    use pigeon_domain::message::MessageId;
 
     #[test]
-    fn insert_message_emits_message_created() {
+    fn explicit_event_is_collected() {
         let mut tracker = ChangeTracker::new();
-        let msg = Message::new(
-            ApplicationId::new(),
-            EventTypeId::new(),
-            serde_json::json!({"test": true}),
-            None,
-            chrono::Duration::hours(1),
-        )
-        .unwrap();
+        let event = DomainEvent::MessageCreated {
+            message_id: MessageId::new(),
+            app_id: ApplicationId::new(),
+            event_type_id: EventTypeId::new(),
+            attempts_created: 3,
+        };
 
-        tracker.record(Change::InsertMessage(msg.clone()));
+        tracker.record(Change::ExplicitEvent(event.clone()));
         let events = tracker.collect_events();
 
         assert_eq!(events.len(), 1);
-        match &events[0] {
-            DomainEvent::MessageCreated {
-                message_id,
-                app_id,
-                event_type_id,
-                attempts_created,
-            } => {
-                assert_eq!(message_id, msg.id());
-                assert_eq!(app_id, msg.app_id());
-                assert_eq!(event_type_id, msg.event_type_id());
-                assert_eq!(*attempts_created, 0);
-            }
-            _ => panic!("expected MessageCreated"),
-        }
+        assert_eq!(events[0], event);
     }
 
     #[test]
-    fn insert_message_counts_associated_attempts() {
-        let mut tracker = ChangeTracker::new();
-        let msg = Message::new(
-            ApplicationId::new(),
-            EventTypeId::new(),
-            serde_json::json!({"test": true}),
-            None,
-            chrono::Duration::hours(1),
-        )
-        .unwrap();
-
-        let a1 = pigeon_domain::attempt::Attempt::new(
-            msg.id().clone(),
-            EndpointId::new(),
-            chrono::Utc::now(),
-        );
-        let a2 = pigeon_domain::attempt::Attempt::new(
-            msg.id().clone(),
-            EndpointId::new(),
-            chrono::Utc::now(),
-        );
-
-        tracker.record(Change::InsertMessage(msg.clone()));
-        tracker.record(Change::InsertAttempt(a1));
-        tracker.record(Change::InsertAttempt(a2));
-
-        let events = tracker.collect_events();
-        match &events[0] {
-            DomainEvent::MessageCreated { attempts_created, .. } => {
-                assert_eq!(*attempts_created, 2);
-            }
-            _ => panic!("expected MessageCreated"),
-        }
-    }
-
-    #[test]
-    fn insert_dead_letter_emits_dead_lettered() {
-        let mut tracker = ChangeTracker::new();
-        let dl = DeadLetter::new(
-            pigeon_domain::message::MessageId::new(),
-            EndpointId::new(),
-            ApplicationId::new(),
-            Some(500),
-            Some("error".into()),
-        );
-
-        tracker.record(Change::InsertDeadLetter(dl.clone()));
-        let events = tracker.collect_events();
-
-        assert_eq!(events.len(), 1);
-        match &events[0] {
-            DomainEvent::DeadLettered {
-                message_id,
-                endpoint_id,
-                app_id,
-            } => {
-                assert_eq!(message_id, dl.message_id());
-                assert_eq!(endpoint_id, dl.endpoint_id());
-                assert_eq!(app_id, dl.app_id());
-            }
-            _ => panic!("expected DeadLettered"),
-        }
-    }
-
-    #[test]
-    fn save_dead_letter_with_replayed_at_emits_replayed() {
-        let mut tracker = ChangeTracker::new();
-        let mut dl = DeadLetter::new(
-            pigeon_domain::message::MessageId::new(),
-            EndpointId::new(),
-            ApplicationId::new(),
-            None,
-            None,
-        );
-        dl.mark_replayed();
-
-        tracker.record(Change::SaveDeadLetter(dl.clone()));
-        let events = tracker.collect_events();
-
-        assert_eq!(events.len(), 1);
-        match &events[0] {
-            DomainEvent::DeadLetterReplayed {
-                dead_letter_id,
-                message_id,
-                endpoint_id,
-            } => {
-                assert_eq!(dead_letter_id, dl.id());
-                assert_eq!(message_id, dl.message_id());
-                assert_eq!(endpoint_id, dl.endpoint_id());
-            }
-            _ => panic!("expected DeadLetterReplayed"),
-        }
-    }
-
-    #[test]
-    fn save_dead_letter_without_replayed_at_emits_nothing() {
-        let mut tracker = ChangeTracker::new();
-        let dl = DeadLetter::new(
-            pigeon_domain::message::MessageId::new(),
-            EndpointId::new(),
-            ApplicationId::new(),
-            None,
-            None,
-        );
-
-        tracker.record(Change::SaveDeadLetter(dl));
-        let events = tracker.collect_events();
-
-        assert!(events.is_empty());
-    }
-
-    #[test]
-    fn save_endpoint_emits_endpoint_updated() {
-        let mut tracker = ChangeTracker::new();
-        let ep = Endpoint::new(
-            ApplicationId::new(),
-            "https://example.com/hook".into(),
-            "whsec_test".into(),
-            vec![EventTypeId::new()],
-        )
-        .unwrap();
-
-        tracker.record(Change::SaveEndpoint(ep.clone()));
-        let events = tracker.collect_events();
-
-        assert_eq!(events.len(), 1);
-        match &events[0] {
-            DomainEvent::EndpointUpdated {
-                endpoint_id,
-                app_id,
-                enabled,
-            } => {
-                assert_eq!(endpoint_id, ep.id());
-                assert_eq!(app_id, ep.app_id());
-                assert!(enabled);
-            }
-            _ => panic!("expected EndpointUpdated"),
-        }
-    }
-
-    #[test]
-    fn no_events_for_non_emitting_changes() {
+    fn non_event_changes_produce_no_events() {
         let mut tracker = ChangeTracker::new();
         let app = Application::new(
             OrganizationId::new(),
@@ -425,28 +231,23 @@ mod tests {
     }
 
     #[test]
-    fn multiple_changes_emit_multiple_events() {
+    fn multiple_explicit_events_collected_in_order() {
         let mut tracker = ChangeTracker::new();
 
-        let msg = Message::new(
-            ApplicationId::new(),
-            EventTypeId::new(),
-            serde_json::json!({"x": 1}),
-            None,
-            chrono::Duration::hours(1),
-        )
-        .unwrap();
+        let e1 = DomainEvent::MessageCreated {
+            message_id: MessageId::new(),
+            app_id: ApplicationId::new(),
+            event_type_id: EventTypeId::new(),
+            attempts_created: 1,
+        };
+        let e2 = DomainEvent::DeadLettered {
+            message_id: MessageId::new(),
+            endpoint_id: EndpointId::new(),
+            app_id: ApplicationId::new(),
+        };
 
-        let dl = DeadLetter::new(
-            pigeon_domain::message::MessageId::new(),
-            EndpointId::new(),
-            ApplicationId::new(),
-            None,
-            None,
-        );
-
-        tracker.record(Change::InsertMessage(msg.clone()));
-        tracker.record(Change::InsertDeadLetter(dl));
+        tracker.record(Change::ExplicitEvent(e1));
+        tracker.record(Change::ExplicitEvent(e2));
 
         let events = tracker.collect_events();
         assert_eq!(events.len(), 2);
