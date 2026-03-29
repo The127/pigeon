@@ -84,6 +84,15 @@ Vue 3 + TypeScript + Tailwind v4 + shadcn-vue + TanStack Query + oidc-client-ts.
 - Test webhook endpoint (`just dev-endpoint`)
 - `ON DELETE CASCADE` for all FK constraints
 
+### ~~Endpoint Stats API~~
+`GET /api/v1/applications/{app_id}/endpoints/{id}/stats?period=24h|7d|30d` — per-endpoint metrics from attempts + `endpoint_delivery_summary` projection: success/failure counts, consecutive failures, last delivery, time-series chart.
+
+### ~~Endpoint Detail Page~~
+Route `/apps/:id/endpoints/:epId` with stats dashboard, edit dialog (name, URL, signing secret, event type subscriptions), delete, subscribed event types linked to detail pages.
+
+### ~~Toast Notifications~~
+Stacking toasts with fan-out on hover (inspired by Keyline UI). Pause-on-hover, progress bar, slide animation. Wired to all mutations across the app.
+
 ## Priority: High (Outbox-unlocked)
 
 ### Dead Letter Alert Webhooks
@@ -95,10 +104,8 @@ Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurab
 ## Priority: Medium
 
 ### Frontend: Polish
-- Toast notifications for mutation success/error
 - Dark mode toggle
 - Mobile responsive sidebar (sheet overlay on small screens)
-- Edit endpoint (URL, name, signing secret, event type subscriptions)
 
 ### Signing Secret Rotation
 No mechanism to rotate an endpoint's `signing_secret` without breaking in-flight deliveries. Design: dual-secret window — deliver signed with new secret, but during a configurable transition period include both old and new signatures so consumers can verify with either.
