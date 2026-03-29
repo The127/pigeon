@@ -8,6 +8,9 @@ use uuid::Uuid;
 pub struct CreateOrganizationRequest {
     pub name: String,
     pub slug: String,
+    pub oidc_issuer_url: String,
+    pub oidc_audience: String,
+    pub oidc_jwks_url: String,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]

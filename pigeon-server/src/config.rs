@@ -8,6 +8,9 @@ pub(crate) struct PigeonConfig {
     pub(crate) bootstrap_org_enabled: bool,
     pub(crate) bootstrap_org_name: String,
     pub(crate) bootstrap_org_slug: String,
+    pub(crate) bootstrap_oidc_issuer_url: String,
+    pub(crate) bootstrap_oidc_audience: String,
+    pub(crate) bootstrap_oidc_jwks_url: String,
     pub(crate) jwks_cache_ttl: Duration,
     // Worker
     pub(crate) worker_batch_size: u32,
@@ -37,6 +40,22 @@ impl PigeonConfig {
 
         let bootstrap_org_slug = std::env::var("PIGEON_BOOTSTRAP_ORG_SLUG")
             .unwrap_or_else(|_| "system".to_string());
+
+        let bootstrap_oidc_issuer_url =
+            std::env::var("PIGEON_BOOTSTRAP_OIDC_ISSUER_URL").unwrap_or_default();
+        let bootstrap_oidc_audience =
+            std::env::var("PIGEON_BOOTSTRAP_OIDC_AUDIENCE").unwrap_or_default();
+        let bootstrap_oidc_jwks_url =
+            std::env::var("PIGEON_BOOTSTRAP_OIDC_JWKS_URL").unwrap_or_default();
+
+        if bootstrap_org_enabled
+            && (bootstrap_oidc_issuer_url.is_empty() || bootstrap_oidc_audience.is_empty())
+        {
+            anyhow::bail!(
+                "PIGEON_BOOTSTRAP_OIDC_ISSUER_URL and PIGEON_BOOTSTRAP_OIDC_AUDIENCE are required \
+                 when PIGEON_BOOTSTRAP_ORG_ENABLED=true"
+            );
+        }
 
         let jwks_cache_ttl_secs: u64 = std::env::var("PIGEON_JWKS_CACHE_TTL_SECS")
             .unwrap_or_else(|_| "3600".to_string())
@@ -89,6 +108,9 @@ impl PigeonConfig {
             bootstrap_org_enabled,
             bootstrap_org_name,
             bootstrap_org_slug,
+            bootstrap_oidc_issuer_url,
+            bootstrap_oidc_audience,
+            bootstrap_oidc_jwks_url,
             jwks_cache_ttl: Duration::from_secs(jwks_cache_ttl_secs),
             worker_batch_size,
             worker_poll_interval: Duration::from_millis(worker_poll_interval_ms),
@@ -116,6 +138,9 @@ mod tests {
             bootstrap_org_enabled: false,
             bootstrap_org_name: "System".to_string(),
             bootstrap_org_slug: "system".to_string(),
+            bootstrap_oidc_issuer_url: String::new(),
+            bootstrap_oidc_audience: String::new(),
+            bootstrap_oidc_jwks_url: String::new(),
             jwks_cache_ttl: Duration::from_secs(3600),
             worker_batch_size: 10,
             worker_poll_interval: Duration::from_millis(1000),

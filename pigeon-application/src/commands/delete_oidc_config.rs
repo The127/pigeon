@@ -39,10 +39,18 @@ impl CommandHandler<DeleteOidcConfig> for DeleteOidcConfigHandler {
         let existing = uow
             .oidc_config_store()
             .find_by_id(&command.id)
+            .await?
+            .ok_or(ApplicationError::NotFound)?;
+
+        let count = uow
+            .oidc_config_store()
+            .count_by_org(existing.org_id())
             .await?;
 
-        if existing.is_none() {
-            return Err(ApplicationError::NotFound);
+        if count <= 1 {
+            return Err(ApplicationError::Validation(
+                "cannot delete the last OIDC config for an organization".to_string(),
+            ));
         }
 
         uow.oidc_config_store().delete(&command.id).await?;
@@ -60,11 +68,59 @@ mod tests {
     use pigeon_domain::organization::OrganizationId;
 
     #[tokio::test]
-    async fn deletes_oidc_config_successfully() {
+    async fn deletes_oidc_config_when_multiple_exist() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
+        let org_id = OrganizationId::new();
+
+        let config1 = OidcConfig::new(
+            org_id.clone(),
+            "https://auth.example.com".into(),
+            "my-api".into(),
+            "https://auth.example.com/.well-known/jwks.json".into(),
+        )
+        .unwrap();
+        let config2 = OidcConfig::new(
+            org_id.clone(),
+            "https://auth2.example.com".into(),
+            "my-api-2".into(),
+            "https://auth2.example.com/.well-known/jwks.json".into(),
+        )
+        .unwrap();
+        let id = config1.id().clone();
+
+        {
+            let mut uow = factory.begin().await.unwrap();
+            uow.oidc_config_store().insert(&config1).await.unwrap();
+            uow.oidc_config_store().insert(&config2).await.unwrap();
+            uow.commit().await.unwrap();
+        }
+        log.entries.lock().unwrap().clear();
+
+        let handler = DeleteOidcConfigHandler::new(factory);
+        let result = handler.handle(DeleteOidcConfig { id }).await;
+
+        assert!(result.is_ok());
+        assert_eq!(
+            log.entries(),
+            vec![
+                "uow_factory:begin",
+                "oidc_config_store:find_by_id",
+                "oidc_config_store:count_by_org",
+                "oidc_config_store:delete",
+                "uow:commit",
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_deleting_last_oidc_config() {
+        let log = OperationLog::new();
+        let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
+        let org_id = OrganizationId::new();
+
         let config = OidcConfig::new(
-            OrganizationId::new(),
+            org_id.clone(),
             "https://auth.example.com".into(),
             "my-api".into(),
             "https://auth.example.com/.well-known/jwks.json".into(),
@@ -82,16 +138,7 @@ mod tests {
         let handler = DeleteOidcConfigHandler::new(factory);
         let result = handler.handle(DeleteOidcConfig { id }).await;
 
-        assert!(result.is_ok());
-        assert_eq!(
-            log.entries(),
-            vec![
-                "uow_factory:begin",
-                "oidc_config_store:find_by_id",
-                "oidc_config_store:delete",
-                "uow:commit",
-            ]
-        );
+        assert!(matches!(result, Err(ApplicationError::Validation(_))));
     }
 
     #[tokio::test]

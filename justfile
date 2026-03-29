@@ -62,6 +62,18 @@ dev-migrate:
 dev-run:
     cargo run -p pigeon-server -- serve
 
+# Run the UI dev server
+dev-ui:
+    cd pigeon-ui && npm run dev
+
+# Run API + UI dev servers in parallel
+dev: dev-up
+    #!/usr/bin/env bash
+    trap 'kill 0' EXIT
+    cargo run -p pigeon-server -- serve &
+    cd pigeon-ui && npm run dev &
+    wait
+
 # Watch mode: re-check on file changes (requires cargo-watch)
 dev-watch:
     cargo watch -c -x 'check --workspace'

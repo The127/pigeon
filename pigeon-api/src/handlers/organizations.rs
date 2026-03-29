@@ -37,6 +37,9 @@ pub async fn create_organization(
     let command = CreateOrganization {
         name: body.name,
         slug: body.slug,
+        oidc_issuer_url: body.oidc_issuer_url,
+        oidc_audience: body.oidc_audience,
+        oidc_jwks_url: body.oidc_jwks_url,
     };
 
     let org = state
@@ -582,7 +585,10 @@ mod tests {
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({
                             "name": "my-org",
-                            "slug": "my-org"
+                            "slug": "my-org",
+                            "oidc_issuer_url": "https://auth.example.com",
+                            "oidc_audience": "pigeon-api",
+                            "oidc_jwks_url": "https://auth.example.com/.well-known/jwks.json"
                         }))
                         .unwrap(),
                     ))
@@ -612,7 +618,10 @@ mod tests {
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({
                             "name": "",
-                            "slug": "my-org"
+                            "slug": "my-org",
+                            "oidc_issuer_url": "https://auth.example.com",
+                            "oidc_audience": "pigeon-api",
+                            "oidc_jwks_url": "https://auth.example.com/.well-known/jwks.json"
                         }))
                         .unwrap(),
                     ))

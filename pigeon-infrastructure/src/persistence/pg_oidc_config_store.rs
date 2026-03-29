@@ -57,6 +57,18 @@ impl OidcConfigStore for PgOidcConfigStore {
         Ok(row.map(|r| r.into_oidc_config()))
     }
 
+    async fn count_by_org(&self, org_id: &OrganizationId) -> Result<u64, ApplicationError> {
+        let count: i64 = sqlx::query_scalar(
+            "SELECT COUNT(*) FROM oidc_configs WHERE org_id = $1",
+        )
+        .bind(org_id.as_uuid())
+        .fetch_one(&self.pool)
+        .await
+        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        Ok(count as u64)
+    }
+
     async fn delete(&mut self, id: &OidcConfigId) -> Result<(), ApplicationError> {
         self.tracker
             .lock()

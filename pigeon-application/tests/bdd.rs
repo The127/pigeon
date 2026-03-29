@@ -120,8 +120,12 @@ pub struct AppWorld {
     msg_data: Option<SharedMessageData>,
 
     // Organization
-    create_org_command: Option<CreateOrganization>,
+    create_org_name: Option<String>,
+    create_org_slug: Option<String>,
+    create_org_oidc_issuer: Option<String>,
+    create_org_oidc_audience: Option<String>,
     create_org_result: Option<Result<Organization, ApplicationError>>,
+    create_org_oidc_data: Option<SharedOidcConfigData>,
     existing_org: Option<Organization>,
     org_data: Option<SharedOrganizationData>,
     update_org_result: Option<Result<Organization, ApplicationError>>,
@@ -1282,17 +1286,41 @@ async fn then_send_message_validation_error(world: &mut AppWorld) {
 
 #[given(regex = r#"a request to create an organization named "([^"]*)" with slug "([^"]*)""#)]
 async fn given_create_org_request(world: &mut AppWorld, name: String, slug: String) {
-    world.create_org_command = Some(CreateOrganization { name, slug });
+    world.create_org_name = Some(name);
+    world.create_org_slug = Some(slug);
     world.log = Some(OperationLog::new());
+}
+
+#[given(regex = r#"OIDC config with issuer "([^"]*)" and audience "([^"]*)""#)]
+async fn given_oidc_config_for_org(world: &mut AppWorld, issuer: String, audience: String) {
+    world.create_org_oidc_issuer = Some(issuer);
+    world.create_org_oidc_audience = Some(audience);
 }
 
 #[when("the create organization command is executed")]
 async fn when_create_org_executed(world: &mut AppWorld) {
     let log = world.log.as_ref().unwrap().clone();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
-    let handler = CreateOrganizationHandler::new(factory);
-    let command = world.create_org_command.take().unwrap();
+
+    let issuer = world.create_org_oidc_issuer.take().unwrap_or_default();
+    let audience = world.create_org_oidc_audience.take().unwrap_or_default();
+    let jwks_url = if issuer.is_empty() {
+        String::new()
+    } else {
+        format!("{issuer}/.well-known/jwks.json")
+    };
+
+    let command = CreateOrganization {
+        name: world.create_org_name.take().unwrap(),
+        slug: world.create_org_slug.take().unwrap(),
+        oidc_issuer_url: issuer,
+        oidc_audience: audience,
+        oidc_jwks_url: jwks_url,
+    };
+
+    let handler = CreateOrganizationHandler::new(factory.clone());
     world.create_org_result = Some(handler.handle(command).await);
+    world.create_org_oidc_data = Some(factory.oidc_config_data().clone());
 }
 
 #[then(regex = r#"the organization should be created with name "([^"]*)""#)]
@@ -1319,6 +1347,15 @@ async fn then_org_store_contains(world: &mut AppWorld) {
     assert!(log
         .entries()
         .contains(&"organization_store:insert".to_string()));
+}
+
+#[then("the OIDC config store should contain a config for the organization")]
+async fn then_oidc_store_contains_config(world: &mut AppWorld) {
+    let oidc_data = world.create_org_oidc_data.as_ref().unwrap();
+    let org = world.create_org_result.as_ref().unwrap().as_ref().unwrap();
+    let configs = oidc_data.oidc_configs.lock().unwrap();
+    assert_eq!(configs.len(), 1);
+    assert_eq!(configs[0].org_id(), org.id());
 }
 
 #[then("the create organization command should fail with a validation error")]
@@ -1598,6 +1635,39 @@ async fn then_oidc_config_validation_error(world: &mut AppWorld) {
     );
 }
 
+#[given("an organization with multiple OIDC configs exists")]
+async fn given_org_with_multiple_oidc_configs(world: &mut AppWorld) {
+    let log = OperationLog::new();
+    let factory = FakeUnitOfWorkFactory::new(log.clone());
+    let org_id = OrganizationId::new();
+    let config1 = OidcConfig::new(
+        org_id.clone(),
+        "https://auth.example.com".into(),
+        "pigeon-api".into(),
+        "https://auth.example.com/.well-known/jwks.json".into(),
+    )
+    .unwrap();
+    let config2 = OidcConfig::new(
+        org_id.clone(),
+        "https://auth2.example.com".into(),
+        "pigeon-api-2".into(),
+        "https://auth2.example.com/.well-known/jwks.json".into(),
+    )
+    .unwrap();
+
+    {
+        let mut uow = factory.begin().await.unwrap();
+        uow.oidc_config_store().insert(&config1).await.unwrap();
+        uow.oidc_config_store().insert(&config2).await.unwrap();
+        uow.commit().await.unwrap();
+    }
+
+    world.org_id = Some(org_id);
+    world.existing_oidc_config = Some(config1);
+    world.oidc_data = Some(factory.oidc_config_data().clone());
+    world.log = Some(log);
+}
+
 #[given("an organization with an OIDC config exists")]
 async fn given_org_with_oidc_config(world: &mut AppWorld) {
     let log = OperationLog::new();
@@ -1646,6 +1716,16 @@ async fn when_delete_oidc_config(world: &mut AppWorld) {
 #[then("the OIDC config should be removed")]
 async fn then_oidc_config_removed(world: &mut AppWorld) {
     assert!(world.delete_oidc_config_result.as_ref().unwrap().is_ok());
+}
+
+#[then("the deletion should fail with a validation error")]
+async fn then_oidc_deletion_validation_error(world: &mut AppWorld) {
+    let result = world.delete_oidc_config_result.as_ref().unwrap();
+    assert!(
+        matches!(result, Err(ApplicationError::Validation(_))),
+        "expected Validation error, got: {:?}",
+        result
+    );
 }
 
 #[when("a non-existent OIDC config is deleted")]

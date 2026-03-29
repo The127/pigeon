@@ -224,6 +224,7 @@ pub trait OidcConfigStore: Send + Sync {
         &self,
         id: &OidcConfigId,
     ) -> Result<Option<OidcConfig>, ApplicationError>;
+    async fn count_by_org(&self, org_id: &OrganizationId) -> Result<u64, ApplicationError>;
     async fn delete(&mut self, id: &OidcConfigId) -> Result<(), ApplicationError>;
 }
 

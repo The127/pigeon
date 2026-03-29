@@ -684,6 +684,12 @@ impl OidcConfigStore for FakeOidcConfigStore {
         Ok(configs.iter().find(|c| c.id() == id).cloned())
     }
 
+    async fn count_by_org(&self, org_id: &OrganizationId) -> Result<u64, ApplicationError> {
+        self.log.record("oidc_config_store:count_by_org");
+        let configs = self.data.oidc_configs.lock().unwrap();
+        Ok(configs.iter().filter(|c| c.org_id() == org_id).count() as u64)
+    }
+
     async fn delete(&mut self, id: &OidcConfigId) -> Result<(), ApplicationError> {
         self.log.record("oidc_config_store:delete");
         let mut configs = self.data.oidc_configs.lock().unwrap();
