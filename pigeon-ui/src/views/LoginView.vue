@@ -188,7 +188,7 @@ const features = [
   height: 500px;
   top: -10%;
   left: -10%;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(217, 119, 6, 0.06);
   animation: orb-drift-1 25s ease-in-out infinite alternate;
 }
 
@@ -197,7 +197,7 @@ const features = [
   height: 400px;
   bottom: -5%;
   right: -5%;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(245, 158, 11, 0.04);
   animation: orb-drift-2 20s ease-in-out infinite alternate;
 }
 
@@ -206,7 +206,7 @@ const features = [
   height: 300px;
   top: 40%;
   left: 30%;
-  background: rgba(255, 255, 255, 0.02);
+  background: rgba(180, 83, 9, 0.05);
   animation: orb-drift-3 30s ease-in-out infinite alternate;
 }
 
