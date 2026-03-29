@@ -17,6 +17,7 @@ import {
   useDeadLetters,
   useReplayDeadLetter,
   useAppStats,
+  useRetriggerMessage,
 } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -193,6 +194,7 @@ const payloadValid = computed(() => {
 
 // --- Messages ---
 const { data: messagesData, isLoading: msgLoading } = useMessages(appId)
+const retriggerMsg = useRetriggerMessage(appId)
 const expandedMessageId = ref<string | null>(null)
 const { data: attemptsData, isLoading: attLoading } = useAttempts(appId, expandedMessageId)
 
@@ -206,6 +208,14 @@ function eventTypeName(etId: string) {
 
 function endpointUrl(epId: string) {
   return endpointsData.value?.items.find(e => e.id === epId)?.url || epId.slice(0, 8)
+}
+
+function messageStatus(msg: { attempts_created: number; succeeded: number; failed: number; dead_lettered: number }) {
+  if (msg.attempts_created === 0) return { label: 'No endpoints', variant: 'outline' as const }
+  if (msg.dead_lettered > 0) return { label: 'Dead lettered', variant: 'destructive' as const }
+  if (msg.succeeded === msg.attempts_created) return { label: 'Delivered', variant: 'default' as const }
+  if (msg.failed > 0) return { label: 'Partially failed', variant: 'secondary' as const }
+  return { label: 'Pending', variant: 'secondary' as const }
 }
 
 function statusColor(status: string) {
@@ -614,7 +624,8 @@ const replayDl = useReplayDeadLetter(appId)
               <TableRow>
                 <TableHead class="w-8" />
                 <TableHead>Event Type</TableHead>
-                <TableHead>Idempotency Key</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Attempts</TableHead>
                 <TableHead>Created</TableHead>
               </TableRow>
             </TableHeader>
@@ -631,8 +642,12 @@ const replayDl = useReplayDeadLetter(appId)
                   <TableCell>
                     <Badge variant="outline">{{ eventTypeName(msg.event_type_id) }}</Badge>
                   </TableCell>
-                  <TableCell class="font-mono text-xs text-muted-foreground">
-                    {{ msg.idempotency_key.slice(0, 20) }}
+                  <TableCell>
+                    <Badge :variant="messageStatus(msg).variant">{{ messageStatus(msg).label }}</Badge>
+                  </TableCell>
+                  <TableCell class="text-muted-foreground text-sm">
+                    {{ msg.succeeded }}/{{ msg.attempts_created }}
+                    <span v-if="msg.dead_lettered > 0" class="text-destructive ml-1">({{ msg.dead_lettered }} dead)</span>
                   </TableCell>
                   <TableCell class="text-muted-foreground">
                     {{ new Date(msg.created_at).toLocaleString() }}
@@ -641,12 +656,23 @@ const replayDl = useReplayDeadLetter(appId)
 
                 <!-- Expanded: Attempts -->
                 <TableRow v-if="expandedMessageId === msg.id" class="bg-muted/30">
-                  <TableCell :colspan="4" class="p-0">
-                    <div class="px-6 py-4">
+                  <TableCell :colspan="5" class="p-0">
+                    <div class="px-6 py-4 space-y-3">
                       <LoadingState v-if="attLoading" message="Loading attempts..." />
-                      <p v-else-if="!attemptsData?.length" class="text-sm text-muted-foreground">
-                        No delivery attempts.
-                      </p>
+                      <template v-else-if="!attemptsData?.length">
+                        <p class="text-sm text-muted-foreground">
+                          No delivery attempts — no endpoints matched this event type when the message was sent.
+                        </p>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          :disabled="retriggerMsg.isPending.value"
+                          @click.stop="retriggerMsg.mutate(msg.id)"
+                        >
+                          <RotateCcw class="mr-2 h-4 w-4" />
+                          {{ retriggerMsg.isPending.value ? 'Retriggering...' : 'Retrigger delivery' }}
+                        </Button>
+                      </template>
                       <Table v-else>
                         <TableHeader>
                           <TableRow>
@@ -677,6 +703,15 @@ const replayDl = useReplayDeadLetter(appId)
                           </TableRow>
                         </TableBody>
                       </Table>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        :disabled="retriggerMsg.isPending.value"
+                        @click.stop="retriggerMsg.mutate(msg.id)"
+                      >
+                        <RotateCcw class="mr-2 h-4 w-4" />
+                        {{ retriggerMsg.isPending.value ? 'Retriggering...' : 'Retrigger delivery' }}
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>

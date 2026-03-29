@@ -50,6 +50,10 @@ export interface MessageResponse {
   payload: unknown
   idempotency_key: string
   created_at: string
+  attempts_created: number
+  succeeded: number
+  failed: number
+  dead_lettered: number
 }
 
 export interface AttemptResponse {
@@ -268,6 +272,22 @@ export function useSendMessage(appId: Ref<string>) {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  })
+}
+
+export function useRetriggerMessage(appId: Ref<string>) {
+  const queryClient = useQueryClient()
+
+  return useMutation<unknown, Error, string>({
+    mutationFn: (messageId) =>
+      apiFetch(`/applications/${appId.value}/messages/${messageId}/retrigger`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['applications', appId, 'messages'],
+      })
+    },
   })
 }
 
