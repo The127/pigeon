@@ -39,7 +39,7 @@ const features = [
 <template>
   <div class="grid min-h-screen lg:grid-cols-2">
     <!-- Left: Hero panel -->
-    <div class="relative hidden overflow-hidden bg-primary lg:flex lg:flex-col lg:justify-between">
+    <div class="relative hidden overflow-hidden bg-[#0a0a0a] lg:flex lg:flex-col lg:justify-between">
       <!-- Animated background -->
       <div class="absolute inset-0 overflow-hidden">
         <div class="login-orb login-orb-1" />
@@ -188,7 +188,7 @@ const features = [
   height: 500px;
   top: -10%;
   left: -10%;
-  background: rgba(217, 119, 6, 0.06);
+  background: rgba(217, 119, 6, 0.7);
   animation: orb-drift-1 25s ease-in-out infinite alternate;
 }
 
@@ -197,7 +197,7 @@ const features = [
   height: 400px;
   bottom: -5%;
   right: -5%;
-  background: rgba(245, 158, 11, 0.04);
+  background: rgba(245, 158, 11, 0.5);
   animation: orb-drift-2 20s ease-in-out infinite alternate;
 }
 
@@ -206,7 +206,7 @@ const features = [
   height: 300px;
   top: 40%;
   left: 30%;
-  background: rgba(180, 83, 9, 0.05);
+  background: rgba(180, 83, 9, 0.6);
   animation: orb-drift-3 30s ease-in-out infinite alternate;
 }
 
