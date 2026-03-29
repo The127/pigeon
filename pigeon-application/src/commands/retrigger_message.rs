@@ -162,6 +162,7 @@ mod tests {
 
         let ep = Endpoint::new(
             app_id.clone(),
+            None,
             "https://a.com/hook".into(),
             "whsec_a".into(),
             vec![event_type_id.clone()],
@@ -270,6 +271,7 @@ mod tests {
             .map(|i| {
                 Endpoint::new(
                     app_id.clone(),
+                    None,
                     format!("https://ep{i}.com/hook"),
                     format!("whsec_{i}"),
                     vec![event_type_id.clone()],
@@ -321,6 +323,7 @@ mod tests {
 
         let ep = Endpoint::new(
             app_id.clone(),
+            None,
             "https://a.com/hook".into(),
             "whsec_a".into(),
             vec![event_type_id.clone()],

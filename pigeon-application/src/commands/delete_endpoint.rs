@@ -68,6 +68,7 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
         let ep = Endpoint::new(
             ApplicationId::new(),
+            None,
             "https://example.com/webhook".into(),
             "whsec_secret123".into(),
             vec![EventTypeId::new()],

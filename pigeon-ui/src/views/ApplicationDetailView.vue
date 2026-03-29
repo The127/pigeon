@@ -120,6 +120,7 @@ function handleDeleteEventType() {
 
 // --- Create Endpoint ---
 const epDialogOpen = ref(false)
+const epName = ref('')
 const epUrl = ref('')
 const epSecret = ref('')
 const epEventTypeIds = ref<string[]>([])
@@ -127,10 +128,16 @@ const createEp = useCreateEndpoint(appId)
 
 function handleCreateEndpoint() {
   createEp.mutate(
-    { url: epUrl.value, signing_secret: epSecret.value, event_type_ids: epEventTypeIds.value },
+    {
+      name: epName.value || undefined,
+      url: epUrl.value,
+      signing_secret: epSecret.value,
+      event_type_ids: epEventTypeIds.value,
+    },
     {
       onSuccess: () => {
         epDialogOpen.value = false
+        epName.value = ''
         epUrl.value = ''
         epSecret.value = ''
         epEventTypeIds.value = []
@@ -206,8 +213,9 @@ function eventTypeName(etId: string) {
   return eventTypesData.value?.items.find(e => e.id === etId)?.name || etId.slice(0, 8)
 }
 
-function endpointUrl(epId: string) {
-  return endpointsData.value?.items.find(e => e.id === epId)?.url || epId.slice(0, 8)
+function endpointLabel(epId: string) {
+  const ep = endpointsData.value?.items.find(e => e.id === epId)
+  return ep?.name || ep?.url || epId.slice(0, 8)
 }
 
 function messageStatus(msg: { attempts_created: number; succeeded: number; failed: number; dead_lettered: number }) {
@@ -510,6 +518,9 @@ const replayDl = useReplayDeadLetter(appId)
                   <DialogDescription>Configure a URL to receive webhook deliveries.</DialogDescription>
                 </DialogHeader>
                 <form class="space-y-4" @submit.prevent="handleCreateEndpoint">
+                  <FormField label="Name" html-for="ep-name" description="Optional — a friendly name will be auto-generated if left blank.">
+                    <Input id="ep-name" v-model="epName" placeholder="e.g. production-webhook" />
+                  </FormField>
                   <FormField label="URL" html-for="ep-url">
                     <Input id="ep-url" v-model="epUrl" placeholder="https://example.com/webhook" />
                   </FormField>
@@ -558,16 +569,17 @@ const replayDl = useReplayDeadLetter(appId)
           <Table v-else>
             <TableHeader>
               <TableRow>
+                <TableHead>Name</TableHead>
                 <TableHead>URL</TableHead>
                 <TableHead>Events</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Created</TableHead>
                 <TableHead class="w-12" />
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow v-for="ep in endpointsData.items" :key="ep.id">
-                <TableCell class="font-medium font-mono text-sm">{{ ep.url }}</TableCell>
+                <TableCell class="font-medium">{{ ep.name }}</TableCell>
+                <TableCell class="font-mono text-sm text-muted-foreground">{{ ep.url }}</TableCell>
                 <TableCell>
                   <div class="flex flex-wrap gap-1">
                     <Badge v-for="etId in ep.event_type_ids" :key="etId" variant="outline">
@@ -680,7 +692,7 @@ const replayDl = useReplayDeadLetter(appId)
                         <TableBody>
                           <TableRow v-for="att in attemptsData" :key="att.id">
                             <TableCell>{{ att.attempt_number }}</TableCell>
-                            <TableCell class="font-mono text-xs">{{ endpointUrl(att.endpoint_id) }}</TableCell>
+                            <TableCell class="font-mono text-xs">{{ endpointLabel(att.endpoint_id) }}</TableCell>
                             <TableCell>
                               <Badge :variant="statusColor(att.status)">{{ att.status }}</Badge>
                             </TableCell>
@@ -736,7 +748,7 @@ const replayDl = useReplayDeadLetter(appId)
             </TableHeader>
             <TableBody>
               <TableRow v-for="dl in deadLettersData.items" :key="dl.id">
-                <TableCell class="font-mono text-xs">{{ endpointUrl(dl.endpoint_id) }}</TableCell>
+                <TableCell class="font-mono text-xs">{{ endpointLabel(dl.endpoint_id) }}</TableCell>
                 <TableCell class="text-muted-foreground">
                   {{ dl.last_response_code ?? '—' }}
                 </TableCell>

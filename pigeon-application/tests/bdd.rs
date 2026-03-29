@@ -800,6 +800,7 @@ async fn given_create_ep_request(world: &mut AppWorld, url: String) {
     world.create_endpoint_command = Some(CreateEndpoint {
         org_id: OrganizationId::new(),
         app_id: ApplicationId::new(),
+        name: None,
         url,
         signing_secret: "whsec_secret123".into(),
         event_type_ids: vec![EventTypeId::new()],
@@ -812,6 +813,7 @@ async fn given_create_ep_with_secret(world: &mut AppWorld, url: String, signing_
     world.create_endpoint_command = Some(CreateEndpoint {
         org_id: OrganizationId::new(),
         app_id: ApplicationId::new(),
+        name: None,
         url,
         signing_secret,
         event_type_ids: vec![EventTypeId::new()],
@@ -876,6 +878,7 @@ async fn given_existing_ep(world: &mut AppWorld, url: String) {
     let factory = FakeUnitOfWorkFactory::new(log.clone());
     let ep = Endpoint::new(
         ApplicationId::new(),
+        None,
         url,
         "whsec_secret123".into(),
         vec![EventTypeId::new()],
@@ -1021,6 +1024,7 @@ async fn given_ep_exists(world: &mut AppWorld, url: String) {
     let factory = FakeUnitOfWorkFactory::new(log.clone());
     let ep = Endpoint::new(
         ApplicationId::new(),
+        None,
         url,
         "whsec_secret123".into(),
         vec![EventTypeId::new()],
@@ -1108,6 +1112,7 @@ async fn given_app_with_endpoints(world: &mut AppWorld, _event_type_name: String
 
     let ep1 = Endpoint::new(
         app_id.clone(),
+        None,
         "https://a.com/hook".into(),
         "whsec_a".into(),
         vec![event_type_id.clone()],
@@ -1115,6 +1120,7 @@ async fn given_app_with_endpoints(world: &mut AppWorld, _event_type_name: String
     .unwrap();
     let ep2 = Endpoint::new(
         app_id.clone(),
+        None,
         "https://b.com/hook".into(),
         "whsec_b".into(),
         vec![event_type_id.clone()],
@@ -1782,6 +1788,7 @@ async fn given_message_with_matching_endpoint(world: &mut AppWorld) {
 
     let ep = Endpoint::new(
         app_id.clone(),
+        None,
         "https://ep.com/hook".into(),
         "whsec_test".into(),
         vec![event_type_id.clone()],
@@ -1840,6 +1847,7 @@ async fn given_message_with_existing_attempt(world: &mut AppWorld) {
 
     let ep = Endpoint::new(
         app_id.clone(),
+        None,
         "https://ep.com/hook".into(),
         "whsec_test".into(),
         vec![event_type_id.clone()],

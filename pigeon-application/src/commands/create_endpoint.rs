@@ -15,6 +15,7 @@ use crate::ports::unit_of_work::UnitOfWorkFactory;
 pub struct CreateEndpoint {
     pub org_id: OrganizationId,
     pub app_id: ApplicationId,
+    pub name: Option<String>,
     pub url: String,
     pub signing_secret: String,
     pub event_type_ids: Vec<EventTypeId>,
@@ -43,6 +44,7 @@ impl CommandHandler<CreateEndpoint> for CreateEndpointHandler {
     async fn handle(&self, command: CreateEndpoint) -> Result<Endpoint, ApplicationError> {
         let endpoint = Endpoint::new(
             command.app_id,
+            command.name,
             command.url,
             command.signing_secret,
             command.event_type_ids,
@@ -72,6 +74,7 @@ mod tests {
             .handle(CreateEndpoint {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
                 app_id: ApplicationId::new(),
+                name: None,
                 url: "https://example.com/webhook".into(),
                 signing_secret: "whsec_secret123".into(),
                 event_type_ids: vec![EventTypeId::new()],
@@ -100,6 +103,7 @@ mod tests {
             .handle(CreateEndpoint {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
                 app_id: ApplicationId::new(),
+                name: None,
                 url: "".into(),
                 signing_secret: "whsec_secret123".into(),
                 event_type_ids: vec![],
@@ -120,6 +124,7 @@ mod tests {
             .handle(CreateEndpoint {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
                 app_id: ApplicationId::new(),
+                name: None,
                 url: "https://example.com/webhook".into(),
                 signing_secret: "".into(),
                 event_type_ids: vec![],

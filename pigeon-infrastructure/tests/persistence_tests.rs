@@ -614,6 +614,7 @@ async fn insert_app_and_event_type(
 fn any_endpoint_for(app: &Application, et: &EventType) -> Endpoint {
     Endpoint::new(
         app.id().clone(),
+        None,
         format!("https://example.com/webhook/{}", uuid::Uuid::new_v4()),
         format!("whsec_{}", uuid::Uuid::new_v4()),
         vec![et.id().clone()],
@@ -1038,6 +1039,7 @@ async fn insert_message_and_attempts_via_uow() {
 
     let ep1 = Endpoint::new(
         app.id().clone(),
+        None,
         format!("https://a.example.com/hook/{}", uuid::Uuid::new_v4()),
         format!("whsec_{}", uuid::Uuid::new_v4()),
         vec![et.id().clone()],
@@ -1045,6 +1047,7 @@ async fn insert_message_and_attempts_via_uow() {
     .unwrap();
     let ep2 = Endpoint::new(
         app.id().clone(),
+        None,
         format!("https://b.example.com/hook/{}", uuid::Uuid::new_v4()),
         format!("whsec_{}", uuid::Uuid::new_v4()),
         vec![et.id().clone()],
@@ -1162,6 +1165,7 @@ async fn endpoint_read_store_finds_enabled_endpoints_by_event_type() {
 
     let ep_enabled_1 = Endpoint::new(
         app.id().clone(),
+        None,
         format!("https://a.example.com/{}", uuid::Uuid::new_v4()),
         format!("whsec_{}", uuid::Uuid::new_v4()),
         vec![et.id().clone()],
@@ -1169,6 +1173,7 @@ async fn endpoint_read_store_finds_enabled_endpoints_by_event_type() {
     .unwrap();
     let ep_enabled_2 = Endpoint::new(
         app.id().clone(),
+        None,
         format!("https://b.example.com/{}", uuid::Uuid::new_v4()),
         format!("whsec_{}", uuid::Uuid::new_v4()),
         vec![et.id().clone()],
@@ -1176,6 +1181,7 @@ async fn endpoint_read_store_finds_enabled_endpoints_by_event_type() {
     .unwrap();
     let mut ep_disabled = Endpoint::new(
         app.id().clone(),
+        None,
         format!("https://c.example.com/{}", uuid::Uuid::new_v4()),
         format!("whsec_{}", uuid::Uuid::new_v4()),
         vec![et.id().clone()],
@@ -1390,6 +1396,7 @@ async fn seed_pending_attempt(
 
     let ep = Endpoint::new(
         app.id().clone(),
+        None,
         "https://example.com/hook".into(),
         "whsec_test123".into(),
         vec![et.id().clone()],
@@ -1663,6 +1670,7 @@ async fn cross_tenant_endpoint_isolation() {
 
     let ep_a = Endpoint::new(
         app_a.id().clone(),
+        None,
         "https://a.com/hook".into(),
         "whsec_a".into(),
         vec![et_a.id().clone()],
@@ -1671,6 +1679,7 @@ async fn cross_tenant_endpoint_isolation() {
 
     let ep_b = Endpoint::new(
         app_b.id().clone(),
+        None,
         "https://b.com/hook".into(),
         "whsec_b".into(),
         vec![et_b.id().clone()],

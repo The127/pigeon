@@ -6,6 +6,7 @@ use uuid::Uuid;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct CreateEndpointRequest {
+    pub name: Option<String>,
     pub url: String,
     pub signing_secret: String,
     pub event_type_ids: Vec<Uuid>,
@@ -23,6 +24,7 @@ pub struct UpdateEndpointRequest {
 pub struct EndpointResponse {
     pub id: Uuid,
     pub app_id: Uuid,
+    pub name: String,
     pub url: String,
     pub enabled: bool,
     pub event_type_ids: Vec<Uuid>,
@@ -35,6 +37,7 @@ impl From<Endpoint> for EndpointResponse {
         Self {
             id: *ep.id().as_uuid(),
             app_id: *ep.app_id().as_uuid(),
+            name: ep.name().to_string(),
             url: ep.url().to_string(),
             enabled: ep.enabled(),
             event_type_ids: ep.event_type_ids().iter().map(|id| *id.as_uuid()).collect(),

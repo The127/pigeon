@@ -7,6 +7,7 @@ pub mod error;
 pub mod event;
 pub mod event_type;
 pub mod message;
+pub mod name_generator;
 pub mod oidc_config;
 pub mod outbox;
 pub mod organization;

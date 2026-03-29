@@ -34,6 +34,7 @@ impl EndpointId {
 pub struct Endpoint {
     id: EndpointId,
     app_id: ApplicationId,
+    name: String,
     url: String,
     signing_secret: String,
     enabled: bool,
@@ -53,6 +54,7 @@ pub enum EndpointError {
 impl Endpoint {
     pub fn new(
         app_id: ApplicationId,
+        name: Option<String>,
         url: String,
         signing_secret: String,
         event_type_ids: Vec<EventTypeId>,
@@ -64,9 +66,15 @@ impl Endpoint {
             return Err(EndpointError::EmptySigningSecret);
         }
 
+        let name = match name {
+            Some(n) if !n.trim().is_empty() => n,
+            _ => crate::name_generator::generate_name(),
+        };
+
         Ok(Self {
             id: EndpointId::new(),
             app_id,
+            name,
             url,
             signing_secret,
             enabled: true,
@@ -82,6 +90,10 @@ impl Endpoint {
 
     pub fn app_id(&self) -> &ApplicationId {
         &self.app_id
+    }
+
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     pub fn url(&self) -> &str {
@@ -144,6 +156,7 @@ mod tests {
     fn create_endpoint() {
         let ep = Endpoint::new(
             ApplicationId::new(),
+            None,
             "https://example.com/webhook".into(),
             "whsec_secret123".into(),
             vec![EventTypeId::new()],
@@ -159,6 +172,7 @@ mod tests {
     fn reject_empty_url() {
         let result = Endpoint::new(
             ApplicationId::new(),
+            None,
             "".into(),
             "whsec_secret123".into(),
             vec![],
@@ -171,6 +185,7 @@ mod tests {
     fn reject_empty_signing_secret() {
         let result = Endpoint::new(
             ApplicationId::new(),
+            None,
             "https://example.com/webhook".into(),
             "".into(),
             vec![],
@@ -194,6 +209,7 @@ mod tests {
     fn reject_whitespace_only_url() {
         let result = Endpoint::new(
             ApplicationId::new(),
+            None,
             "   ".into(),
             "whsec_secret123".into(),
             vec![],
@@ -206,6 +222,7 @@ mod tests {
     fn reject_whitespace_only_signing_secret() {
         let result = Endpoint::new(
             ApplicationId::new(),
+            None,
             "https://example.com/webhook".into(),
             "   ".into(),
             vec![],
@@ -247,6 +264,7 @@ mod tests {
         let ep = Endpoint::reconstitute(EndpointState {
             id: state.id.clone(),
             app_id: state.app_id.clone(),
+            name: state.name.clone(),
             url: state.url.clone(),
             signing_secret: state.signing_secret.clone(),
             enabled: state.enabled,

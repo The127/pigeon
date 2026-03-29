@@ -35,6 +35,7 @@ async fn given_endpoint_with_failures(
     let app_id = ApplicationId::new();
     let ep = Endpoint::new(
         app_id.clone(),
+        None,
         "https://example.com/hook".into(),
         "whsec_test".into(),
         vec![EventTypeId::new()],
@@ -62,6 +63,7 @@ async fn given_disabled_endpoint(
     let app_id = ApplicationId::new();
     let mut ep = Endpoint::new(
         app_id.clone(),
+        None,
         "https://example.com/hook".into(),
         "whsec_test".into(),
         vec![EventTypeId::new()],

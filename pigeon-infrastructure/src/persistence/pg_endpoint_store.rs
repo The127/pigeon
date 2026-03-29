@@ -48,7 +48,7 @@ impl EndpointStore for PgEndpointStore {
 
         // Fall back to DB with org scoping via JOIN
         let row = sqlx::query_as::<_, EndpointRow>(
-            "SELECT e.id, e.app_id, e.url, e.signing_secret, e.enabled, e.created_at, \
+            "SELECT e.id, e.app_id, e.name, e.url, e.signing_secret, e.enabled, e.created_at, \
              e.xmin::text::bigint AS version \
              FROM endpoints e \
              JOIN applications a ON a.id = e.app_id \
@@ -94,7 +94,7 @@ impl EndpointStore for PgEndpointStore {
         }
 
         let row = sqlx::query_as::<_, EndpointRow>(
-            "SELECT id, app_id, url, signing_secret, enabled, created_at, \
+            "SELECT id, app_id, name, url, signing_secret, enabled, created_at, \
              xmin::text::bigint AS version \
              FROM endpoints \
              WHERE id = $1 AND app_id = $2",
@@ -147,6 +147,7 @@ impl EndpointStore for PgEndpointStore {
 struct EndpointRow {
     id: uuid::Uuid,
     app_id: uuid::Uuid,
+    name: String,
     url: String,
     signing_secret: String,
     enabled: bool,
@@ -159,6 +160,7 @@ impl EndpointRow {
         Endpoint::reconstitute(EndpointState {
             id: EndpointId::from_uuid(self.id),
             app_id: ApplicationId::from_uuid(self.app_id),
+            name: self.name,
             url: self.url,
             signing_secret: self.signing_secret,
             enabled: self.enabled,

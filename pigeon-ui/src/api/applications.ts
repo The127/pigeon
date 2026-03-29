@@ -43,6 +43,18 @@ export function useAppStats(appId: Ref<string>, period: Ref<string>) {
 
 // --- Types not yet in generated client (pending server restart) ---
 
+// Endpoint types with name field (pending server restart + client regen)
+export interface EndpointWithName {
+  id: string
+  app_id: string
+  name: string
+  url: string
+  enabled: boolean
+  event_type_ids: string[]
+  created_at: string
+  version: number
+}
+
 export interface MessageResponse {
   id: string
   app_id: string
@@ -207,7 +219,7 @@ export function useEndpoints(appId: Ref<string>) {
   return useQuery({
     queryKey: ['applications', appId, 'endpoints'],
     queryFn: () =>
-      apiFetch<{ items: EndpointResponse[]; total: number }>(
+      apiFetch<{ items: EndpointWithName[]; total: number }>(
         `/applications/${appId.value}/endpoints?limit=100`,
       ),
   })
@@ -216,7 +228,7 @@ export function useEndpoints(appId: Ref<string>) {
 export function useCreateEndpoint(appId: Ref<string>) {
   const queryClient = useQueryClient()
 
-  return useMutation<EndpointResponse, Error, CreateEndpointRequest>({
+  return useMutation<EndpointWithName, Error, CreateEndpointRequest & { name?: string }>({
     mutationFn: (body) =>
       apiFetch(`/applications/${appId.value}/endpoints`, {
         method: 'POST',

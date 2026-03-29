@@ -46,6 +46,7 @@ pub async fn create_endpoint(
     let command = CreateEndpoint {
         org_id,
         app_id,
+        name: body.name,
         url: body.url,
         signing_secret: body.signing_secret,
         event_type_ids: body.event_type_ids.into_iter().map(EventTypeId::from_uuid).collect(),
@@ -390,6 +391,7 @@ mod tests {
             match &self.result {
                 Ok(_) => Endpoint::new(
                     command.app_id,
+                    command.name,
                     command.url,
                     command.signing_secret,
                     command.event_type_ids,
