@@ -110,8 +110,10 @@ Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurab
 - Endpoints list: filter by enabled/disabled
 - Pagination controls on all lists (currently hardcoded limit=100)
 
+### ~~Dark Mode~~
+Auto (system default), light, and dark modes. Theme toggle in sidebar footer cycles through modes. Preference stored in localStorage. Amber accent in both themes. Animated amber orbs on login page.
+
 ### Frontend: Polish
-- Dark mode toggle
 - Mobile responsive sidebar (sheet overlay on small screens)
 
 ### Signing Secret Rotation
