@@ -25,6 +25,11 @@ const router = createRouter({
       name: 'applications',
       component: () => import('@/views/ApplicationsView.vue'),
     },
+    {
+      path: '/apps/:id',
+      name: 'application-detail',
+      component: () => import('@/views/ApplicationDetailView.vue'),
+    },
   ],
 })
 
