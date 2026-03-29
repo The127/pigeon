@@ -35,6 +35,11 @@ const router = createRouter({
       name: 'event-type-detail',
       component: () => import('@/views/EventTypeDetailView.vue'),
     },
+    {
+      path: '/apps/:id/endpoints/:epId',
+      name: 'endpoint-detail',
+      component: () => import('@/views/EndpointDetailView.vue'),
+    },
   ],
 })
 
