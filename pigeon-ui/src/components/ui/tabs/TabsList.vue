@@ -32,7 +32,8 @@ const delegatedProps = reactiveOmit(props, "class")
   height: 60%;
   width: 1px;
   border-radius: 1px;
-  background-color: var(--color-border);
+  background-color: var(--color-muted-foreground);
+  opacity: 0.3;
 }
 
 .tabs-list-separated :deep([data-slot="tabs-trigger"]) {

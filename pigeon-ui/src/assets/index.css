@@ -192,6 +192,73 @@
   --sidebar-ring: oklch(0.7 0.15 65);
 }
 
+/* --- Accent color overrides --- */
+/* Amber is the default (already in :root and .dark) */
+
+[data-accent="teal"] {
+  --primary: oklch(0.55 0.14 180);
+  --ring: oklch(0.55 0.14 180);
+  --sidebar-primary: oklch(0.55 0.14 180);
+  --chart-1: oklch(0.6 0.14 180);
+}
+[data-accent="teal"].dark, .dark[data-accent="teal"] {
+  --primary: oklch(0.7 0.14 180);
+  --ring: oklch(0.7 0.14 180);
+  --sidebar-primary: oklch(0.7 0.14 180);
+  --chart-1: oklch(0.7 0.14 180);
+}
+
+[data-accent="indigo"] {
+  --primary: oklch(0.5 0.18 270);
+  --ring: oklch(0.5 0.18 270);
+  --sidebar-primary: oklch(0.5 0.18 270);
+  --chart-1: oklch(0.55 0.18 270);
+}
+[data-accent="indigo"].dark, .dark[data-accent="indigo"] {
+  --primary: oklch(0.68 0.16 270);
+  --ring: oklch(0.68 0.16 270);
+  --sidebar-primary: oklch(0.68 0.16 270);
+  --chart-1: oklch(0.68 0.16 270);
+}
+
+[data-accent="rose"] {
+  --primary: oklch(0.55 0.2 15);
+  --ring: oklch(0.55 0.2 15);
+  --sidebar-primary: oklch(0.55 0.2 15);
+  --chart-1: oklch(0.6 0.2 15);
+}
+[data-accent="rose"].dark, .dark[data-accent="rose"] {
+  --primary: oklch(0.7 0.17 15);
+  --ring: oklch(0.7 0.17 15);
+  --sidebar-primary: oklch(0.7 0.17 15);
+  --chart-1: oklch(0.7 0.17 15);
+}
+
+[data-accent="emerald"] {
+  --primary: oklch(0.55 0.16 155);
+  --ring: oklch(0.55 0.16 155);
+  --sidebar-primary: oklch(0.55 0.16 155);
+  --chart-1: oklch(0.6 0.16 155);
+}
+[data-accent="emerald"].dark, .dark[data-accent="emerald"] {
+  --primary: oklch(0.7 0.15 155);
+  --ring: oklch(0.7 0.15 155);
+  --sidebar-primary: oklch(0.7 0.15 155);
+  --chart-1: oklch(0.7 0.15 155);
+}
+
+/* --- Colorblind mode overrides --- */
+/* Changes semantic colors (destructive red) to colorblind-safe alternatives */
+
+[data-colorblind="deuteranopia"],
+[data-colorblind="protanopia"] {
+  --destructive: oklch(0.65 0.18 50);
+}
+
+[data-colorblind="tritanopia"] {
+  --destructive: oklch(0.6 0.2 340);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;

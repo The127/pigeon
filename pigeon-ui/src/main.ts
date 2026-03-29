@@ -3,6 +3,7 @@ import { VueQueryPlugin } from '@tanstack/vue-query'
 import App from './App.vue'
 import router from './router'
 import { initAuth } from './auth'
+import './composables/useTheme' // Initialize theme settings on startup
 import './assets/index.css'
 
 async function bootstrap() {
