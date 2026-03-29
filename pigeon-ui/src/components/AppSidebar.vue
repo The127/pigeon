@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Monitor } from 'lucide-vue-next'
+import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Monitor, ScrollText } from 'lucide-vue-next'
 import { useAuth } from '@/auth'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { Button } from '@/components/ui/button'
@@ -21,6 +21,7 @@ const { mode, setMode } = useTheme()
 
 const nav = [
   { name: 'Applications', to: '/apps', icon: LayoutGrid },
+  { name: 'Audit Log', to: '/audit-log', icon: ScrollText },
 ]
 
 function isActive(path: string) {

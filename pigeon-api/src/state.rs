@@ -40,6 +40,7 @@ use pigeon_application::queries::get_message_by_id::GetMessageById;
 use pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage;
 use pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByApp;
 use pigeon_application::queries::list_messages_by_app::ListMessagesByApp;
+use pigeon_application::queries::list_audit_log::ListAuditLog;
 use pigeon_application::queries::list_organizations::ListOrganizations;
 
 use crate::auth::JwksProvider;
@@ -88,6 +89,7 @@ pub struct AppState {
     pub org_read_store: Arc<dyn OrganizationReadStore>,
     pub app_read_store: Arc<dyn ApplicationReadStore>,
     pub jwks_provider: Arc<dyn JwksProvider>,
+    pub list_audit_log: Arc<dyn QueryHandler<ListAuditLog>>,
     pub audit_store: Arc<dyn pigeon_application::ports::audit_store::AuditStore>,
     pub metrics_render: Arc<dyn Fn() -> String + Send + Sync>,
     pub admin_org_id: Option<OrganizationId>,

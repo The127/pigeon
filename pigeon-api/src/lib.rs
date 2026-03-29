@@ -25,6 +25,7 @@ use crate::dto::endpoint::{
 use crate::dto::event_type::{
     CreateEventTypeRequest, EventTypeResponse, UpdateEventTypeRequest,
 };
+use crate::handlers::audit;
 use crate::handlers::dead_letters;
 use crate::dto::attempt::AttemptResponse;
 use crate::dto::dead_letter::DeadLetterResponse;
@@ -64,6 +65,7 @@ use crate::state::AppState;
         dead_letters::list_dead_letters,
         dead_letters::get_dead_letter,
         dead_letters::replay,
+        audit::list_audit_log,
         stats::get_stats,
         event_type_stats::get_event_type_stats,
         endpoint_stats::get_endpoint_stats,
@@ -107,6 +109,7 @@ use crate::state::AppState;
         OrganizationResponse,
         CreateOidcConfigRequest,
         OidcConfigResponse,
+        dto::audit::AuditLogResponse,
         PaginatedResponse,
         ErrorBody,
         health::HealthResponse,
@@ -192,6 +195,7 @@ pub fn router(state: AppState) -> Router {
     // API routes protected by JWT auth middleware
     let api_routes = Router::new()
         .nest("/api/v1/applications", app_routes)
+        .route("/api/v1/audit-log", get(audit::list_audit_log))
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             auth::auth_middleware,
@@ -329,6 +333,7 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
 
     let api_routes = Router::new()
         .nest("/api/v1/applications", app_routes)
+        .route("/api/v1/audit-log", get(audit::list_audit_log))
         .layer(axum::middleware::from_fn(
             test_support::test_auth_middleware,
         ));

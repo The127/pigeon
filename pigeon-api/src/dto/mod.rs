@@ -1,4 +1,5 @@
 pub mod application;
+pub mod audit;
 pub mod attempt;
 pub mod dead_letter;
 pub mod endpoint;

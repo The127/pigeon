@@ -110,6 +110,27 @@ export function useEndpointStats(
   })
 }
 
+// --- Audit Log ---
+
+export interface AuditLogEntry {
+  id: string
+  command_name: string
+  actor: string
+  timestamp: string
+  success: boolean
+  error_message: string | null
+}
+
+export function useAuditLog(offset: Ref<number>, limit: Ref<number>) {
+  return useQuery({
+    queryKey: ['audit-log', offset, limit],
+    queryFn: () =>
+      apiFetch<{ items: AuditLogEntry[]; total: number; offset: number; limit: number }>(
+        `/audit-log?offset=${offset.value}&limit=${limit.value}`,
+      ),
+  })
+}
+
 // --- Types not yet in generated client (pending server restart) ---
 
 // Endpoint types with name field (pending server restart + client regen)

@@ -8,6 +8,7 @@ use pigeon_application::commands::replay_dead_letter::ReplayDeadLetter;
 use pigeon_application::commands::retrigger_message::RetriggerMessage;
 use pigeon_application::commands::retry_attempt::RetryAttempt;
 use pigeon_application::commands::send_test_event::{SendTestEvent, SendTestEventResult};
+use pigeon_application::queries::list_audit_log::ListAuditLog;
 use pigeon_application::error::ApplicationError;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
 use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore, OrganizationReadStore};
@@ -33,6 +34,16 @@ use pigeon_domain::organization::{Organization, OrganizationId};
 use uuid::Uuid;
 
 use crate::auth::{AuthContext, JwksProvider};
+
+// --- Stub ListAuditLogHandler ---
+
+pub(crate) struct StubListAuditLogHandler;
+#[async_trait]
+impl QueryHandler<ListAuditLog> for StubListAuditLogHandler {
+    async fn handle(&self, _q: ListAuditLog) -> Result<PaginatedResult<pigeon_application::ports::audit_read_store::AuditLogEntry>, ApplicationError> {
+        Ok(PaginatedResult { items: vec![], total: 0, offset: 0, limit: 20 })
+    }
+}
 
 // --- Stub AuditStore ---
 

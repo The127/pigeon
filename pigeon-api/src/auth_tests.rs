@@ -372,6 +372,15 @@ impl QueryHandler<ListOidcConfigsByOrg> for S {
         unimplemented!()
     }
 }
+#[async_trait]
+impl QueryHandler<pigeon_application::queries::list_audit_log::ListAuditLog> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::queries::list_audit_log::ListAuditLog,
+    ) -> Result<PaginatedResult<pigeon_application::ports::audit_read_store::AuditLogEntry>, ApplicationError> {
+        unimplemented!()
+    }
+}
 
 fn test_state() -> AppState {
     AppState {
@@ -417,6 +426,7 @@ fn test_state() -> AppState {
         retry_attempt: Arc::new(S),
         retrigger_message: Arc::new(S),
         send_test_event: Arc::new(S),
+        list_audit_log: Arc::new(S),
         audit_store: Arc::new(S),
         metrics_render: Arc::new(|| String::new()),
         admin_org_id: None,

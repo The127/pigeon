@@ -1,4 +1,5 @@
 pub mod get_app_stats;
+pub mod list_audit_log;
 pub mod get_application_by_id;
 pub mod get_dead_letter_by_id;
 pub mod get_endpoint_by_id;

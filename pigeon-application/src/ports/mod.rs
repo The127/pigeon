@@ -1,3 +1,4 @@
+pub mod audit_read_store;
 pub mod audit_store;
 pub mod delivery;
 pub mod event_dispatcher;

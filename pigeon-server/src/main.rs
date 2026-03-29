@@ -47,6 +47,7 @@ use pigeon_application::queries::list_applications::ListApplicationsHandler;
 use pigeon_application::queries::list_endpoints_by_app::ListEndpointsByAppHandler;
 use pigeon_application::queries::list_event_types_by_app::ListEventTypesByAppHandler;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrgHandler;
+use pigeon_application::queries::list_audit_log::ListAuditLogHandler;
 use pigeon_application::queries::list_organizations::ListOrganizationsHandler;
 use pigeon_application::commands::disable_endpoint::DisableEndpointHandler;
 use pigeon_application::services::auto_disable_saga::AutoDisableEndpointSaga;
@@ -57,7 +58,7 @@ use pigeon_application::services::outbox_worker::{
 };
 use pigeon_infrastructure::http::ReqwestWebhookClient;
 use pigeon_infrastructure::persistence::{
-    PgApplicationReadStore, PgAttemptReadStore, PgAuditStore, PgDeadLetterReadStore, PgDeliveryQueue,
+    PgApplicationReadStore, PgAttemptReadStore, PgAuditReadStore, PgAuditStore, PgDeadLetterReadStore, PgDeliveryQueue,
     PgEndpointReadStore, PgEndpointStatsReadStore, PgEventOutbox, PgEventTypeReadStore,
     PgHealthChecker, PgMessageReadStore, PgOidcConfigReadStore, PgOrganizationReadStore,
     PgProjectionStore, PgEventTypeStatsReadStore, PgStatsReadStore, PgUnitOfWorkFactory,
@@ -309,6 +310,7 @@ async fn run_api(
     let event_type_stats_read_store = Arc::new(PgEventTypeStatsReadStore::new(pool.clone()));
     let endpoint_stats_read_store = Arc::new(PgEndpointStatsReadStore::new(pool.clone()));
     let health_checker = Arc::new(PgHealthChecker::new(pool.clone()));
+    let audit_read_store = Arc::new(PgAuditReadStore::new(pool.clone()));
     let audit_store = Arc::new(PgAuditStore::new(pool));
 
     let idempotency_ttl = Duration::hours(24);
@@ -369,6 +371,7 @@ async fn run_api(
             event_type_read_store.clone(),
         )),
         health_checker,
+        list_audit_log: Arc::new(ListAuditLogHandler::new(audit_read_store)),
         audit_store,
         metrics_render,
         admin_org_id,

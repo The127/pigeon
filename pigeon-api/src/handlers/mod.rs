@@ -1,5 +1,6 @@
 pub mod applications;
 pub mod attempts;
+pub mod audit;
 pub mod auth_config;
 pub mod dead_letters;
 pub mod endpoint_stats;

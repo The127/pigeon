@@ -21,6 +21,11 @@ const router = createRouter({
       redirect: '/apps',
     },
     {
+      path: '/audit-log',
+      name: 'audit-log',
+      component: () => import('@/views/AuditLogView.vue'),
+    },
+    {
       path: '/apps',
       name: 'applications',
       component: () => import('@/views/ApplicationsView.vue'),
