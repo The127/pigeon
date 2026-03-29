@@ -2,6 +2,7 @@ pub mod applications;
 pub mod attempts;
 pub mod auth_config;
 pub mod dead_letters;
+pub mod endpoint_stats;
 pub mod endpoints;
 pub mod event_type_stats;
 pub mod event_types;

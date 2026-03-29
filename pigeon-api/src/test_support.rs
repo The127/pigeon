@@ -14,6 +14,7 @@ use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStor
 use pigeon_application::ports::message_status::MessageWithStatus;
 use pigeon_application::ports::stats_read_store::AppStats;
 use pigeon_application::queries::get_app_stats::GetAppStats;
+use pigeon_application::queries::get_endpoint_stats::GetEndpointStats;
 use pigeon_application::queries::get_event_type_stats::GetEventTypeStats;
 use pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById;
 use pigeon_application::queries::get_message_by_id::GetMessageById;
@@ -67,6 +68,25 @@ impl QueryHandler<GetEventTypeStats> for StubGetEventTypeStatsHandler {
             subscribed_endpoints: 0,
             time_series: vec![],
             recent_messages: vec![],
+        })
+    }
+}
+
+pub(crate) struct StubGetEndpointStatsHandler;
+#[async_trait]
+impl QueryHandler<GetEndpointStats> for StubGetEndpointStatsHandler {
+    async fn handle(&self, _q: GetEndpointStats) -> Result<pigeon_application::ports::endpoint_stats_read_store::EndpointStats, ApplicationError> {
+        Ok(pigeon_application::ports::endpoint_stats_read_store::EndpointStats {
+            total_attempts: 0,
+            total_pending: 0,
+            total_succeeded: 0,
+            total_failed: 0,
+            total_dead_lettered: 0,
+            success_rate: 0.0,
+            consecutive_failures: 0,
+            last_delivery_at: None,
+            last_status: None,
+            time_series: vec![],
         })
     }
 }

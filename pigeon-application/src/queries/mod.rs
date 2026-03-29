@@ -2,6 +2,7 @@ pub mod get_app_stats;
 pub mod get_application_by_id;
 pub mod get_dead_letter_by_id;
 pub mod get_endpoint_by_id;
+pub mod get_endpoint_stats;
 pub mod get_event_type_by_id;
 pub mod get_event_type_stats;
 pub mod get_message_by_id;

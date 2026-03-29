@@ -2,6 +2,7 @@ pub mod application;
 pub mod attempt;
 pub mod dead_letter;
 pub mod endpoint;
+pub mod endpoint_stats;
 pub mod event_type;
 pub mod event_type_stats;
 pub mod message;
