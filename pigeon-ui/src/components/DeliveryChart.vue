@@ -20,9 +20,8 @@ const maxValue = computed(() => {
 
 function barHeight(value: number) {
   if (value === 0) return '0%'
-  // Minimum visible height of 4px, otherwise scale to percentage of max
   const pct = (value / maxValue.value) * 100
-  return `max(4px, ${pct}%)`
+  return `${Math.max(2, pct)}%`
 }
 
 function defaultLabel(bucket: string) {
