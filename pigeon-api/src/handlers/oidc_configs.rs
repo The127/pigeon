@@ -14,7 +14,9 @@ use pigeon_domain::organization::OrganizationId;
 use crate::dto::oidc_config::{CreateOidcConfigRequest, OidcConfigResponse};
 use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
+use crate::extractors::AuthInfo;
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 /// Create a new OIDC config for an organization
 #[utoipa::path(
@@ -30,6 +32,7 @@ use crate::state::AppState;
 )]
 pub(crate) async fn create_oidc_config(
     State(state): State<AppState>,
+    auth: AuthInfo,
     Path(org_id): Path<Uuid>,
     Json(body): Json<CreateOidcConfigRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -40,9 +43,7 @@ pub(crate) async fn create_oidc_config(
         jwks_url: body.jwks_url,
     };
 
-    let config = state
-        .create_oidc_config
-        .handle(command)
+    let config = dispatch(&*state.create_oidc_config, command, &auth.user_id, &auth.org_id, &*state.audit_store)
         .await
         .map_err(ApiError)?;
     let response = OidcConfigResponse::from(config);
@@ -138,15 +139,14 @@ pub(crate) async fn list_oidc_configs(
 )]
 pub(crate) async fn delete_oidc_config(
     State(state): State<AppState>,
+    auth: AuthInfo,
     Path((_org_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = DeleteOidcConfig {
         id: OidcConfigId::from_uuid(id),
     };
 
-    state
-        .delete_oidc_config
-        .handle(command)
+    dispatch(&*state.delete_oidc_config, command, &auth.user_id, &auth.org_id, &*state.audit_store)
         .await
         .map_err(ApiError)?;
 
@@ -470,6 +470,7 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            audit_store: Arc::new(StubAuditStore),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

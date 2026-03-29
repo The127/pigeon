@@ -355,10 +355,16 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
             get(oidc_configs::get_oidc_config).delete(oidc_configs::delete_oidc_config),
         );
 
-    Router::new()
-        .merge(api_routes)
+    let admin_routes = Router::new()
         .nest("/admin/v1/organizations", org_routes)
         .nest("/admin/v1/organizations/{org_id}/oidc-configs", oidc_config_routes)
+        .layer(axum::middleware::from_fn(
+            test_support::test_auth_middleware,
+        ));
+
+    Router::new()
+        .merge(api_routes)
+        .merge(admin_routes)
         .route("/api/v1/auth/config", get(handlers::auth_config::auth_config))
         .route("/api/openapi.json", get(|| async { axum::Json(ApiDoc::openapi()) }))
         .route("/health", get(health::liveness))

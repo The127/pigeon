@@ -10,8 +10,9 @@ use pigeon_application::commands::retry_attempt::RetryAttempt;
 use pigeon_domain::attempt::AttemptId;
 
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::OrgId;
+use crate::extractors::AuthInfo;
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 #[derive(Serialize, ToSchema)]
 pub struct RetryAttemptResponse {
@@ -38,15 +39,15 @@ pub struct RetryAttemptResponse {
 )]
 pub async fn retry(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((_app_id, attempt_id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = RetryAttempt {
-        org_id,
+        org_id: auth.org_id.clone(),
         attempt_id: AttemptId::from_uuid(attempt_id),
     };
 
-    let attempt = state.retry_attempt.handle(command).await.map_err(ApiError)?;
+    let attempt = dispatch(&*state.retry_attempt, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     let status_str = match attempt.status() {
         pigeon_domain::attempt::AttemptStatus::Pending => "pending",

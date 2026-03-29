@@ -17,7 +17,9 @@ use crate::dto::organization::{
 };
 use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
+use crate::extractors::AuthInfo;
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 /// Create a new organization
 #[utoipa::path(
@@ -32,6 +34,7 @@ use crate::state::AppState;
 )]
 pub async fn create_organization(
     State(state): State<AppState>,
+    auth: AuthInfo,
     Json(body): Json<CreateOrganizationRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = CreateOrganization {
@@ -42,9 +45,7 @@ pub async fn create_organization(
         oidc_jwks_url: body.oidc_jwks_url,
     };
 
-    let org = state
-        .create_organization
-        .handle(command)
+    let org = dispatch(&*state.create_organization, command, &auth.user_id, &auth.org_id, &*state.audit_store)
         .await
         .map_err(ApiError)?;
     let response = OrganizationResponse::from(org);
@@ -131,6 +132,7 @@ pub async fn list_organizations(
 )]
 pub async fn update_organization(
     State(state): State<AppState>,
+    auth: AuthInfo,
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateOrganizationRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -140,9 +142,7 @@ pub async fn update_organization(
         version: Version::new(body.version),
     };
 
-    let org = state
-        .update_organization
-        .handle(command)
+    let org = dispatch(&*state.update_organization, command, &auth.user_id, &auth.org_id, &*state.audit_store)
         .await
         .map_err(ApiError)?;
 
@@ -162,15 +162,14 @@ pub async fn update_organization(
 )]
 pub async fn delete_organization(
     State(state): State<AppState>,
+    auth: AuthInfo,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = DeleteOrganization {
         id: OrganizationId::from_uuid(id),
     };
 
-    state
-        .delete_organization
-        .handle(command)
+    dispatch(&*state.delete_organization, command, &auth.user_id, &auth.org_id, &*state.audit_store)
         .await
         .map_err(ApiError)?;
 
@@ -540,6 +539,7 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            audit_store: Arc::new(StubAuditStore),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

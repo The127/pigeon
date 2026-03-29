@@ -408,6 +408,7 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            audit_store: Arc::new(StubAuditStore),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

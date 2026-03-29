@@ -57,7 +57,7 @@ use pigeon_application::services::outbox_worker::{
 };
 use pigeon_infrastructure::http::ReqwestWebhookClient;
 use pigeon_infrastructure::persistence::{
-    PgApplicationReadStore, PgAttemptReadStore, PgDeadLetterReadStore, PgDeliveryQueue,
+    PgApplicationReadStore, PgAttemptReadStore, PgAuditStore, PgDeadLetterReadStore, PgDeliveryQueue,
     PgEndpointReadStore, PgEndpointStatsReadStore, PgEventOutbox, PgEventTypeReadStore,
     PgHealthChecker, PgMessageReadStore, PgOidcConfigReadStore, PgOrganizationReadStore,
     PgProjectionStore, PgEventTypeStatsReadStore, PgStatsReadStore, PgUnitOfWorkFactory,
@@ -308,7 +308,8 @@ async fn run_api(
     let stats_read_store = Arc::new(PgStatsReadStore::new(pool.clone()));
     let event_type_stats_read_store = Arc::new(PgEventTypeStatsReadStore::new(pool.clone()));
     let endpoint_stats_read_store = Arc::new(PgEndpointStatsReadStore::new(pool.clone()));
-    let health_checker = Arc::new(PgHealthChecker::new(pool));
+    let health_checker = Arc::new(PgHealthChecker::new(pool.clone()));
+    let audit_store = Arc::new(PgAuditStore::new(pool));
 
     let idempotency_ttl = Duration::hours(24);
 
@@ -368,6 +369,7 @@ async fn run_api(
             event_type_read_store.clone(),
         )),
         health_checker,
+        audit_store,
         metrics_render,
         admin_org_id,
     };

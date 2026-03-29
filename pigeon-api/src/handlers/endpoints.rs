@@ -17,8 +17,9 @@ use pigeon_domain::version::Version;
 use crate::dto::endpoint::{CreateEndpointRequest, EndpointResponse, UpdateEndpointRequest};
 use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::OrgId;
+use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 use super::verify_app_ownership;
 
@@ -36,15 +37,15 @@ use super::verify_app_ownership;
 )]
 pub async fn create_endpoint(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path(app_id): Path<Uuid>,
     Json(body): Json<CreateEndpointRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = CreateEndpoint {
-        org_id,
+        org_id: auth.org_id.clone(),
         app_id,
         name: body.name,
         url: body.url,
@@ -52,7 +53,7 @@ pub async fn create_endpoint(
         event_type_ids: body.event_type_ids.into_iter().map(EventTypeId::from_uuid).collect(),
     };
 
-    let ep = state.create_endpoint.handle(command).await.map_err(ApiError)?;
+    let ep = dispatch(&*state.create_endpoint, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
     let response = EndpointResponse::from(ep);
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -155,15 +156,15 @@ pub async fn get_endpoint(
 )]
 pub async fn update_endpoint(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
     Json(body): Json<UpdateEndpointRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = UpdateEndpoint {
-        org_id,
+        org_id: auth.org_id.clone(),
         id: EndpointId::from_uuid(id),
         url: body.url,
         signing_secret: body.signing_secret,
@@ -171,7 +172,7 @@ pub async fn update_endpoint(
         version: Version::new(body.version),
     };
 
-    let ep = state.update_endpoint.handle(command).await.map_err(ApiError)?;
+    let ep = dispatch(&*state.update_endpoint, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     Ok(Json(EndpointResponse::from(ep)))
 }
@@ -192,18 +193,18 @@ pub async fn update_endpoint(
 )]
 pub async fn delete_endpoint(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = DeleteEndpoint {
-        org_id,
+        org_id: auth.org_id.clone(),
         id: EndpointId::from_uuid(id),
     };
 
-    state.delete_endpoint.handle(command).await.map_err(ApiError)?;
+    dispatch(&*state.delete_endpoint, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -555,6 +556,7 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            audit_store: Arc::new(StubAuditStore),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

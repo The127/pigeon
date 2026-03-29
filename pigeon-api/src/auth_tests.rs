@@ -301,6 +301,12 @@ impl pigeon_application::ports::health::HealthChecker for S {
     }
 }
 #[async_trait]
+impl pigeon_application::ports::audit_store::AuditStore for S {
+    async fn record(&self, _entry: pigeon_application::ports::audit_store::AuditEntry) -> Result<(), ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
 impl CommandHandler<pigeon_application::commands::create_organization::CreateOrganization> for S {
     async fn handle(
         &self,
@@ -411,6 +417,7 @@ fn test_state() -> AppState {
         retry_attempt: Arc::new(S),
         retrigger_message: Arc::new(S),
         send_test_event: Arc::new(S),
+        audit_store: Arc::new(S),
         metrics_render: Arc::new(|| String::new()),
         admin_org_id: None,
     }

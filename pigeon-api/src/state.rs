@@ -88,6 +88,7 @@ pub struct AppState {
     pub org_read_store: Arc<dyn OrganizationReadStore>,
     pub app_read_store: Arc<dyn ApplicationReadStore>,
     pub jwks_provider: Arc<dyn JwksProvider>,
+    pub audit_store: Arc<dyn pigeon_application::ports::audit_store::AuditStore>,
     pub metrics_render: Arc<dyn Fn() -> String + Send + Sync>,
     pub admin_org_id: Option<OrganizationId>,
 }

@@ -15,8 +15,9 @@ use pigeon_domain::dead_letter::DeadLetterId;
 use crate::dto::dead_letter::DeadLetterResponse;
 use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::OrgId;
+use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 use super::verify_app_ownership;
 
@@ -123,15 +124,15 @@ pub async fn get_dead_letter(
 )]
 pub async fn replay(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((_app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = ReplayDeadLetter {
-        org_id,
+        org_id: auth.org_id.clone(),
         dead_letter_id: DeadLetterId::from_uuid(id),
     };
 
-    let dead_letter = state.replay_dead_letter.handle(command).await.map_err(ApiError)?;
+    let dead_letter = dispatch(&*state.replay_dead_letter, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     let response = ReplayDeadLetterResponse {
         id: *dead_letter.id().as_uuid(),

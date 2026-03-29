@@ -17,8 +17,9 @@ use crate::dto::attempt::AttemptResponse;
 use crate::dto::message::{MessageResponse, SendMessageRequest, SendMessageResponse};
 use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::OrgId;
+use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 use super::verify_app_ownership;
 
@@ -37,22 +38,22 @@ use super::verify_app_ownership;
 )]
 pub async fn send_message(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path(app_id): Path<Uuid>,
     Json(body): Json<SendMessageRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = SendMessage {
-        org_id,
+        org_id: auth.org_id.clone(),
         app_id,
         event_type_id: EventTypeId::from_uuid(body.event_type_id),
         payload: body.payload,
         idempotency_key: body.idempotency_key,
     };
 
-    let result = state.send_message.handle(command).await.map_err(ApiError)?;
+    let result = dispatch(&*state.send_message, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
     let was_duplicate = result.was_duplicate;
 
     if was_duplicate {
@@ -201,20 +202,24 @@ pub async fn list_attempts(
 )]
 pub async fn retrigger_message(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
-    let result = state
-        .retrigger_message
-        .handle(RetriggerMessage {
+    let result = dispatch(
+        &*state.retrigger_message,
+        RetriggerMessage {
             message_id: MessageId::from_uuid(id),
-            org_id,
-        })
-        .await
-        .map_err(ApiError)?;
+            org_id: auth.org_id.clone(),
+        },
+        &auth.user_id,
+        &auth.org_id,
+        &*state.audit_store,
+    )
+    .await
+    .map_err(ApiError)?;
 
     let response = serde_json::json!({
         "message_id": result.message.id().as_uuid(),
@@ -535,6 +540,7 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            audit_store: Arc::new(StubAuditStore),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

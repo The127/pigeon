@@ -16,8 +16,9 @@ use pigeon_domain::version::Version;
 use crate::dto::event_type::{CreateEventTypeRequest, EventTypeResponse, UpdateEventTypeRequest};
 use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::OrgId;
+use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 use super::verify_app_ownership;
 
@@ -35,21 +36,21 @@ use super::verify_app_ownership;
 )]
 pub async fn create_event_type(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path(app_id): Path<Uuid>,
     Json(body): Json<CreateEventTypeRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = CreateEventType {
-        org_id,
+        org_id: auth.org_id.clone(),
         app_id,
         name: body.name,
         schema: body.schema,
     };
 
-    let et = state.create_event_type.handle(command).await.map_err(ApiError)?;
+    let et = dispatch(&*state.create_event_type, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
     let response = EventTypeResponse::from(et);
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -152,22 +153,22 @@ pub async fn get_event_type(
 )]
 pub async fn update_event_type(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
     Json(body): Json<UpdateEventTypeRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = UpdateEventType {
-        org_id,
+        org_id: auth.org_id.clone(),
         id: EventTypeId::from_uuid(id),
         name: body.name,
         schema: body.schema,
         version: Version::new(body.version),
     };
 
-    let et = state.update_event_type.handle(command).await.map_err(ApiError)?;
+    let et = dispatch(&*state.update_event_type, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     Ok(Json(EventTypeResponse::from(et)))
 }
@@ -188,18 +189,18 @@ pub async fn update_event_type(
 )]
 pub async fn delete_event_type(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = DeleteEventType {
-        org_id,
+        org_id: auth.org_id.clone(),
         id: EventTypeId::from_uuid(id),
     };
 
-    state.delete_event_type.handle(command).await.map_err(ApiError)?;
+    dispatch(&*state.delete_event_type, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -563,6 +564,7 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            audit_store: Arc::new(StubAuditStore),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

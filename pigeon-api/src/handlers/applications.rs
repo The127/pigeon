@@ -15,8 +15,9 @@ use pigeon_domain::version::Version;
 use crate::dto::application::{ApplicationResponse, CreateApplicationRequest, UpdateApplicationRequest};
 use crate::dto::pagination::{ListQuery, PaginatedResponse};
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::OrgId;
+use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 /// Create a new application
 #[utoipa::path(
@@ -31,16 +32,16 @@ use crate::state::AppState;
 )]
 pub async fn create_application(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Json(body): Json<CreateApplicationRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = CreateApplication {
-        org_id,
+        org_id: auth.org_id.clone(),
         name: body.name,
         uid: body.uid,
     };
 
-    let app = state.create_application.handle(command).await.map_err(ApiError)?;
+    let app = dispatch(&*state.create_application, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
     let response = ApplicationResponse::from(app);
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -125,18 +126,18 @@ pub async fn list_applications(
 )]
 pub async fn update_application(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path(id): Path<Uuid>,
     Json(body): Json<UpdateApplicationRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = UpdateApplication {
-        org_id,
+        org_id: auth.org_id.clone(),
         id: ApplicationId::from_uuid(id),
         name: body.name,
         version: Version::new(body.version),
     };
 
-    let app = state.update_application.handle(command).await.map_err(ApiError)?;
+    let app = dispatch(&*state.update_application, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     Ok(Json(ApplicationResponse::from(app)))
 }
@@ -154,15 +155,15 @@ pub async fn update_application(
 )]
 pub async fn delete_application(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = DeleteApplication {
-        org_id,
+        org_id: auth.org_id.clone(),
         id: ApplicationId::from_uuid(id),
     };
 
-    state.delete_application.handle(command).await.map_err(ApiError)?;
+    dispatch(&*state.delete_application, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -511,6 +512,7 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            audit_store: Arc::new(StubAuditStore),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }
@@ -577,32 +579,7 @@ mod tests {
         assert_eq!(json["uid"], "app_123");
     }
 
-    #[tokio::test]
-    async fn create_without_org_id_returns_401() {
-        let app = fake_app();
-        let state = default_state_with_app(app);
-        let router = test_router(state);
-
-        let response = router
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri("/api/v1/applications")
-                    .header("content-type", "application/json")
-                    .body(Body::from(
-                        serde_json::to_string(&serde_json::json!({
-                            "name": "my-app",
-                            "uid": "app_123"
-                        }))
-                        .unwrap(),
-                    ))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
-    }
+    // Auth-required behavior is tested in auth_tests.rs with the production router.
 
     #[tokio::test]
     async fn create_with_empty_name_returns_400() {
@@ -654,27 +631,6 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let json = body_json(response.into_body()).await;
         assert!(json["id"].is_string());
-    }
-
-    #[tokio::test]
-    async fn get_without_org_id_returns_401() {
-        let app = fake_app();
-        let id = *app.id().as_uuid();
-        let state = default_state_with_app(app);
-        let router = test_router(state);
-
-        let response = router
-            .oneshot(
-                Request::builder()
-                    .method("GET")
-                    .uri(&format!("/api/v1/applications/{id}"))
-                    .body(Body::empty())
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
 
     #[tokio::test]

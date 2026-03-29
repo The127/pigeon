@@ -11,8 +11,9 @@ use pigeon_domain::application::ApplicationId;
 use pigeon_domain::endpoint::EndpointId;
 
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::OrgId;
+use crate::extractors::AuthInfo;
 use crate::state::AppState;
+use pigeon_application::mediator::dispatcher::dispatch;
 
 use super::verify_app_ownership;
 
@@ -37,19 +38,19 @@ pub struct TestEventResponse {
 )]
 pub async fn send_test_event(
     State(state): State<AppState>,
-    OrgId(org_id): OrgId,
+    auth: AuthInfo,
     Path((app_id, endpoint_id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = SendTestEvent {
-        org_id,
+        org_id: auth.org_id.clone(),
         app_id,
         endpoint_id: EndpointId::from_uuid(endpoint_id),
     };
 
-    let result = state.send_test_event.handle(command).await.map_err(ApiError)?;
+    let result = dispatch(&*state.send_test_event, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
 
     let response = TestEventResponse {
         message_id: *result.message.id().as_uuid(),

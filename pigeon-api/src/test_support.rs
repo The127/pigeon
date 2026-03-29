@@ -34,6 +34,16 @@ use uuid::Uuid;
 
 use crate::auth::{AuthContext, JwksProvider};
 
+// --- Stub AuditStore ---
+
+pub(crate) struct StubAuditStore;
+#[async_trait]
+impl pigeon_application::ports::audit_store::AuditStore for StubAuditStore {
+    async fn record(&self, _entry: pigeon_application::ports::audit_store::AuditEntry) -> Result<(), ApplicationError> {
+        Ok(())
+    }
+}
+
 // --- Stub message/attempt/dead-letter query handlers ---
 
 pub(crate) struct StubGetAppStatsHandler;
@@ -329,17 +339,19 @@ pub(crate) async fn test_auth_middleware(
     mut request: Request,
     next: Next,
 ) -> Response {
-    if let Some(org_id_header) = request.headers().get("x-org-id") {
-        if let Ok(org_id_str) = org_id_header.to_str() {
-            if let Ok(uuid) = Uuid::parse_str(org_id_str) {
-                let auth_context = AuthContext {
-                    org_id: OrganizationId::from_uuid(uuid),
-                    user_id: "test-user".to_string(),
-                };
-                request.extensions_mut().insert(auth_context);
-            }
-        }
-    }
+    let org_id = request
+        .headers()
+        .get("x-org-id")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| Uuid::parse_str(s).ok())
+        .map(OrganizationId::from_uuid)
+        .unwrap_or_else(OrganizationId::new);
+
+    let auth_context = AuthContext {
+        org_id,
+        user_id: "test-user".to_string(),
+    };
+    request.extensions_mut().insert(auth_context);
     next.run(request).await
 }
 
