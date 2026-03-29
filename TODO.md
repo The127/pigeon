@@ -106,11 +106,12 @@ Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurab
 ### ~~Search & Filtering~~
 Application search (name/UID ILIKE), message filter (event type), dead letter filter (endpoint + replayed status), audit log filter (command name ILIKE + success/failure). Dynamic SQL with conditional WHERE clauses. Reactive UI via TanStack Query. Pagination on audit log.
 
-### ~~Dark Mode~~
-Auto (system default), light, and dark modes. Theme toggle in sidebar footer cycles through modes. Preference stored in localStorage. Amber accent in both themes. Animated amber orbs on login page.
+### ~~Dark Mode + Themes~~
+Auto/Light/Dark mode with amber accent. Settings page at `/settings` with: accent color picker (amber/teal/indigo/rose/emerald), colorblind mode (deuteranopia/protanopia/tritanopia), high contrast toggle, dyslexia-friendly font (OpenDyslexic), and live preview. All persisted in localStorage.
 
 ### Frontend: Polish
 - Mobile responsive sidebar (sheet overlay on small screens)
+- Message status filter (backend: done, UI: done)
 
 ### Signing Secret Rotation
 No mechanism to rotate an endpoint's `signing_secret` without breaking in-flight deliveries. Design: dual-secret window — deliver signed with new secret, but during a configurable transition period include both old and new signatures so consumers can verify with either.
