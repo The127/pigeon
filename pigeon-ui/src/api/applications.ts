@@ -15,6 +15,32 @@ import type {
   SendMessageResponse,
 } from './generated/types.gen'
 
+// --- Stats ---
+
+export interface TimeBucket {
+  bucket: string
+  succeeded: number
+  failed: number
+}
+
+export interface AppStatsResponse {
+  total_messages: number
+  total_attempts: number
+  total_succeeded: number
+  total_failed: number
+  total_dead_lettered: number
+  success_rate: number
+  time_series: TimeBucket[]
+}
+
+export function useAppStats(appId: Ref<string>, period: Ref<string>) {
+  return useQuery<AppStatsResponse>({
+    queryKey: ['applications', appId, 'stats', period],
+    queryFn: () =>
+      apiFetch(`/applications/${appId.value}/stats?period=${period.value}`),
+  })
+}
+
 // --- Types not yet in generated client (pending server restart) ---
 
 export interface MessageResponse {

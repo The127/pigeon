@@ -16,6 +16,7 @@ import {
   useAttempts,
   useDeadLetters,
   useReplayDeadLetter,
+  useAppStats,
 } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -60,13 +61,17 @@ import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil, Send, CheckCircle2, Mail, AlertTriangle, RotateCcw, ChevronDown, ChevronRight } from 'lucide-vue-next'
+import StatCard from '@/components/StatCard.vue'
+import DeliveryChart from '@/components/DeliveryChart.vue'
+import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil, Send, CheckCircle2, Mail, AlertTriangle, RotateCcw, ChevronDown, ChevronRight, Activity, Inbox, CheckCircle, XCircle, Skull } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 const appId = computed(() => route.params.id as string)
 
 const { data: app, isLoading, error } = useApplication(appId)
+const statsPeriod = ref('24h')
+const { data: stats, isLoading: statsLoading } = useAppStats(appId, statsPeriod)
 const updateApp = useUpdateApplication(appId)
 const deleteApp = useDeleteApplication()
 const { data: eventTypesData, isLoading: etLoading } = useEventTypes(appId)
@@ -300,8 +305,11 @@ const replayDl = useReplayDeadLetter(appId)
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs default-value="event-types">
+      <Tabs default-value="dashboard">
         <TabsList>
+          <TabsTrigger value="dashboard">
+            Dashboard
+          </TabsTrigger>
           <TabsTrigger value="event-types">
             Event Types
             <Badge v-if="eventTypesData?.total" variant="secondary" class="ml-2">
@@ -330,6 +338,83 @@ const replayDl = useReplayDeadLetter(appId)
             Send Message
           </TabsTrigger>
         </TabsList>
+
+        <!-- Event Types Tab -->
+        <!-- Dashboard Tab -->
+        <TabsContent value="dashboard" class="space-y-6">
+          <!-- Period selector -->
+          <div class="flex justify-end">
+            <div class="inline-flex rounded-md border">
+              <button
+                v-for="p in ['24h', '7d', '30d']"
+                :key="p"
+                class="px-3 py-1.5 text-xs font-medium transition-colors first:rounded-l-md last:rounded-r-md"
+                :class="statsPeriod === p
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:text-foreground'"
+                @click="statsPeriod = p"
+              >
+                {{ p }}
+              </button>
+            </div>
+          </div>
+
+          <LoadingState v-if="statsLoading" message="Loading stats..." />
+
+          <template v-else-if="stats">
+            <!-- Stat cards -->
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+              <StatCard
+                title="Messages"
+                :value="stats.total_messages"
+                :icon="Inbox"
+              />
+              <StatCard
+                title="Attempts"
+                :value="stats.total_attempts"
+                :icon="Activity"
+              />
+              <StatCard
+                title="Succeeded"
+                :value="stats.total_succeeded"
+                :icon="CheckCircle"
+                variant="success"
+              />
+              <StatCard
+                title="Failed"
+                :value="stats.total_failed"
+                :icon="XCircle"
+                :variant="stats.total_failed > 0 ? 'destructive' : 'default'"
+              />
+              <StatCard
+                title="Dead Lettered"
+                :value="stats.total_dead_lettered"
+                :icon="Skull"
+                :variant="stats.total_dead_lettered > 0 ? 'warning' : 'default'"
+              />
+            </div>
+
+            <!-- Success rate -->
+            <div class="rounded-lg border bg-card p-4">
+              <div class="flex items-center justify-between">
+                <p class="text-sm font-medium text-muted-foreground">Success Rate</p>
+                <p class="text-2xl font-semibold" :class="stats.success_rate >= 0.95 ? 'text-emerald-600' : stats.success_rate >= 0.8 ? 'text-amber-600' : 'text-destructive'">
+                  {{ stats.total_attempts > 0 ? `${(stats.success_rate * 100).toFixed(1)}%` : '—' }}
+                </p>
+              </div>
+              <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                  class="h-full rounded-full transition-all duration-500"
+                  :class="stats.success_rate >= 0.95 ? 'bg-emerald-500' : stats.success_rate >= 0.8 ? 'bg-amber-500' : 'bg-destructive'"
+                  :style="{ width: `${stats.success_rate * 100}%` }"
+                />
+              </div>
+            </div>
+
+            <!-- Chart -->
+            <DeliveryChart :data="stats.time_series" />
+          </template>
+        </TabsContent>
 
         <!-- Event Types Tab -->
         <TabsContent value="event-types" class="space-y-4">
