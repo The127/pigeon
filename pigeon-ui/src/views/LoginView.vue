@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useAuth } from '@/auth'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -9,14 +9,24 @@ import PigeonLogo from '@/components/PigeonLogo.vue'
 const { login } = useAuth()
 
 const healthy = ref<boolean | null>(null)
+let healthInterval: ReturnType<typeof setInterval> | null = null
 
-onMounted(async () => {
+async function checkHealth() {
   try {
     const res = await fetch('/health/ready')
     healthy.value = res.ok
   } catch {
     healthy.value = false
   }
+}
+
+onMounted(() => {
+  checkHealth()
+  healthInterval = setInterval(checkHealth, 15000)
+})
+
+onUnmounted(() => {
+  if (healthInterval) clearInterval(healthInterval)
 })
 
 const features = [
