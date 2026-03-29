@@ -30,16 +30,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -284,26 +274,21 @@ const replayDl = useReplayDeadLetter(appId)
       </Dialog>
 
       <!-- Delete Application Dialog -->
-      <AlertDialog v-model:open="deleteAppOpen">
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete application</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog v-model:open="deleteAppOpen">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete application</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete <strong>{{ app.name }}</strong>?
               This will remove all event types, endpoints, and message history.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              @click="handleDeleteApp"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" @click="deleteAppOpen = false">Cancel</Button>
+            <Button variant="destructive" @click="handleDeleteApp">Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Tabs default-value="dashboard">
         <TabsList>
@@ -817,46 +802,36 @@ const replayDl = useReplayDeadLetter(appId)
       </Tabs>
 
       <!-- Delete Event Type confirmation -->
-      <AlertDialog :open="!!deleteEtTarget" @update:open="(v: boolean) => { if (!v) deleteEtTarget = null }">
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete event type</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog :open="!!deleteEtTarget" @update:open="(v: boolean) => { if (!v) deleteEtTarget = null }">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete event type</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete <strong>{{ deleteEtTarget?.name }}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              @click="handleDeleteEventType"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" @click="deleteEtTarget = null">Cancel</Button>
+            <Button variant="destructive" @click="handleDeleteEventType">Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <!-- Delete Endpoint confirmation -->
-      <AlertDialog :open="!!deleteEpTarget" @update:open="(v: boolean) => { if (!v) deleteEpTarget = null }">
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete endpoint</AlertDialogTitle>
-            <AlertDialogDescription>
+      <Dialog :open="!!deleteEpTarget" @update:open="(v: boolean) => { if (!v) deleteEpTarget = null }">
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete endpoint</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete <strong class="font-mono">{{ deleteEpTarget?.url }}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              @click="handleDeleteEndpoint"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" @click="deleteEpTarget = null">Cancel</Button>
+            <Button variant="destructive" @click="handleDeleteEndpoint">Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </template>
   </div>
 </template>
