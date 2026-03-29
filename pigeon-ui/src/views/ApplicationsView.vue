@@ -38,7 +38,8 @@ import { Plus, LayoutGrid, MoreHorizontal, Trash2 } from 'lucide-vue-next'
 
 const router = useRouter()
 const toast = useToast()
-const { data, isLoading, error } = useApplications()
+const search = ref('')
+const { data, isLoading, error } = useApplications(search)
 const createApp = useCreateApplication()
 const deleteApp = useDeleteApplication()
 
@@ -151,6 +152,12 @@ function handleDelete() {
         </Dialog>
       </template>
     </PageHeader>
+
+    <Input
+      v-model="search"
+      placeholder="Search applications..."
+      class="max-w-sm"
+    />
 
     <LoadingState v-if="isLoading" message="Loading applications..." />
 

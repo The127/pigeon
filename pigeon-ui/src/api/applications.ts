@@ -121,13 +121,25 @@ export interface AuditLogEntry {
   error_message: string | null
 }
 
-export function useAuditLog(offset: Ref<number>, limit: Ref<number>) {
+export function useAuditLog(
+  offset: Ref<number>,
+  limit: Ref<number>,
+  commandFilter: Ref<string>,
+  successFilter: Ref<string>,
+) {
   return useQuery({
-    queryKey: ['audit-log', offset, limit],
-    queryFn: () =>
-      apiFetch<{ items: AuditLogEntry[]; total: number; offset: number; limit: number }>(
-        `/audit-log?offset=${offset.value}&limit=${limit.value}`,
-      ),
+    queryKey: ['audit-log', offset, limit, commandFilter, successFilter],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        offset: String(offset.value),
+        limit: String(limit.value),
+      })
+      if (commandFilter.value) params.set('command', commandFilter.value)
+      if (successFilter.value) params.set('success', successFilter.value)
+      return apiFetch<{ items: AuditLogEntry[]; total: number; offset: number; limit: number }>(
+        `/audit-log?${params}`,
+      )
+    },
   })
 }
 
@@ -185,10 +197,14 @@ import { apiFetch } from './client'
 
 // --- Applications ---
 
-export function useApplications() {
+export function useApplications(search: Ref<string>) {
   return useQuery<PaginatedApplicationResponse>({
-    queryKey: ['applications'],
-    queryFn: () => apiFetch('/applications?limit=100'),
+    queryKey: ['applications', search],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: '100' })
+      if (search.value) params.set('search', search.value)
+      return apiFetch(`/applications?${params}`)
+    },
   })
 }
 
@@ -393,13 +409,16 @@ export function useRetriggerMessage(appId: Ref<string>) {
   })
 }
 
-export function useMessages(appId: Ref<string>) {
+export function useMessages(appId: Ref<string>, eventTypeId: Ref<string>) {
   return useQuery({
-    queryKey: ['applications', appId, 'messages'],
-    queryFn: () =>
-      apiFetch<{ items: MessageResponse[]; total: number }>(
-        `/applications/${appId.value}/messages?limit=50`,
-      ),
+    queryKey: ['applications', appId, 'messages', eventTypeId],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: '50' })
+      if (eventTypeId.value) params.set('event_type_id', eventTypeId.value)
+      return apiFetch<{ items: MessageResponse[]; total: number }>(
+        `/applications/${appId.value}/messages?${params}`,
+      )
+    },
   })
 }
 
@@ -416,13 +435,17 @@ export function useAttempts(appId: Ref<string>, messageId: Ref<string | null>) {
 
 // --- Dead Letters ---
 
-export function useDeadLetters(appId: Ref<string>) {
+export function useDeadLetters(appId: Ref<string>, endpointId: Ref<string>, replayed: Ref<string>) {
   return useQuery({
-    queryKey: ['applications', appId, 'dead-letters'],
-    queryFn: () =>
-      apiFetch<{ items: DeadLetterResponse[]; total: number }>(
-        `/applications/${appId.value}/dead-letters?limit=50`,
-      ),
+    queryKey: ['applications', appId, 'dead-letters', endpointId, replayed],
+    queryFn: () => {
+      const params = new URLSearchParams({ limit: '50' })
+      if (endpointId.value) params.set('endpoint_id', endpointId.value)
+      if (replayed.value) params.set('replayed', replayed.value)
+      return apiFetch<{ items: DeadLetterResponse[]; total: number }>(
+        `/applications/${appId.value}/dead-letters?${params}`,
+      )
+    },
   })
 }
 

@@ -219,7 +219,8 @@ const payloadValid = computed(() => {
 })
 
 // --- Messages ---
-const { data: messagesData, isLoading: msgLoading } = useMessages(appId)
+const msgEventTypeFilter = ref('')
+const { data: messagesData, isLoading: msgLoading } = useMessages(appId, msgEventTypeFilter)
 const retriggerMsg = useRetriggerMessage(appId)
 const expandedMessageId = ref<string | null>(null)
 const { data: attemptsData, isLoading: attLoading } = useAttempts(appId, expandedMessageId)
@@ -266,7 +267,9 @@ function handleRetrigger(messageId: string) {
 }
 
 // --- Dead Letters ---
-const { data: deadLettersData, isLoading: dlLoading } = useDeadLetters(appId)
+const dlEndpointFilter = ref('')
+const dlReplayedFilter = ref('')
+const { data: deadLettersData, isLoading: dlLoading } = useDeadLetters(appId, dlEndpointFilter, dlReplayedFilter)
 const replayDl = useReplayDeadLetter(appId)
 
 function handleReplay(deadLetterId: string) {
@@ -671,6 +674,22 @@ function handleReplay(deadLetterId: string) {
         <!-- Send Message Tab -->
         <!-- Messages Tab -->
         <TabsContent value="messages" class="space-y-4">
+          <div class="flex gap-2">
+            <select
+              v-model="msgEventTypeFilter"
+              class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">All event types</option>
+              <option
+                v-for="et in eventTypesData?.items"
+                :key="et.id"
+                :value="et.id"
+              >
+                {{ et.name }}
+              </option>
+            </select>
+          </div>
+
           <LoadingState v-if="msgLoading" message="Loading messages..." />
 
           <EmptyState
@@ -774,6 +793,30 @@ function handleReplay(deadLetterId: string) {
 
         <!-- Dead Letters Tab -->
         <TabsContent value="dead-letters" class="space-y-4">
+          <div class="flex gap-2">
+            <select
+              v-model="dlEndpointFilter"
+              class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">All endpoints</option>
+              <option
+                v-for="ep in endpointsData?.items"
+                :key="ep.id"
+                :value="ep.id"
+              >
+                {{ ep.name }}
+              </option>
+            </select>
+            <select
+              v-model="dlReplayedFilter"
+              class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">All statuses</option>
+              <option value="false">Unreplayed</option>
+              <option value="true">Replayed</option>
+            </select>
+          </div>
+
           <LoadingState v-if="dlLoading" message="Loading dead letters..." />
 
           <EmptyState

@@ -19,7 +19,9 @@ import { ScrollText, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 
 const limit = ref(25)
 const offset = ref(0)
-const { data, isLoading, error } = useAuditLog(offset, limit)
+const commandFilter = ref('')
+const successFilter = ref('')
+const { data, isLoading, error } = useAuditLog(offset, limit, commandFilter, successFilter)
 
 function prevPage() {
   offset.value = Math.max(0, offset.value - limit.value)
@@ -43,6 +45,22 @@ function formatCommand(name: string) {
       title="Audit Log"
       description="A record of all actions performed in your organization."
     />
+
+    <div class="flex gap-2">
+      <input
+        v-model="commandFilter"
+        placeholder="Filter by action..."
+        class="flex h-9 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
+      <select
+        v-model="successFilter"
+        class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <option value="">All results</option>
+        <option value="true">Success</option>
+        <option value="false">Failed</option>
+      </select>
+    </div>
 
     <LoadingState v-if="isLoading" message="Loading audit log..." />
 
