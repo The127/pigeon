@@ -152,20 +152,23 @@ function handleCreate() {
           <TableHead>Name</TableHead>
           <TableHead>UID</TableHead>
           <TableHead>Created</TableHead>
-          <TableHead class="w-24">Version</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
-        <TableRow v-for="app in data.items" :key="app.id">
-          <TableCell class="font-medium">{{ app.name }}</TableCell>
+        <TableRow
+          v-for="app in data.items"
+          :key="app.id"
+          class="cursor-pointer"
+          @click="$router.push(`/apps/${app.id}`)"
+        >
+          <TableCell>
+            <span class="font-medium text-primary underline-offset-4 hover:underline">{{ app.name }}</span>
+          </TableCell>
           <TableCell>
             <Badge variant="secondary">{{ app.uid }}</Badge>
           </TableCell>
           <TableCell class="text-muted-foreground">
             {{ new Date(app.created_at).toLocaleDateString() }}
-          </TableCell>
-          <TableCell>
-            <Badge variant="outline">v{{ app.version }}</Badge>
           </TableCell>
         </TableRow>
       </TableBody>

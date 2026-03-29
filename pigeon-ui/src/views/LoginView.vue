@@ -138,9 +138,9 @@ const features = [
           </p>
         </div>
 
-        <Button class="w-full" size="lg" @click="login">
+        <Button class="group w-full" size="lg" @click="login">
           Continue with SSO
-          <ArrowRight class="ml-2 h-4 w-4" />
+          <ArrowRight class="ml-2 h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
         </Button>
 
         <div class="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
