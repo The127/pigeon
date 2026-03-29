@@ -563,7 +563,7 @@ const replayDl = useReplayDeadLetter(appId)
                     <Badge v-for="etId in ep.event_type_ids" :key="etId" variant="outline">
                       {{ eventTypesData?.items.find(e => e.id === etId)?.name || etId.slice(0, 8) }}
                     </Badge>
-                    <span v-if="!ep.event_type_ids.length" class="text-muted-foreground text-sm">All events</span>
+                    <span v-if="!ep.event_type_ids.length" class="text-muted-foreground text-sm">No events subscribed</span>
                   </div>
                 </TableCell>
                 <TableCell>
