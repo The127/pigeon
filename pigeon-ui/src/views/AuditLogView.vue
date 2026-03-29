@@ -3,6 +3,8 @@ import { ref } from 'vue'
 import { useAuditLog } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import FilterSelect from '@/components/FilterSelect.vue'
 import {
   Table,
   TableBody,
@@ -47,19 +49,16 @@ function formatCommand(name: string) {
     />
 
     <div class="flex gap-2">
-      <input
+      <Input
         v-model="commandFilter"
         placeholder="Filter by action..."
-        class="flex h-9 w-48 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        class="max-w-[200px]"
       />
-      <select
+      <FilterSelect
         v-model="successFilter"
-        class="flex h-9 rounded-md border border-input bg-background px-3 py-1 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <option value="">All results</option>
-        <option value="true">Success</option>
-        <option value="false">Failed</option>
-      </select>
+        placeholder="All results"
+        :options="[{ value: 'true', label: 'Success' }, { value: 'false', label: 'Failed' }]"
+      />
     </div>
 
     <LoadingState v-if="isLoading" message="Loading audit log..." />
