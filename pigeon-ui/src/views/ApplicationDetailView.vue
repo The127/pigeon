@@ -11,6 +11,7 @@ import {
   useDeleteEventType,
   useCreateEndpoint,
   useDeleteEndpoint,
+  useSendMessage,
 } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -54,7 +55,8 @@ import FormField from '@/components/FormField.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import ErrorState from '@/components/ErrorState.vue'
-import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil } from 'lucide-vue-next'
+import { Textarea } from '@/components/ui/textarea'
+import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil, Send, CheckCircle2 } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,6 +155,42 @@ function handleDeleteEndpoint() {
     onSuccess: () => { deleteEpTarget.value = null },
   })
 }
+
+// --- Send Message ---
+const sendMsg = useSendMessage(appId)
+const msgEventTypeId = ref('')
+const msgPayload = ref('{\n  \n}')
+const msgResult = ref<{ id: string; attempts: number; duplicate: boolean } | null>(null)
+
+function handleSendMessage() {
+  let payload: unknown
+  try {
+    payload = JSON.parse(msgPayload.value)
+  } catch {
+    return
+  }
+  sendMsg.mutate(
+    { event_type_id: msgEventTypeId.value, payload },
+    {
+      onSuccess: (data) => {
+        msgResult.value = {
+          id: data.id,
+          attempts: data.attempts_created,
+          duplicate: data.was_duplicate,
+        }
+      },
+    },
+  )
+}
+
+const payloadValid = computed(() => {
+  try {
+    JSON.parse(msgPayload.value)
+    return true
+  } catch {
+    return false
+  }
+})
 </script>
 
 <template>
@@ -240,6 +278,9 @@ function handleDeleteEndpoint() {
             <Badge v-if="endpointsData?.total" variant="secondary" class="ml-2">
               {{ endpointsData.total }}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="send">
+            Send Message
           </TabsTrigger>
         </TabsList>
 
@@ -437,6 +478,70 @@ function handleDeleteEndpoint() {
               </TableRow>
             </TableBody>
           </Table>
+        </TabsContent>
+
+        <!-- Send Message Tab -->
+        <TabsContent value="send" class="space-y-4">
+          <div class="max-w-lg space-y-4">
+            <form class="space-y-4" @submit.prevent="handleSendMessage">
+              <FormField label="Event Type" html-for="msg-et">
+                <select
+                  id="msg-et"
+                  v-model="msgEventTypeId"
+                  class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <option value="" disabled>Select an event type</option>
+                  <option
+                    v-for="et in eventTypesData?.items"
+                    :key="et.id"
+                    :value="et.id"
+                  >
+                    {{ et.name }}
+                  </option>
+                </select>
+              </FormField>
+
+              <FormField
+                label="Payload"
+                html-for="msg-payload"
+                :description="payloadValid ? 'Valid JSON object.' : undefined"
+                :error="!payloadValid && msgPayload.trim() ? 'Invalid JSON.' : undefined"
+              >
+                <Textarea
+                  id="msg-payload"
+                  v-model="msgPayload"
+                  class="font-mono text-sm min-h-[160px]"
+                  placeholder='{ "key": "value" }'
+                />
+              </FormField>
+
+              <Button
+                type="submit"
+                :disabled="sendMsg.isPending.value || !msgEventTypeId || !payloadValid"
+              >
+                <Send class="mr-2 h-4 w-4" />
+                {{ sendMsg.isPending.value ? 'Sending...' : 'Send Message' }}
+              </Button>
+            </form>
+
+            <ErrorState v-if="sendMsg.error.value" :message="sendMsg.error.value.message" />
+
+            <div
+              v-if="msgResult"
+              class="flex items-start gap-3 rounded-md border border-border bg-muted/30 p-4"
+            >
+              <CheckCircle2 class="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+              <div class="space-y-1 text-sm">
+                <p class="font-medium">
+                  {{ msgResult.duplicate ? 'Duplicate message (idempotent)' : 'Message sent' }}
+                </p>
+                <p class="text-muted-foreground">
+                  ID: <span class="font-mono">{{ msgResult.id.slice(0, 8) }}</span>
+                  &middot; {{ msgResult.attempts }} attempt{{ msgResult.attempts !== 1 ? 's' : '' }} created
+                </p>
+              </div>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
 

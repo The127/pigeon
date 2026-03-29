@@ -11,6 +11,8 @@ import type {
   EndpointResponse,
   CreateEndpointRequest,
   UpdateEndpointRequest,
+  SendMessageRequest,
+  SendMessageResponse,
 } from './generated/types.gen'
 import { apiFetch } from './client'
 
@@ -193,5 +195,17 @@ export function useDeleteEndpoint(appId: Ref<string>) {
         queryKey: ['applications', appId, 'endpoints'],
       })
     },
+  })
+}
+
+// --- Messages ---
+
+export function useSendMessage(appId: Ref<string>) {
+  return useMutation<SendMessageResponse, Error, SendMessageRequest>({
+    mutationFn: (body) =>
+      apiFetch(`/applications/${appId.value}/messages`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   })
 }
