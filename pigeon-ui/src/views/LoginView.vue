@@ -66,11 +66,11 @@ const features = [
         </div>
 
         <h1 class="text-4xl font-bold tracking-tight text-primary-foreground xl:text-5xl" style="line-height: 1.1;">
-          Webhook delivery<br />you don't worry about.
+          Reliable webhook delivery for your infrastructure.
         </h1>
 
         <p class="mt-4 max-w-md text-base text-primary-foreground/60 leading-relaxed">
-          Self-hosted infrastructure for reliable, observable webhook dispatch.
+          Self-hosted, observable, and built for production.
           Send once, deliver everywhere.
         </p>
 
