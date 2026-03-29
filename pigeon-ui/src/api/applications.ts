@@ -42,6 +42,45 @@ export function useAppStats(appId: Ref<string>, period: Ref<string>) {
   })
 }
 
+// --- Event Type Stats ---
+
+export interface EventTypeStatsResponse {
+  total_messages: number
+  total_attempts: number
+  total_pending: number
+  total_succeeded: number
+  total_failed: number
+  total_dead_lettered: number
+  success_rate: number
+  subscribed_endpoints: number
+  time_series: TimeBucket[]
+  recent_messages: RecentMessage[]
+}
+
+export interface RecentMessage {
+  id: string
+  idempotency_key: string
+  created_at: string
+  attempts_created: number
+  succeeded: number
+  failed: number
+  dead_lettered: number
+}
+
+export function useEventTypeStats(
+  appId: Ref<string>,
+  eventTypeId: Ref<string>,
+  period: Ref<string>,
+) {
+  return useQuery<EventTypeStatsResponse>({
+    queryKey: ['applications', appId, 'event-types', eventTypeId, 'stats', period],
+    queryFn: () =>
+      apiFetch(
+        `/applications/${appId.value}/event-types/${eventTypeId.value}/stats?period=${period.value}`,
+      ),
+  })
+}
+
 // --- Types not yet in generated client (pending server restart) ---
 
 // Endpoint types with name field (pending server restart + client regen)

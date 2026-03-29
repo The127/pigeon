@@ -475,14 +475,19 @@ const replayDl = useReplayDeadLetter(appId)
               </TableRow>
             </TableHeader>
             <TableBody>
-              <TableRow v-for="et in eventTypesData.items" :key="et.id">
-                <TableCell class="font-medium">
-                  <Badge variant="outline">{{ et.name }}</Badge>
+              <TableRow
+                v-for="et in eventTypesData.items"
+                :key="et.id"
+                class="cursor-pointer"
+                @click="$router.push(`/apps/${appId}/event-types/${et.id}`)"
+              >
+                <TableCell>
+                  <span class="font-medium text-primary underline-offset-4 hover:underline">{{ et.name }}</span>
                 </TableCell>
                 <TableCell class="text-muted-foreground">
                   {{ new Date(et.created_at).toLocaleDateString() }}
                 </TableCell>
-                <TableCell>
+                <TableCell @click.stop>
                   <DropdownMenu>
                     <DropdownMenuTrigger as-child>
                       <Button variant="ghost" size="icon" class="h-8 w-8">

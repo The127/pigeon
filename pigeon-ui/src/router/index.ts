@@ -30,6 +30,11 @@ const router = createRouter({
       name: 'application-detail',
       component: () => import('@/views/ApplicationDetailView.vue'),
     },
+    {
+      path: '/apps/:id/event-types/:etId',
+      name: 'event-type-detail',
+      component: () => import('@/views/EventTypeDetailView.vue'),
+    },
   ],
 })
 
