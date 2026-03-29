@@ -13,7 +13,7 @@ const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string; descrip
 ]
 
 const colorblindOptions: { value: string; label: string }[] = [
-  { value: 'none', label: 'None' },
+  { value: 'none', label: 'Default (no adjustment)' },
   { value: 'deuteranopia', label: 'Deuteranopia (reduced green)' },
   { value: 'protanopia', label: 'Protanopia (reduced red)' },
   { value: 'tritanopia', label: 'Tritanopia (reduced blue)' },
@@ -95,14 +95,17 @@ const accentOptions: { value: AccentColor; label: string; color: string }[] = [
       <!-- Accessibility -->
       <div class="space-y-3">
         <h3 class="text-sm font-medium">Accessibility</h3>
-        <div class="flex items-center gap-3">
+        <div class="space-y-2">
+          <p class="text-sm text-muted-foreground">Color vision adjustment</p>
           <FilterSelect
             :model-value="colorblind"
-            placeholder="Color vision"
+            placeholder="Default (no adjustment)"
             :options="colorblindOptions"
             @update:model-value="(v: string) => setColorblind(v as ColorblindMode)"
           />
-          <span class="text-xs text-muted-foreground">Adjusts alert and chart colors for color vision deficiencies.</span>
+          <p class="text-xs text-muted-foreground">
+            Adjusts alert and chart colors for color vision deficiencies.
+          </p>
         </div>
       </div>
     </div>
