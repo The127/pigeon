@@ -1,0 +1,39 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import { isAuthenticated } from '@/auth'
+
+const router = createRouter({
+  history: createWebHistory(),
+  routes: [
+    {
+      path: '/login',
+      name: 'login',
+      component: () => import('@/views/LoginView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/auth/callback',
+      name: 'auth-callback',
+      component: () => import('@/views/AuthCallbackView.vue'),
+      meta: { public: true },
+    },
+    {
+      path: '/',
+      redirect: '/apps',
+    },
+    {
+      path: '/apps',
+      name: 'applications',
+      component: () => import('@/views/ApplicationsView.vue'),
+    },
+  ],
+})
+
+router.beforeEach((to) => {
+  if (to.meta.public) return true
+  if (!isAuthenticated()) {
+    return { name: 'login', query: { redirect: to.fullPath } }
+  }
+  return true
+})
+
+export default router
