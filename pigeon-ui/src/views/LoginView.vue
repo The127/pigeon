@@ -189,7 +189,7 @@ const features = [
   top: -10%;
   left: -10%;
   background: rgba(217, 119, 6, 0.7);
-  animation: orb-drift-1 25s ease-in-out infinite alternate;
+  animation: orb-drift-1 12s ease-in-out infinite alternate;
 }
 
 .login-orb-2 {
@@ -198,7 +198,7 @@ const features = [
   bottom: -5%;
   right: -5%;
   background: rgba(245, 158, 11, 0.5);
-  animation: orb-drift-2 20s ease-in-out infinite alternate;
+  animation: orb-drift-2 10s ease-in-out infinite alternate;
 }
 
 .login-orb-3 {
@@ -207,21 +207,21 @@ const features = [
   top: 40%;
   left: 30%;
   background: rgba(180, 83, 9, 0.6);
-  animation: orb-drift-3 30s ease-in-out infinite alternate;
+  animation: orb-drift-3 15s ease-in-out infinite alternate;
 }
 
 @keyframes orb-drift-1 {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(15%, 20%); }
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(40%, 35%) scale(1.15); }
 }
 
 @keyframes orb-drift-2 {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(-20%, -15%); }
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-35%, -30%) scale(1.1); }
 }
 
 @keyframes orb-drift-3 {
-  0% { transform: translate(0, 0); }
-  100% { transform: translate(10%, -25%); }
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(25%, -40%) scale(1.2); }
 }
 </style>
