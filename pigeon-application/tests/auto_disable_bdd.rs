@@ -37,7 +37,7 @@ async fn given_endpoint_with_failures(
         app_id.clone(),
         None,
         "https://example.com/hook".into(),
-        "whsec_test".into(),
+        Some("whsec_test".into()),
         vec![EventTypeId::new()],
     )
     .unwrap();
@@ -65,7 +65,7 @@ async fn given_disabled_endpoint(
         app_id.clone(),
         None,
         "https://example.com/hook".into(),
-        "whsec_test".into(),
+        Some("whsec_test".into()),
         vec![EventTypeId::new()],
     )
     .unwrap();

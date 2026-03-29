@@ -36,7 +36,7 @@ pub struct Endpoint {
     app_id: ApplicationId,
     name: String,
     url: String,
-    signing_secret: String,
+    signing_secret: Option<String>,
     enabled: bool,
     event_type_ids: Vec<EventTypeId>,
     created_at: DateTime<Utc>,
@@ -47,8 +47,6 @@ pub struct Endpoint {
 pub enum EndpointError {
     #[error("endpoint URL must not be empty")]
     EmptyUrl,
-    #[error("signing secret must not be empty")]
-    EmptySigningSecret,
 }
 
 impl Endpoint {
@@ -56,15 +54,15 @@ impl Endpoint {
         app_id: ApplicationId,
         name: Option<String>,
         url: String,
-        signing_secret: String,
+        signing_secret: Option<String>,
         event_type_ids: Vec<EventTypeId>,
     ) -> Result<Self, EndpointError> {
         if url.trim().is_empty() {
             return Err(EndpointError::EmptyUrl);
         }
-        if signing_secret.trim().is_empty() {
-            return Err(EndpointError::EmptySigningSecret);
-        }
+
+        let signing_secret =
+            signing_secret.filter(|s| !s.trim().is_empty());
 
         let name = match name {
             Some(n) if !n.trim().is_empty() => n,
@@ -100,8 +98,8 @@ impl Endpoint {
         &self.url
     }
 
-    pub fn signing_secret(&self) -> &str {
-        &self.signing_secret
+    pub fn signing_secret(&self) -> Option<&str> {
+        self.signing_secret.as_deref()
     }
 
     pub fn enabled(&self) -> bool {
@@ -131,17 +129,14 @@ impl Endpoint {
     pub fn update(
         &mut self,
         url: String,
-        signing_secret: String,
+        signing_secret: Option<String>,
         event_type_ids: Vec<EventTypeId>,
     ) -> Result<(), EndpointError> {
         if url.trim().is_empty() {
             return Err(EndpointError::EmptyUrl);
         }
-        if signing_secret.trim().is_empty() {
-            return Err(EndpointError::EmptySigningSecret);
-        }
         self.url = url;
-        self.signing_secret = signing_secret;
+        self.signing_secret = signing_secret.filter(|s| !s.trim().is_empty());
         self.event_type_ids = event_type_ids;
         Ok(())
     }
@@ -158,7 +153,7 @@ mod tests {
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            "whsec_secret123".into(),
+            Some("whsec_secret123".into()),
             vec![EventTypeId::new()],
         )
         .unwrap();
@@ -174,7 +169,7 @@ mod tests {
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            "whsec_secret".into(),
+            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -189,7 +184,7 @@ mod tests {
             ApplicationId::new(),
             Some("".into()),
             "https://example.com/webhook".into(),
-            "whsec_secret".into(),
+            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -204,7 +199,7 @@ mod tests {
             ApplicationId::new(),
             Some("   ".into()),
             "https://example.com/webhook".into(),
-            "whsec_secret".into(),
+            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -219,7 +214,7 @@ mod tests {
             ApplicationId::new(),
             Some("my-webhook".into()),
             "https://example.com/webhook".into(),
-            "whsec_secret".into(),
+            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -233,7 +228,7 @@ mod tests {
             ApplicationId::new(),
             None,
             "".into(),
-            "whsec_secret123".into(),
+            Some("whsec_secret123".into()),
             vec![],
         );
 
@@ -241,16 +236,17 @@ mod tests {
     }
 
     #[test]
-    fn reject_empty_signing_secret() {
-        let result = Endpoint::new(
+    fn empty_signing_secret_normalized_to_none() {
+        let ep = Endpoint::new(
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            "".into(),
+            Some("".into()),
             vec![],
-        );
+        )
+        .unwrap();
 
-        assert!(result.is_err());
+        assert!(ep.signing_secret().is_none());
     }
 
     #[test]
@@ -270,7 +266,7 @@ mod tests {
             ApplicationId::new(),
             None,
             "   ".into(),
-            "whsec_secret123".into(),
+            Some("whsec_secret123".into()),
             vec![],
         );
 
@@ -278,16 +274,31 @@ mod tests {
     }
 
     #[test]
-    fn reject_whitespace_only_signing_secret() {
-        let result = Endpoint::new(
+    fn whitespace_signing_secret_normalized_to_none() {
+        let ep = Endpoint::new(
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            "   ".into(),
+            Some("   ".into()),
             vec![],
-        );
+        )
+        .unwrap();
 
-        assert!(result.is_err());
+        assert!(ep.signing_secret().is_none());
+    }
+
+    #[test]
+    fn none_signing_secret_allowed() {
+        let ep = Endpoint::new(
+            ApplicationId::new(),
+            None,
+            "https://example.com/webhook".into(),
+            None,
+            vec![],
+        )
+        .unwrap();
+
+        assert!(ep.signing_secret().is_none());
     }
 
     #[test]
@@ -335,7 +346,7 @@ mod tests {
         assert_eq!(*ep.id(), state.id);
         assert_eq!(*ep.app_id(), state.app_id);
         assert_eq!(ep.url(), state.url);
-        assert_eq!(ep.signing_secret(), state.signing_secret);
+        assert_eq!(ep.signing_secret(), state.signing_secret.as_deref());
         assert_eq!(ep.enabled(), state.enabled);
         assert_eq!(ep.event_type_ids(), state.event_type_ids);
         assert_eq!(*ep.created_at(), state.created_at);

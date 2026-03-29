@@ -149,7 +149,7 @@ struct EndpointRow {
     app_id: uuid::Uuid,
     name: String,
     url: String,
-    signing_secret: String,
+    signing_secret: Option<String>,
     enabled: bool,
     created_at: chrono::DateTime<chrono::Utc>,
     version: i64,

@@ -136,7 +136,7 @@ impl DeliveryWorkerService {
     async fn deliver_one(&self, task: DeliveryTask) {
         let result = self
             .http_client
-            .deliver(&task.endpoint_url, &task.payload, &task.signing_secret)
+            .deliver(&task.endpoint_url, &task.payload, task.signing_secret.as_deref())
             .await;
 
         match result {

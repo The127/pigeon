@@ -8,14 +8,14 @@ use uuid::Uuid;
 pub struct CreateEndpointRequest {
     pub name: Option<String>,
     pub url: String,
-    pub signing_secret: String,
+    pub signing_secret: Option<String>,
     pub event_type_ids: Vec<Uuid>,
 }
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct UpdateEndpointRequest {
     pub url: String,
-    pub signing_secret: String,
+    pub signing_secret: Option<String>,
     pub event_type_ids: Vec<Uuid>,
     pub version: u64,
 }

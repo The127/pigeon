@@ -56,7 +56,7 @@ fn make_task(endpoint_url: &str, attempt_number: u32) -> DeliveryTask {
     DeliveryTask {
         attempt_id: AttemptId::new(),
         endpoint_url: endpoint_url.to_string(),
-        signing_secret: "whsec_test".to_string(),
+        signing_secret: Some("whsec_test".to_string()),
         payload: json!({"event": "test"}),
         attempt_number,
         endpoint_id: EndpointId::new(),

@@ -25,7 +25,7 @@ async fn delivers_payload_with_correct_signature() {
     let client = ReqwestWebhookClient::new(Duration::from_secs(5));
     let url = format!("{}/webhook", server.url());
 
-    let result = client.deliver(&url, &payload, secret).await;
+    let result = client.deliver(&url, &payload, Some(secret)).await;
 
     mock.assert_async().await;
 
@@ -69,7 +69,7 @@ async fn signature_is_valid_hmac_sha256() {
 
     let client = ReqwestWebhookClient::new(Duration::from_secs(5));
     let url = format!("{}/hook", server.url());
-    client.deliver(&url, &payload, secret).await;
+    client.deliver(&url, &payload, Some(secret)).await;
 
     // If the signature doesn't match, mockito won't match the mock and the test fails
     mock.assert_async().await;
@@ -90,7 +90,7 @@ async fn returns_error_response_codes() {
     let url = format!("{}/failing", server.url());
 
     let result = client
-        .deliver(&url, &json!({"x": 1}), "secret")
+        .deliver(&url, &json!({"x": 1}), Some("secret"))
         .await;
 
     mock.assert_async().await;
@@ -116,7 +116,7 @@ async fn returns_error_on_connection_refused() {
         .deliver(
             "http://127.0.0.1:1",
             &json!({"x": 1}),
-            "secret",
+            Some("secret"),
         )
         .await;
 

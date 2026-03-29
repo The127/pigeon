@@ -17,7 +17,7 @@ pub struct UpdateEndpoint {
     pub org_id: OrganizationId,
     pub id: EndpointId,
     pub url: String,
-    pub signing_secret: String,
+    pub signing_secret: Option<String>,
     pub event_type_ids: Vec<EventTypeId>,
     pub version: Version,
 }
@@ -85,7 +85,7 @@ mod tests {
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            "whsec_secret123".into(),
+            Some("whsec_secret123".into()),
             vec![EventTypeId::new()],
         )
         .unwrap();
@@ -111,7 +111,7 @@ mod tests {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
                 id,
                 url: "https://new.example.com/webhook".into(),
-                signing_secret: "whsec_new_secret".into(),
+                signing_secret: Some("whsec_new_secret".into()),
                 event_type_ids: vec![],
                 version,
             })
@@ -142,7 +142,7 @@ mod tests {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
                 id: EndpointId::new(),
                 url: "https://example.com/webhook".into(),
-                signing_secret: "whsec_secret".into(),
+                signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version: Version::new(0),
             })
@@ -170,7 +170,7 @@ mod tests {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
                 id,
                 url: "".into(),
-                signing_secret: "whsec_secret".into(),
+                signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version,
             })
@@ -197,7 +197,7 @@ mod tests {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
                 id,
                 url: "https://example.com/webhook".into(),
-                signing_secret: "whsec_secret".into(),
+                signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version: Version::new(999),
             })

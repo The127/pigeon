@@ -39,7 +39,7 @@ impl PgDeliveryQueue {
 struct DeliveryTaskRow {
     attempt_id: uuid::Uuid,
     endpoint_url: String,
-    signing_secret: String,
+    signing_secret: Option<String>,
     payload: serde_json::Value,
     attempt_number: i32,
     endpoint_id: uuid::Uuid,

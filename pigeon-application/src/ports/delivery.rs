@@ -14,7 +14,7 @@ use crate::error::ApplicationError;
 pub struct DeliveryTask {
     pub attempt_id: AttemptId,
     pub endpoint_url: String,
-    pub signing_secret: String,
+    pub signing_secret: Option<String>,
     pub payload: Value,
     pub attempt_number: u32,
     pub endpoint_id: EndpointId,
@@ -96,11 +96,11 @@ pub trait DeliveryQueue: Send + Sync {
 #[cfg_attr(feature = "test-support", mockall::automock)]
 #[async_trait]
 pub trait WebhookHttpClient: Send + Sync {
-    /// Deliver a webhook payload to the given URL, signing with HMAC-SHA256.
-    async fn deliver(
+    /// Deliver a webhook payload to the given URL, optionally signing with HMAC-SHA256.
+    async fn deliver<'a>(
         &self,
         url: &str,
         payload: &Value,
-        signing_secret: &str,
+        signing_secret: Option<&'a str>,
     ) -> WebhookResult;
 }

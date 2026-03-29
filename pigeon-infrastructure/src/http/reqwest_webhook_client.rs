@@ -31,22 +31,27 @@ impl ReqwestWebhookClient {
 
 #[async_trait]
 impl WebhookHttpClient for ReqwestWebhookClient {
-    async fn deliver(
+    async fn deliver<'a>(
         &self,
         url: &str,
         payload: &serde_json::Value,
-        signing_secret: &str,
+        signing_secret: Option<&'a str>,
     ) -> WebhookResult {
         let body = serde_json::to_vec(payload).expect("payload is valid JSON");
-        let signature = Self::sign(&body, signing_secret);
 
         let start = Instant::now();
 
-        let result = self
+        let mut request = self
             .client
             .post(url)
-            .header("Content-Type", "application/json")
-            .header("X-Pigeon-Signature", signature)
+            .header("Content-Type", "application/json");
+
+        if let Some(secret) = signing_secret {
+            let signature = Self::sign(&body, secret);
+            request = request.header("X-Pigeon-Signature", signature);
+        }
+
+        let result = request
             .body(body)
             .send()
             .await;

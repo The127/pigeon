@@ -49,7 +49,7 @@ impl EndpointState {
             app_id: ApplicationId::new(),
             name: crate::name_generator::generate_name(),
             url: format!("https://example.com/webhook/{}", Uuid::new_v4()),
-            signing_secret: format!("whsec_{}", Uuid::new_v4()),
+            signing_secret: Some(format!("whsec_{}", Uuid::new_v4())),
             enabled: true,
             event_type_ids: vec![EventTypeId::new()],
             created_at: chrono::Utc::now(),
@@ -165,7 +165,7 @@ pub fn any_endpoint() -> Endpoint {
         ApplicationId::new(),
         None,
         format!("https://example.com/webhook/{}", Uuid::new_v4()),
-        format!("whsec_{}", Uuid::new_v4()),
+        Some(format!("whsec_{}", Uuid::new_v4())),
         vec![EventTypeId::new()],
     )
     .unwrap()
