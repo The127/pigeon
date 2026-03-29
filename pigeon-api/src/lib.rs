@@ -25,7 +25,10 @@ use crate::dto::endpoint::{
 use crate::dto::event_type::{
     CreateEventTypeRequest, EventTypeResponse, UpdateEventTypeRequest,
 };
-use crate::dto::message::{SendMessageRequest, SendMessageResponse};
+use crate::handlers::dead_letters;
+use crate::dto::attempt::AttemptResponse;
+use crate::dto::dead_letter::DeadLetterResponse;
+use crate::dto::message::{MessageResponse, SendMessageRequest, SendMessageResponse};
 use crate::dto::oidc_config::{CreateOidcConfigRequest, OidcConfigResponse};
 use crate::dto::organization::{
     CreateOrganizationRequest, OrganizationResponse, UpdateOrganizationRequest,
@@ -54,6 +57,12 @@ use crate::state::AppState;
         endpoints::update_endpoint,
         endpoints::delete_endpoint,
         messages::send_message,
+        messages::list_messages,
+        messages::get_message,
+        messages::list_attempts,
+        dead_letters::list_dead_letters,
+        dead_letters::get_dead_letter,
+        dead_letters::replay,
         organizations::create_organization,
         organizations::get_organization,
         organizations::list_organizations,
@@ -78,6 +87,10 @@ use crate::state::AppState;
         EndpointResponse,
         SendMessageRequest,
         SendMessageResponse,
+        MessageResponse,
+        AttemptResponse,
+        DeadLetterResponse,
+        dead_letters::ReplayDeadLetterResponse,
         CreateOrganizationRequest,
         UpdateOrganizationRequest,
         OrganizationResponse,

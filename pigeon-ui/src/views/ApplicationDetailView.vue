@@ -12,6 +12,10 @@ import {
   useCreateEndpoint,
   useDeleteEndpoint,
   useSendMessage,
+  useMessages,
+  useAttempts,
+  useDeadLetters,
+  useReplayDeadLetter,
 } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -56,7 +60,7 @@ import EmptyState from '@/components/EmptyState.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import ErrorState from '@/components/ErrorState.vue'
 import { Textarea } from '@/components/ui/textarea'
-import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil, Send, CheckCircle2 } from 'lucide-vue-next'
+import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil, Send, CheckCircle2, Mail, AlertTriangle, RotateCcw, ChevronDown, ChevronRight } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
@@ -191,6 +195,37 @@ const payloadValid = computed(() => {
     return false
   }
 })
+
+// --- Messages ---
+const { data: messagesData, isLoading: msgLoading } = useMessages(appId)
+const expandedMessageId = ref<string | null>(null)
+const { data: attemptsData, isLoading: attLoading } = useAttempts(appId, expandedMessageId)
+
+function toggleMessage(id: string) {
+  expandedMessageId.value = expandedMessageId.value === id ? null : id
+}
+
+function eventTypeName(etId: string) {
+  return eventTypesData.value?.items.find(e => e.id === etId)?.name || etId.slice(0, 8)
+}
+
+function endpointUrl(epId: string) {
+  return endpointsData.value?.items.find(e => e.id === epId)?.url || epId.slice(0, 8)
+}
+
+function statusColor(status: string) {
+  switch (status) {
+    case 'succeeded': return 'default'
+    case 'pending': return 'secondary'
+    case 'in_flight': return 'secondary'
+    case 'failed': return 'destructive'
+    default: return 'outline'
+  }
+}
+
+// --- Dead Letters ---
+const { data: deadLettersData, isLoading: dlLoading } = useDeadLetters(appId)
+const replayDl = useReplayDeadLetter(appId)
 </script>
 
 <template>
@@ -277,6 +312,18 @@ const payloadValid = computed(() => {
             Endpoints
             <Badge v-if="endpointsData?.total" variant="secondary" class="ml-2">
               {{ endpointsData.total }}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="messages">
+            Messages
+            <Badge v-if="messagesData?.total" variant="secondary" class="ml-2">
+              {{ messagesData.total }}
+            </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="dead-letters">
+            Dead Letters
+            <Badge v-if="deadLettersData?.total" variant="secondary" class="ml-2">
+              {{ deadLettersData.total }}
             </Badge>
           </TabsTrigger>
           <TabsTrigger value="send">
@@ -474,6 +521,145 @@ const payloadValid = computed(() => {
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                </TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TabsContent>
+
+        <!-- Send Message Tab -->
+        <!-- Messages Tab -->
+        <TabsContent value="messages" class="space-y-4">
+          <LoadingState v-if="msgLoading" message="Loading messages..." />
+
+          <EmptyState
+            v-else-if="!messagesData?.items.length"
+            :icon="Mail"
+            title="No messages"
+            description="Send a message from the Send Message tab to see delivery history here."
+          />
+
+          <Table v-else>
+            <TableHeader>
+              <TableRow>
+                <TableHead class="w-8" />
+                <TableHead>Event Type</TableHead>
+                <TableHead>Idempotency Key</TableHead>
+                <TableHead>Created</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <template v-for="msg in messagesData.items" :key="msg.id">
+                <TableRow
+                  class="cursor-pointer"
+                  @click="toggleMessage(msg.id)"
+                >
+                  <TableCell class="w-8 pr-0">
+                    <ChevronDown v-if="expandedMessageId === msg.id" class="h-4 w-4 text-muted-foreground" />
+                    <ChevronRight v-else class="h-4 w-4 text-muted-foreground" />
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{{ eventTypeName(msg.event_type_id) }}</Badge>
+                  </TableCell>
+                  <TableCell class="font-mono text-xs text-muted-foreground">
+                    {{ msg.idempotency_key.slice(0, 20) }}
+                  </TableCell>
+                  <TableCell class="text-muted-foreground">
+                    {{ new Date(msg.created_at).toLocaleString() }}
+                  </TableCell>
+                </TableRow>
+
+                <!-- Expanded: Attempts -->
+                <TableRow v-if="expandedMessageId === msg.id" class="bg-muted/30">
+                  <TableCell :colspan="4" class="p-0">
+                    <div class="px-6 py-4">
+                      <LoadingState v-if="attLoading" message="Loading attempts..." />
+                      <p v-else-if="!attemptsData?.length" class="text-sm text-muted-foreground">
+                        No delivery attempts.
+                      </p>
+                      <Table v-else>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>#</TableHead>
+                            <TableHead>Endpoint</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Response</TableHead>
+                            <TableHead>Duration</TableHead>
+                            <TableHead>Attempted</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          <TableRow v-for="att in attemptsData" :key="att.id">
+                            <TableCell>{{ att.attempt_number }}</TableCell>
+                            <TableCell class="font-mono text-xs">{{ endpointUrl(att.endpoint_id) }}</TableCell>
+                            <TableCell>
+                              <Badge :variant="statusColor(att.status)">{{ att.status }}</Badge>
+                            </TableCell>
+                            <TableCell class="text-muted-foreground">
+                              {{ att.response_code ?? '—' }}
+                            </TableCell>
+                            <TableCell class="text-muted-foreground">
+                              {{ att.duration_ms != null ? `${att.duration_ms}ms` : '—' }}
+                            </TableCell>
+                            <TableCell class="text-muted-foreground">
+                              {{ att.attempted_at ? new Date(att.attempted_at).toLocaleString() : 'Pending' }}
+                            </TableCell>
+                          </TableRow>
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              </template>
+            </TableBody>
+          </Table>
+        </TabsContent>
+
+        <!-- Dead Letters Tab -->
+        <TabsContent value="dead-letters" class="space-y-4">
+          <LoadingState v-if="dlLoading" message="Loading dead letters..." />
+
+          <EmptyState
+            v-else-if="!deadLettersData?.items.length"
+            :icon="AlertTriangle"
+            title="No dead letters"
+            description="Messages that exhaust all retry attempts will appear here."
+          />
+
+          <Table v-else>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Endpoint</TableHead>
+                <TableHead>Last Response</TableHead>
+                <TableHead>Dead Lettered</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead class="w-12" />
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="dl in deadLettersData.items" :key="dl.id">
+                <TableCell class="font-mono text-xs">{{ endpointUrl(dl.endpoint_id) }}</TableCell>
+                <TableCell class="text-muted-foreground">
+                  {{ dl.last_response_code ?? '—' }}
+                </TableCell>
+                <TableCell class="text-muted-foreground">
+                  {{ new Date(dl.dead_lettered_at).toLocaleString() }}
+                </TableCell>
+                <TableCell>
+                  <Badge v-if="dl.replayed_at" variant="secondary">Replayed</Badge>
+                  <Badge v-else variant="destructive">Failed</Badge>
+                </TableCell>
+                <TableCell>
+                  <Button
+                    v-if="!dl.replayed_at"
+                    variant="ghost"
+                    size="icon"
+                    class="h-8 w-8"
+                    :disabled="replayDl.isPending.value"
+                    @click="replayDl.mutate(dl.id)"
+                  >
+                    <RotateCcw class="h-4 w-4" />
+                  </Button>
                 </TableCell>
               </TableRow>
             </TableBody>

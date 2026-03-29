@@ -14,6 +14,41 @@ import type {
   SendMessageRequest,
   SendMessageResponse,
 } from './generated/types.gen'
+
+// --- Types not yet in generated client (pending server restart) ---
+
+export interface MessageResponse {
+  id: string
+  app_id: string
+  event_type_id: string
+  payload: unknown
+  idempotency_key: string
+  created_at: string
+}
+
+export interface AttemptResponse {
+  id: string
+  message_id: string
+  endpoint_id: string
+  status: string
+  response_code: number | null
+  response_body: string | null
+  attempted_at: string | null
+  next_attempt_at: string | null
+  attempt_number: number
+  duration_ms: number | null
+}
+
+export interface DeadLetterResponse {
+  id: string
+  message_id: string
+  endpoint_id: string
+  app_id: string
+  last_response_code: number | null
+  last_response_body: string | null
+  dead_lettered_at: string
+  replayed_at: string | null
+}
 import { apiFetch } from './client'
 
 // --- Applications ---
@@ -207,5 +242,54 @@ export function useSendMessage(appId: Ref<string>) {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  })
+}
+
+export function useMessages(appId: Ref<string>) {
+  return useQuery({
+    queryKey: ['applications', appId, 'messages'],
+    queryFn: () =>
+      apiFetch<{ items: MessageResponse[]; total: number }>(
+        `/applications/${appId.value}/messages?limit=50`,
+      ),
+  })
+}
+
+export function useAttempts(appId: Ref<string>, messageId: Ref<string | null>) {
+  return useQuery({
+    queryKey: ['applications', appId, 'messages', messageId, 'attempts'],
+    queryFn: () =>
+      apiFetch<AttemptResponse[]>(
+        `/applications/${appId.value}/messages/${messageId.value}/attempts`,
+      ),
+    enabled: () => !!messageId.value,
+  })
+}
+
+// --- Dead Letters ---
+
+export function useDeadLetters(appId: Ref<string>) {
+  return useQuery({
+    queryKey: ['applications', appId, 'dead-letters'],
+    queryFn: () =>
+      apiFetch<{ items: DeadLetterResponse[]; total: number }>(
+        `/applications/${appId.value}/dead-letters?limit=50`,
+      ),
+  })
+}
+
+export function useReplayDeadLetter(appId: Ref<string>) {
+  const queryClient = useQueryClient()
+
+  return useMutation<unknown, Error, string>({
+    mutationFn: (id) =>
+      apiFetch(`/applications/${appId.value}/dead-letters/${id}/replay`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['applications', appId, 'dead-letters'],
+      })
+    },
   })
 }
