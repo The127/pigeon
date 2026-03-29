@@ -169,6 +169,65 @@ mod tests {
     }
 
     #[test]
+    fn auto_generates_name_when_none_provided() {
+        let ep = Endpoint::new(
+            ApplicationId::new(),
+            None,
+            "https://example.com/webhook".into(),
+            "whsec_secret".into(),
+            vec![],
+        )
+        .unwrap();
+
+        assert!(!ep.name().is_empty());
+        assert!(ep.name().contains('-'), "expected adjective-noun format, got: {}", ep.name());
+    }
+
+    #[test]
+    fn auto_generates_name_when_empty_string_provided() {
+        let ep = Endpoint::new(
+            ApplicationId::new(),
+            Some("".into()),
+            "https://example.com/webhook".into(),
+            "whsec_secret".into(),
+            vec![],
+        )
+        .unwrap();
+
+        assert!(!ep.name().is_empty());
+        assert!(ep.name().contains('-'));
+    }
+
+    #[test]
+    fn auto_generates_name_when_whitespace_only_provided() {
+        let ep = Endpoint::new(
+            ApplicationId::new(),
+            Some("   ".into()),
+            "https://example.com/webhook".into(),
+            "whsec_secret".into(),
+            vec![],
+        )
+        .unwrap();
+
+        assert!(!ep.name().is_empty());
+        assert!(ep.name().contains('-'));
+    }
+
+    #[test]
+    fn uses_provided_name() {
+        let ep = Endpoint::new(
+            ApplicationId::new(),
+            Some("my-webhook".into()),
+            "https://example.com/webhook".into(),
+            "whsec_secret".into(),
+            vec![],
+        )
+        .unwrap();
+
+        assert_eq!(ep.name(), "my-webhook");
+    }
+
+    #[test]
     fn reject_empty_url() {
         let result = Endpoint::new(
             ApplicationId::new(),
