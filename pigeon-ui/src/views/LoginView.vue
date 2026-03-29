@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref, onMounted } from 'vue'
 import { useAuth } from '@/auth'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -6,6 +7,17 @@ import { Zap, RefreshCcw, Activity, ArrowRight, Check } from 'lucide-vue-next'
 import PigeonLogo from '@/components/PigeonLogo.vue'
 
 const { login } = useAuth()
+
+const healthy = ref<boolean | null>(null)
+
+onMounted(async () => {
+  try {
+    const res = await fetch('/health/ready')
+    healthy.value = res.ok
+  } catch {
+    healthy.value = false
+  }
+})
 
 const features = [
   { icon: Zap, title: 'Fan-out delivery', desc: 'One message, every subscribed endpoint' },
@@ -83,15 +95,28 @@ const features = [
       </div>
 
       <!-- Bottom status bar -->
-      <div class="relative z-10 border-t border-primary-foreground/10 px-12 py-4 xl:px-16">
-        <div class="flex items-center gap-6 font-mono text-xs text-primary-foreground/40">
-          <span class="flex items-center gap-1.5">
-            <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            All systems operational
-          </span>
-          <span>HMAC-SHA256</span>
-          <span>Exponential backoff</span>
+      <div class="relative z-10 flex items-center justify-between border-t border-primary-foreground/10 px-12 py-4 xl:px-16">
+        <div class="flex items-center gap-2 font-mono text-xs text-primary-foreground/40">
+          <span
+            class="inline-block h-1.5 w-1.5 rounded-full"
+            :class="{
+              'bg-emerald-400': healthy === true,
+              'bg-red-400': healthy === false,
+              'bg-primary-foreground/20 animate-pulse': healthy === null,
+            }"
+          />
+          <span v-if="healthy === null">Checking...</span>
+          <span v-else-if="healthy">All systems operational</span>
+          <span v-else>Service unavailable</span>
         </div>
+        <a
+          href="https://github.com/The127/pigeon"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="font-mono text-xs text-primary-foreground/30 transition-colors hover:text-primary-foreground/60"
+        >
+          GitHub
+        </a>
       </div>
     </div>
 
