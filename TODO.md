@@ -38,6 +38,37 @@ Transactional outbox pattern: events are INSERT'd into `event_outbox` table insi
 ### ~~Integration Tests~~
 Cross-tenant SQL isolation tests for applications, endpoints, event types, and OIDC configs. OidcConfig CRUD, SendMessage, and delivery queue flows were already covered.
 
+## Priority: High (UI-blocking)
+
+### Message Read API
+- `GET /api/v1/applications/{app_id}/messages` — list messages (paginated)
+- `GET /api/v1/applications/{app_id}/messages/{id}` — get message by ID
+- Requires: `MessageReadStore` trait, list/get queries, API handler, Pg adapter
+
+### Attempt Read API
+- `GET /api/v1/applications/{app_id}/messages/{msg_id}/attempts` — list attempts for a message
+- Requires: `AttemptReadStore` trait (list query), API handler, Pg adapter
+
+### Dead Letter Read API
+- `GET /api/v1/applications/{app_id}/dead-letters` — list dead letters (paginated)
+- `GET /api/v1/applications/{app_id}/dead-letters/{id}` — get dead letter by ID
+- Requires: extend `DeadLetterReadStore` (currently only has `consecutive_failure_count`), API handler, Pg adapter
+
+### Frontend: Messages & Delivery View
+Blocked on the three read APIs above. Tab on application detail page showing messages → attempts drill-down.
+
+### Frontend: Dead Letter Queue View
+Blocked on dead letter read API. Tab on application detail page with replay button per entry.
+
+### Frontend: Edit Event Type / Endpoint
+- Edit event type name
+- Edit endpoint URL, signing secret, event type subscriptions
+
+### Frontend: Polish
+- Toast notifications for mutation success/error
+- Dark mode toggle
+- Mobile responsive sidebar (sheet overlay on small screens)
+
 ## Priority: High (Outbox-unlocked)
 
 ### More Domain Events
@@ -81,5 +112,5 @@ Currently raw `std::env::var` calls in `PigeonConfig`. Could use `config-rs` or 
 ### Inbound Webhook Signature Verification
 Pigeon sends webhooks, it doesn't receive them from external services. If scope expands to receiving, inbound signatures need verification. Not currently planned.
 
-### Frontend (pigeon-ui)
-Vue 3 + TypeScript + shadcn-vue + generated OpenAPI client. Lives in `pigeon-ui/` directory. API is stable, delivery worker is operational. OpenAPI spec at `/api/openapi.json`. Can consume real-time events via SSE once that's implemented.
+### ~~Frontend (pigeon-ui)~~
+Vue 3 + TypeScript + Tailwind v4 + shadcn-vue + TanStack Query + oidc-client-ts. OIDC auth with route guard, generated OpenAPI client. App shell with collapsible sidebar. Applications CRUD, event types CRUD, endpoints CRUD, send message form. Blocked on backend read APIs for messages/attempts/dead letters views.
