@@ -917,6 +917,7 @@ function handleReplay(deadLetterId: string) {
               <FormField
                 label="Payload"
                 html-for="msg-payload"
+                required
                 :description="payloadValid ? 'Valid JSON object.' : undefined"
                 :error="!payloadValid && msgPayload.trim() ? 'Invalid JSON.' : undefined"
               >
