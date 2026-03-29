@@ -26,6 +26,7 @@ export interface TimeBucket {
 export interface AppStatsResponse {
   total_messages: number
   total_attempts: number
+  total_pending: number
   total_succeeded: number
   total_failed: number
   total_dead_lettered: number
@@ -228,7 +229,7 @@ export function useEndpoints(appId: Ref<string>) {
 export function useCreateEndpoint(appId: Ref<string>) {
   const queryClient = useQueryClient()
 
-  return useMutation<EndpointWithName, Error, CreateEndpointRequest & { name?: string }>({
+  return useMutation<EndpointWithName, Error, Omit<CreateEndpointRequest, 'signing_secret'> & { name?: string; signing_secret?: string }>({
     mutationFn: (body) =>
       apiFetch(`/applications/${appId.value}/endpoints`, {
         method: 'POST',

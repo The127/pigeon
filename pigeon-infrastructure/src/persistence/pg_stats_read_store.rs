@@ -21,6 +21,7 @@ impl PgStatsReadStore {
 struct CountsRow {
     total_messages: i64,
     total_attempts: i64,
+    total_pending: i64,
     total_succeeded: i64,
     total_failed: i64,
     total_dead_lettered: i64,
@@ -52,6 +53,10 @@ impl StatsReadStore for PgStatsReadStore {
                  JOIN messages m ON m.id = att.message_id \
                  JOIN applications a ON a.id = m.app_id \
                  WHERE m.app_id = $1 AND a.org_id = $2 AND att.attempted_at >= $3) AS total_attempts, \
+                (SELECT COUNT(*) FROM attempts att \
+                 JOIN messages m ON m.id = att.message_id \
+                 JOIN applications a ON a.id = m.app_id \
+                 WHERE m.app_id = $1 AND a.org_id = $2 AND att.status IN ('pending', 'in_flight')) AS total_pending, \
                 (SELECT COUNT(*) FROM attempts att \
                  JOIN messages m ON m.id = att.message_id \
                  JOIN applications a ON a.id = m.app_id \
@@ -107,6 +112,7 @@ impl StatsReadStore for PgStatsReadStore {
         Ok(AppStats {
             total_messages: counts.total_messages as u64,
             total_attempts,
+            total_pending: counts.total_pending as u64,
             total_succeeded,
             total_failed: counts.total_failed as u64,
             total_dead_lettered: counts.total_dead_lettered as u64,

@@ -9,6 +9,7 @@ use crate::error::ApplicationError;
 pub struct AppStats {
     pub total_messages: u64,
     pub total_attempts: u64,
+    pub total_pending: u64,
     pub total_succeeded: u64,
     pub total_failed: u64,
     pub total_dead_lettered: u64,

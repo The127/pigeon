@@ -41,6 +41,7 @@ impl QueryHandler<GetAppStats> for StubGetAppStatsHandler {
         Ok(AppStats {
             total_messages: 0,
             total_attempts: 0,
+            total_pending: 0,
             total_succeeded: 0,
             total_failed: 0,
             total_dead_lettered: 0,

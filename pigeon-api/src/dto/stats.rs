@@ -8,6 +8,7 @@ use pigeon_application::ports::stats_read_store::AppStats;
 pub struct AppStatsResponse {
     pub total_messages: u64,
     pub total_attempts: u64,
+    pub total_pending: u64,
     pub total_succeeded: u64,
     pub total_failed: u64,
     pub total_dead_lettered: u64,
@@ -27,6 +28,7 @@ impl From<AppStats> for AppStatsResponse {
         Self {
             total_messages: stats.total_messages,
             total_attempts: stats.total_attempts,
+            total_pending: stats.total_pending,
             total_succeeded: stats.total_succeeded,
             total_failed: stats.total_failed,
             total_dead_lettered: stats.total_dead_lettered,

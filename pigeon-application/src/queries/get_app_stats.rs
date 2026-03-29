@@ -59,6 +59,7 @@ mod tests {
             Ok(AppStats {
                 total_messages: 10,
                 total_attempts: 20,
+                total_pending: 0,
                 total_succeeded: 18,
                 total_failed: 2,
                 total_dead_lettered: 1,

@@ -131,7 +131,7 @@ function handleCreateEndpoint() {
     {
       name: epName.value || undefined,
       url: epUrl.value,
-      signing_secret: epSecret.value,
+      signing_secret: epSecret.value || undefined,
       event_type_ids: epEventTypeIds.value,
     },
     {
@@ -221,8 +221,10 @@ function endpointLabel(epId: string) {
 function messageStatus(msg: { attempts_created: number; succeeded: number; failed: number; dead_lettered: number }) {
   if (msg.attempts_created === 0) return { label: 'No endpoints', variant: 'outline' as const }
   if (msg.dead_lettered > 0) return { label: 'Dead lettered', variant: 'destructive' as const }
-  if (msg.succeeded === msg.attempts_created) return { label: 'Delivered', variant: 'default' as const }
-  if (msg.failed > 0) return { label: 'Partially failed', variant: 'secondary' as const }
+  if (msg.succeeded >= msg.attempts_created) return { label: 'Delivered', variant: 'default' as const }
+  if (msg.failed > 0 && msg.succeeded === 0) return { label: 'Failed', variant: 'destructive' as const }
+  if (msg.failed > 0) return { label: 'Partial', variant: 'secondary' as const }
+  if (msg.succeeded > 0) return { label: 'Delivering', variant: 'secondary' as const }
   return { label: 'Pending', variant: 'secondary' as const }
 }
 
@@ -366,16 +368,17 @@ const replayDl = useReplayDeadLetter(appId)
 
           <template v-else-if="stats">
             <!-- Stat cards -->
-            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               <StatCard
                 title="Messages"
                 :value="stats.total_messages"
                 :icon="Inbox"
               />
               <StatCard
-                title="Attempts"
-                :value="stats.total_attempts"
+                title="Pending"
+                :value="stats.total_pending"
                 :icon="Activity"
+                :variant="stats.total_pending > 0 ? 'warning' : 'default'"
               />
               <StatCard
                 title="Succeeded"
@@ -524,7 +527,7 @@ const replayDl = useReplayDeadLetter(appId)
                   <FormField label="URL" html-for="ep-url">
                     <Input id="ep-url" v-model="epUrl" placeholder="https://example.com/webhook" />
                   </FormField>
-                  <FormField label="Signing Secret" html-for="ep-secret" description="Used to sign payloads with HMAC-SHA256.">
+                  <FormField label="Signing Secret" html-for="ep-secret" description="Optional — used to sign payloads with HMAC-SHA256. Leave blank to skip signing.">
                     <Input id="ep-secret" v-model="epSecret" placeholder="whsec_..." />
                   </FormField>
                   <FormField v-if="eventTypesData?.items.length" label="Event Types" description="Select which events this endpoint receives.">
@@ -542,7 +545,7 @@ const replayDl = useReplayDeadLetter(appId)
                     </div>
                   </FormField>
                   <DialogFooter>
-                    <Button type="submit" :disabled="createEp.isPending.value || !epUrl || !epSecret">
+                    <Button type="submit" :disabled="createEp.isPending.value || !epUrl">
                       {{ createEp.isPending.value ? 'Creating...' : 'Create' }}
                     </Button>
                   </DialogFooter>
@@ -681,7 +684,6 @@ const replayDl = useReplayDeadLetter(appId)
                       <Table v-else>
                         <TableHeader>
                           <TableRow>
-                            <TableHead>#</TableHead>
                             <TableHead>Endpoint</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Response</TableHead>
@@ -691,8 +693,7 @@ const replayDl = useReplayDeadLetter(appId)
                         </TableHeader>
                         <TableBody>
                           <TableRow v-for="att in attemptsData" :key="att.id">
-                            <TableCell>{{ att.attempt_number }}</TableCell>
-                            <TableCell class="font-mono text-xs">{{ endpointLabel(att.endpoint_id) }}</TableCell>
+                            <TableCell>{{ endpointLabel(att.endpoint_id) }}</TableCell>
                             <TableCell>
                               <Badge :variant="statusColor(att.status)">{{ att.status }}</Badge>
                             </TableCell>
