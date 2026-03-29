@@ -7,6 +7,8 @@ export type ColorblindMode = 'none' | 'deuteranopia' | 'protanopia' | 'tritanopi
 const MODE_KEY = 'pigeon-theme'
 const ACCENT_KEY = 'pigeon-accent'
 const COLORBLIND_KEY = 'pigeon-colorblind'
+const CONTRAST_KEY = 'pigeon-contrast'
+const DYSLEXIA_KEY = 'pigeon-dyslexia'
 
 const mode = ref<ThemeMode>(
   (localStorage.getItem(MODE_KEY) as ThemeMode) || 'auto',
@@ -18,6 +20,14 @@ const accent = ref<AccentColor>(
 
 const colorblind = ref<ColorblindMode>(
   (localStorage.getItem(COLORBLIND_KEY) as ColorblindMode) || 'none',
+)
+
+const highContrast = ref(
+  localStorage.getItem(CONTRAST_KEY) === 'true',
+)
+
+const dyslexiaFont = ref(
+  localStorage.getItem(DYSLEXIA_KEY) === 'true',
 )
 
 function applyTheme(m: ThemeMode) {
@@ -35,6 +45,30 @@ function applyAccent(a: AccentColor) {
 
 function applyColorblind(c: ColorblindMode) {
   document.documentElement.setAttribute('data-colorblind', c)
+}
+
+function applyContrast(on: boolean) {
+  if (on) {
+    document.documentElement.setAttribute('data-contrast', 'high')
+  } else {
+    document.documentElement.removeAttribute('data-contrast')
+  }
+}
+
+function applyDyslexia(on: boolean) {
+  if (on) {
+    document.documentElement.classList.add('dyslexia-font')
+    // Load OpenDyslexic font if not already loaded
+    if (!document.getElementById('opendyslexic-font')) {
+      const link = document.createElement('link')
+      link.id = 'opendyslexic-font'
+      link.rel = 'stylesheet'
+      link.href = 'https://fonts.cdnfonts.com/css/opendyslexic'
+      document.head.appendChild(link)
+    }
+  } else {
+    document.documentElement.classList.remove('dyslexia-font')
+  }
 }
 
 const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
@@ -57,18 +91,34 @@ watch(colorblind, (c) => {
   applyColorblind(c)
 }, { immediate: true })
 
+watch(highContrast, (on) => {
+  localStorage.setItem(CONTRAST_KEY, String(on))
+  applyContrast(on)
+}, { immediate: true })
+
+watch(dyslexiaFont, (on) => {
+  localStorage.setItem(DYSLEXIA_KEY, String(on))
+  applyDyslexia(on)
+}, { immediate: true })
+
 export function useTheme() {
   return {
     mode,
     accent,
     colorblind,
+    highContrast,
+    dyslexiaFont,
     setMode: (m: ThemeMode) => { mode.value = m },
     setAccent: (a: AccentColor) => { accent.value = a },
     setColorblind: (c: ColorblindMode) => { colorblind.value = c },
+    setHighContrast: (on: boolean) => { highContrast.value = on },
+    setDyslexiaFont: (on: boolean) => { dyslexiaFont.value = on },
   }
 }
 
-// Initialize on module load — ensures settings are applied before first render
+// Initialize on module load
 applyTheme(mode.value)
 applyAccent(accent.value)
 applyColorblind(colorblind.value)
+applyContrast(highContrast.value)
+applyDyslexia(dyslexiaFont.value)

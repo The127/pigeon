@@ -259,6 +259,26 @@
   --destructive: oklch(0.6 0.2 340);
 }
 
+/* --- High contrast mode --- */
+[data-contrast="high"] {
+  --foreground: oklch(0.05 0 0);
+  --muted-foreground: oklch(0.35 0.02 60);
+  --border: oklch(0.7 0.01 80);
+  --input: oklch(0.7 0.01 80);
+}
+.dark[data-contrast="high"], [data-contrast="high"].dark {
+  --foreground: oklch(0.98 0 0);
+  --muted-foreground: oklch(0.75 0.02 60);
+  --border: oklch(0.4 0.01 60);
+  --input: oklch(0.4 0.01 60);
+}
+
+/* --- Dyslexia font --- */
+.dyslexia-font {
+  --font-sans: 'OpenDyslexic', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'OpenDyslexicMono', ui-monospace, monospace;
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
