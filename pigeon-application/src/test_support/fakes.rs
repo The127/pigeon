@@ -162,6 +162,7 @@ impl ApplicationReadStore for FakeApplicationReadStore {
     async fn list_by_org(
         &self,
         org_id: &pigeon_domain::organization::OrganizationId,
+        _search: Option<String>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<Application>, ApplicationError> {
@@ -180,6 +181,7 @@ impl ApplicationReadStore for FakeApplicationReadStore {
     async fn count_by_org(
         &self,
         org_id: &pigeon_domain::organization::OrganizationId,
+        _search: Option<String>,
     ) -> Result<u64, ApplicationError> {
         self.log.record("application_read_store:count_by_org");
         let apps = self.data.applications.lock().unwrap();

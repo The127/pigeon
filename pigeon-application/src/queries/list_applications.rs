@@ -13,6 +13,7 @@ use crate::queries::PaginatedResult;
 #[derive(Debug)]
 pub struct ListApplications {
     pub org_id: OrganizationId,
+    pub search: Option<String>,
     pub offset: u64,
     pub limit: u64,
 }
@@ -37,8 +38,8 @@ impl QueryHandler<ListApplications> for ListApplicationsHandler {
         &self,
         query: ListApplications,
     ) -> Result<PaginatedResult<Application>, ApplicationError> {
-        let items = self.read_store.list_by_org(&query.org_id, query.offset, query.limit).await?;
-        let total = self.read_store.count_by_org(&query.org_id).await?;
+        let items = self.read_store.list_by_org(&query.org_id, query.search.clone(), query.offset, query.limit).await?;
+        let total = self.read_store.count_by_org(&query.org_id, query.search).await?;
 
         Ok(PaginatedResult {
             items,
@@ -59,13 +60,14 @@ mod tests {
     #[tokio::test]
     async fn returns_empty_list() {
         let mut mock = MockApplicationReadStore::new();
-        mock.expect_list_by_org().returning(|_, _, _| Ok(vec![]));
-        mock.expect_count_by_org().returning(|_| Ok(0));
+        mock.expect_list_by_org().returning(|_, _, _, _| Ok(vec![]));
+        mock.expect_count_by_org().returning(|_, _| Ok(0));
 
         let handler = ListApplicationsHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListApplications {
                 org_id: OrganizationId::new(),
+                search: None,
                 offset: 0,
                 limit: 10,
             })
@@ -87,14 +89,15 @@ mod tests {
 
         let mut mock = MockApplicationReadStore::new();
         mock.expect_list_by_org()
-            .withf(|_, offset, limit| *offset == 0 && *limit == 10)
-            .returning(move |_, _, _| Ok(items_clone.clone()));
-        mock.expect_count_by_org().returning(|_| Ok(5));
+            .withf(|_, _, offset, limit| *offset == 0 && *limit == 10)
+            .returning(move |_, _, _, _| Ok(items_clone.clone()));
+        mock.expect_count_by_org().returning(|_, _| Ok(5));
 
         let handler = ListApplicationsHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListApplications {
                 org_id: OrganizationId::new(),
+                search: None,
                 offset: 0,
                 limit: 10,
             })
@@ -124,15 +127,16 @@ mod tests {
 
         let mut mock = MockApplicationReadStore::new();
         mock.expect_list_by_org()
-            .withf(move |org_id, _, _| *org_id == org_a_clone)
-            .returning(move |_, _, _| Ok(items_a_clone.clone()));
+            .withf(move |org_id, _, _, _| *org_id == org_a_clone)
+            .returning(move |_, _, _, _| Ok(items_a_clone.clone()));
         mock.expect_count_by_org()
-            .returning(|_| Ok(1));
+            .returning(|_, _| Ok(1));
 
         let handler = ListApplicationsHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListApplications {
                 org_id: org_a,
+                search: None,
                 offset: 0,
                 limit: 10,
             })
@@ -147,14 +151,15 @@ mod tests {
     async fn respects_offset_and_limit() {
         let mut mock = MockApplicationReadStore::new();
         mock.expect_list_by_org()
-            .withf(|_, offset, limit| *offset == 20 && *limit == 5)
-            .returning(|_, _, _| Ok(vec![]));
-        mock.expect_count_by_org().returning(|_| Ok(25));
+            .withf(|_, _, offset, limit| *offset == 20 && *limit == 5)
+            .returning(|_, _, _, _| Ok(vec![]));
+        mock.expect_count_by_org().returning(|_, _| Ok(25));
 
         let handler = ListApplicationsHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListApplications {
                 org_id: OrganizationId::new(),
+                search: None,
                 offset: 20,
                 limit: 5,
             })

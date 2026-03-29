@@ -13,7 +13,7 @@ use pigeon_domain::application::ApplicationId;
 use pigeon_domain::version::Version;
 
 use crate::dto::application::{ApplicationResponse, CreateApplicationRequest, UpdateApplicationRequest};
-use crate::dto::pagination::{ListQuery, PaginatedResponse};
+use crate::dto::pagination::{ApplicationListQuery, PaginatedResponse};
 use crate::error::{ApiError, ErrorBody};
 use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
@@ -82,7 +82,7 @@ pub async fn get_application(
 #[utoipa::path(
     get,
     path = "/api/v1/applications",
-    params(ListQuery),
+    params(ApplicationListQuery),
     responses(
         (status = 200, description = "Paginated list of applications", body = PaginatedResponse),
     ),
@@ -91,10 +91,11 @@ pub async fn get_application(
 pub async fn list_applications(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
-    Query(query): Query<ListQuery>,
+    Query(query): Query<ApplicationListQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let list_query = ListApplications {
         org_id,
+        search: query.search,
         offset: query.offset.unwrap_or(0),
         limit: query.limit.unwrap_or(20),
     };

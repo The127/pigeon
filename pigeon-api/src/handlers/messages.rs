@@ -15,7 +15,7 @@ use pigeon_domain::message::MessageId;
 
 use crate::dto::attempt::AttemptResponse;
 use crate::dto::message::{MessageResponse, SendMessageRequest, SendMessageResponse};
-use crate::dto::pagination::ListQuery;
+use crate::dto::pagination::MessageListQuery;
 use crate::error::{ApiError, ErrorBody};
 use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
@@ -79,7 +79,7 @@ pub async fn send_message(
     path = "/api/v1/applications/{app_id}/messages",
     params(
         ("app_id" = Uuid, Path, description = "Application ID"),
-        ListQuery,
+        MessageListQuery,
     ),
     responses(
         (status = 200, description = "Paginated list of messages"),
@@ -90,7 +90,7 @@ pub async fn list_messages(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path(app_id): Path<Uuid>,
-    Query(query): Query<ListQuery>,
+    Query(query): Query<MessageListQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
     verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
@@ -100,6 +100,7 @@ pub async fn list_messages(
         .handle(ListMessagesByApp {
             app_id,
             org_id,
+            event_type_id: query.event_type_id.map(EventTypeId::from_uuid),
             offset: query.offset.unwrap_or(0),
             limit: query.limit.unwrap_or(20),
         })

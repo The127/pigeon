@@ -527,7 +527,7 @@ async fn when_list(world: &mut AppWorld, offset: u64, limit: u64) {
 
     world.list_result = Some(
         handler
-            .handle(ListApplications { org_id, offset, limit })
+            .handle(ListApplications { org_id, search: None, offset, limit })
             .await,
     );
     world.log = Some(log);

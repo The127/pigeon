@@ -90,16 +90,31 @@ impl MessageReadStore for PgMessageReadStore {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        event_type_id: Option<EventTypeId>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<MessageWithStatus>, ApplicationError> {
-        let query = format!(
-            "{SELECT_WITH_STATUS} WHERE m.app_id = $1 AND a.org_id = $2 \
-             ORDER BY m.created_at DESC LIMIT $3 OFFSET $4"
+        let mut sql = format!(
+            "{SELECT_WITH_STATUS} WHERE m.app_id = $1 AND a.org_id = $2"
         );
-        let rows = sqlx::query_as::<_, MessageWithStatusRow>(&query)
+        let mut param_idx = 3u32;
+        if event_type_id.is_some() {
+            sql.push_str(&format!(" AND m.event_type_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        sql.push_str(&format!(
+            " ORDER BY m.created_at DESC LIMIT ${} OFFSET ${}",
+            param_idx,
+            param_idx + 1,
+        ));
+
+        let mut q = sqlx::query_as::<_, MessageWithStatusRow>(&sql)
             .bind(app_id.as_uuid())
-            .bind(org_id.as_uuid())
+            .bind(org_id.as_uuid());
+        if let Some(ref et_id) = event_type_id {
+            q = q.bind(et_id.as_uuid());
+        }
+        let rows = q
             .bind(limit as i64)
             .bind(offset as i64)
             .fetch_all(&self.pool)
@@ -113,17 +128,27 @@ impl MessageReadStore for PgMessageReadStore {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        event_type_id: Option<EventTypeId>,
     ) -> Result<u64, ApplicationError> {
-        let row: (i64,) = sqlx::query_as(
+        let mut sql = String::from(
             "SELECT COUNT(*) FROM messages m \
              JOIN applications a ON a.id = m.app_id \
              WHERE m.app_id = $1 AND a.org_id = $2",
-        )
-        .bind(app_id.as_uuid())
-        .bind(org_id.as_uuid())
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+        );
+        if event_type_id.is_some() {
+            sql.push_str(" AND m.event_type_id = $3");
+        }
+
+        let mut q = sqlx::query_as::<_, (i64,)>(&sql)
+            .bind(app_id.as_uuid())
+            .bind(org_id.as_uuid());
+        if let Some(ref et_id) = event_type_id {
+            q = q.bind(et_id.as_uuid());
+        }
+        let row = q
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(row.0 as u64)
     }

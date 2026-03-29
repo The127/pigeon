@@ -35,12 +35,14 @@ pub trait ApplicationReadStore: Send + Sync {
     async fn list_by_org(
         &self,
         org_id: &OrganizationId,
+        search: Option<String>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<Application>, ApplicationError>;
     async fn count_by_org(
         &self,
         org_id: &OrganizationId,
+        search: Option<String>,
     ) -> Result<u64, ApplicationError>;
 }
 
@@ -194,6 +196,8 @@ pub trait DeadLetterReadStore: Send + Sync {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        endpoint_id: Option<EndpointId>,
+        replayed: Option<bool>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<DeadLetter>, ApplicationError>;
@@ -201,6 +205,8 @@ pub trait DeadLetterReadStore: Send + Sync {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        endpoint_id: Option<EndpointId>,
+        replayed: Option<bool>,
     ) -> Result<u64, ApplicationError>;
 }
 
@@ -216,6 +222,7 @@ pub trait MessageReadStore: Send + Sync {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        event_type_id: Option<EventTypeId>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<MessageWithStatus>, ApplicationError>;
@@ -223,6 +230,7 @@ pub trait MessageReadStore: Send + Sync {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        event_type_id: Option<EventTypeId>,
     ) -> Result<u64, ApplicationError>;
 }
 

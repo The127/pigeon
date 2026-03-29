@@ -37,29 +37,58 @@ impl ApplicationReadStore for PgApplicationReadStore {
     async fn list_by_org(
         &self,
         org_id: &OrganizationId,
+        search: Option<String>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<Application>, ApplicationError> {
-        let rows = sqlx::query_as::<_, ApplicationRow>(
+        let mut sql = String::from(
             "SELECT id, org_id, name, uid, created_at, xmin::text::bigint AS version \
              FROM applications \
-             WHERE org_id = $1 \
-             ORDER BY created_at DESC \
-             LIMIT $2 OFFSET $3",
-        )
-        .bind(org_id.as_uuid())
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+             WHERE org_id = $1",
+        );
+        let mut param_idx = 2u32;
+        if search.is_some() {
+            sql.push_str(&format!(
+                " AND (name ILIKE '%' || ${p} || '%' OR uid ILIKE '%' || ${p} || '%')",
+                p = param_idx,
+            ));
+            param_idx += 1;
+        }
+        sql.push_str(&format!(
+            " ORDER BY created_at DESC LIMIT ${} OFFSET ${}",
+            param_idx,
+            param_idx + 1,
+        ));
+
+        let mut q = sqlx::query_as::<_, ApplicationRow>(&sql).bind(org_id.as_uuid());
+        if let Some(s) = &search {
+            q = q.bind(s.as_str());
+        }
+        let rows = q
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(rows.into_iter().map(|r| r.into_application()).collect())
     }
 
-    async fn count_by_org(&self, org_id: &OrganizationId) -> Result<u64, ApplicationError> {
-        let row: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM applications WHERE org_id = $1")
-            .bind(org_id.as_uuid())
+    async fn count_by_org(
+        &self,
+        org_id: &OrganizationId,
+        search: Option<String>,
+    ) -> Result<u64, ApplicationError> {
+        let mut sql = String::from("SELECT COUNT(*) FROM applications WHERE org_id = $1");
+        if search.is_some() {
+            sql.push_str(" AND (name ILIKE '%' || $2 || '%' OR uid ILIKE '%' || $2 || '%')");
+        }
+
+        let mut q = sqlx::query_as::<_, (i64,)>(&sql).bind(org_id.as_uuid());
+        if let Some(s) = &search {
+            q = q.bind(s.as_str());
+        }
+        let row = q
             .fetch_one(&self.pool)
             .await
             .map_err(|e| ApplicationError::Internal(e.to_string()))?;

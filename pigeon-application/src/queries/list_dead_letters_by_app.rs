@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use pigeon_domain::application::ApplicationId;
 use pigeon_domain::dead_letter::DeadLetter;
+use pigeon_domain::endpoint::EndpointId;
 use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
@@ -15,6 +16,8 @@ use crate::queries::PaginatedResult;
 pub struct ListDeadLettersByApp {
     pub app_id: ApplicationId,
     pub org_id: OrganizationId,
+    pub endpoint_id: Option<EndpointId>,
+    pub replayed: Option<bool>,
     pub offset: u64,
     pub limit: u64,
 }
@@ -41,11 +44,11 @@ impl QueryHandler<ListDeadLettersByApp> for ListDeadLettersByAppHandler {
     ) -> Result<PaginatedResult<DeadLetter>, ApplicationError> {
         let items = self
             .read_store
-            .list_by_app(&query.app_id, &query.org_id, query.offset, query.limit)
+            .list_by_app(&query.app_id, &query.org_id, query.endpoint_id.clone(), query.replayed, query.offset, query.limit)
             .await?;
         let total = self
             .read_store
-            .count_by_app(&query.app_id, &query.org_id)
+            .count_by_app(&query.app_id, &query.org_id, query.endpoint_id, query.replayed)
             .await?;
 
         Ok(PaginatedResult {
@@ -65,14 +68,16 @@ mod tests {
     #[tokio::test]
     async fn returns_empty_list() {
         let mut mock = MockDeadLetterReadStore::new();
-        mock.expect_list_by_app().returning(|_, _, _, _| Ok(vec![]));
-        mock.expect_count_by_app().returning(|_, _| Ok(0));
+        mock.expect_list_by_app().returning(|_, _, _, _, _, _| Ok(vec![]));
+        mock.expect_count_by_app().returning(|_, _, _, _| Ok(0));
 
         let handler = ListDeadLettersByAppHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListDeadLettersByApp {
                 app_id: ApplicationId::new(),
                 org_id: OrganizationId::new(),
+                endpoint_id: None,
+                replayed: None,
                 offset: 0,
                 limit: 10,
             })
@@ -93,14 +98,16 @@ mod tests {
 
         let mut mock = MockDeadLetterReadStore::new();
         mock.expect_list_by_app()
-            .returning(move |_, _, _, _| Ok(items_clone.clone()));
-        mock.expect_count_by_app().returning(|_, _| Ok(3));
+            .returning(move |_, _, _, _, _, _| Ok(items_clone.clone()));
+        mock.expect_count_by_app().returning(|_, _, _, _| Ok(3));
 
         let handler = ListDeadLettersByAppHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListDeadLettersByApp {
                 app_id: ApplicationId::new(),
                 org_id: OrganizationId::new(),
+                endpoint_id: None,
+                replayed: None,
                 offset: 0,
                 limit: 10,
             })

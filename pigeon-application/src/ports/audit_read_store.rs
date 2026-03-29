@@ -21,11 +21,15 @@ pub trait AuditReadStore: Send + Sync {
     async fn list_by_org(
         &self,
         org_id: &OrganizationId,
+        command_filter: Option<String>,
+        success_filter: Option<bool>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<AuditLogEntry>, ApplicationError>;
     async fn count_by_org(
         &self,
         org_id: &OrganizationId,
+        command_filter: Option<String>,
+        success_filter: Option<bool>,
     ) -> Result<u64, ApplicationError>;
 }

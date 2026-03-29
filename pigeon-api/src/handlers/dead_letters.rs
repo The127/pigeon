@@ -13,7 +13,7 @@ use pigeon_domain::application::ApplicationId;
 use pigeon_domain::dead_letter::DeadLetterId;
 
 use crate::dto::dead_letter::DeadLetterResponse;
-use crate::dto::pagination::ListQuery;
+use crate::dto::pagination::DeadLetterListQuery;
 use crate::error::{ApiError, ErrorBody};
 use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
@@ -35,7 +35,7 @@ pub struct ReplayDeadLetterResponse {
     path = "/api/v1/applications/{app_id}/dead-letters",
     params(
         ("app_id" = Uuid, Path, description = "Application ID"),
-        ListQuery,
+        DeadLetterListQuery,
     ),
     responses(
         (status = 200, description = "Paginated list of dead letters"),
@@ -46,7 +46,7 @@ pub async fn list_dead_letters(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path(app_id): Path<Uuid>,
-    Query(query): Query<ListQuery>,
+    Query(query): Query<DeadLetterListQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
     verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
@@ -56,6 +56,8 @@ pub async fn list_dead_letters(
         .handle(ListDeadLettersByApp {
             app_id,
             org_id,
+            endpoint_id: query.endpoint_id.map(pigeon_domain::endpoint::EndpointId::from_uuid),
+            replayed: query.replayed,
             offset: query.offset.unwrap_or(0),
             limit: query.limit.unwrap_or(20),
         })

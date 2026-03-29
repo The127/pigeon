@@ -99,27 +99,50 @@ impl DeadLetterReadStore for PgDeadLetterReadStore {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        endpoint_id: Option<EndpointId>,
+        replayed: Option<bool>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<DeadLetter>, ApplicationError> {
-        let rows = sqlx::query_as::<_, DeadLetterRow>(
+        let mut sql = String::from(
             "SELECT dl.id, dl.message_id, dl.endpoint_id, dl.app_id, \
                     dl.last_response_code, dl.last_response_body, \
                     dl.dead_lettered_at, dl.replayed_at, \
                     dl.xmin::text::bigint AS version \
              FROM dead_letters dl \
              JOIN applications a ON a.id = dl.app_id \
-             WHERE dl.app_id = $1 AND a.org_id = $2 \
-             ORDER BY dl.dead_lettered_at DESC \
-             LIMIT $3 OFFSET $4",
-        )
-        .bind(app_id.as_uuid())
-        .bind(org_id.as_uuid())
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+             WHERE dl.app_id = $1 AND a.org_id = $2",
+        );
+        let mut param_idx = 3u32;
+        if endpoint_id.is_some() {
+            sql.push_str(&format!(" AND dl.endpoint_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        if let Some(r) = replayed {
+            if r {
+                sql.push_str(" AND dl.replayed_at IS NOT NULL");
+            } else {
+                sql.push_str(" AND dl.replayed_at IS NULL");
+            }
+        }
+        sql.push_str(&format!(
+            " ORDER BY dl.dead_lettered_at DESC LIMIT ${} OFFSET ${}",
+            param_idx,
+            param_idx + 1,
+        ));
+
+        let mut q = sqlx::query_as::<_, DeadLetterRow>(&sql)
+            .bind(app_id.as_uuid())
+            .bind(org_id.as_uuid());
+        if let Some(ref ep_id) = endpoint_id {
+            q = q.bind(ep_id.as_uuid());
+        }
+        let rows = q
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(rows.into_iter().map(|r| r.into_dead_letter()).collect())
     }
@@ -128,17 +151,38 @@ impl DeadLetterReadStore for PgDeadLetterReadStore {
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
+        endpoint_id: Option<EndpointId>,
+        replayed: Option<bool>,
     ) -> Result<u64, ApplicationError> {
-        let row: (i64,) = sqlx::query_as(
+        let mut sql = String::from(
             "SELECT COUNT(*) FROM dead_letters dl \
              JOIN applications a ON a.id = dl.app_id \
              WHERE dl.app_id = $1 AND a.org_id = $2",
-        )
-        .bind(app_id.as_uuid())
-        .bind(org_id.as_uuid())
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+        );
+        let mut param_idx = 3u32;
+        if endpoint_id.is_some() {
+            sql.push_str(&format!(" AND dl.endpoint_id = ${param_idx}"));
+            param_idx += 1;
+        }
+        let _ = param_idx; // suppress unused warning
+        if let Some(r) = replayed {
+            if r {
+                sql.push_str(" AND dl.replayed_at IS NOT NULL");
+            } else {
+                sql.push_str(" AND dl.replayed_at IS NULL");
+            }
+        }
+
+        let mut q = sqlx::query_as::<_, (i64,)>(&sql)
+            .bind(app_id.as_uuid())
+            .bind(org_id.as_uuid());
+        if let Some(ref ep_id) = endpoint_id {
+            q = q.bind(ep_id.as_uuid());
+        }
+        let row = q
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(row.0 as u64)
     }

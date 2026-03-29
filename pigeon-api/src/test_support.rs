@@ -274,6 +274,7 @@ impl ApplicationReadStore for StubApplicationReadStore {
     async fn list_by_org(
         &self,
         _org_id: &OrganizationId,
+        _search: Option<String>,
         _offset: u64,
         _limit: u64,
     ) -> Result<Vec<Application>, ApplicationError> {
@@ -282,6 +283,7 @@ impl ApplicationReadStore for StubApplicationReadStore {
     async fn count_by_org(
         &self,
         _org_id: &OrganizationId,
+        _search: Option<String>,
     ) -> Result<u64, ApplicationError> {
         Ok(0)
     }
@@ -331,6 +333,7 @@ impl ApplicationReadStore for FakeApplicationReadStore {
     async fn list_by_org(
         &self,
         _org_id: &OrganizationId,
+        _search: Option<String>,
         _offset: u64,
         _limit: u64,
     ) -> Result<Vec<Application>, ApplicationError> {
@@ -339,6 +342,7 @@ impl ApplicationReadStore for FakeApplicationReadStore {
     async fn count_by_org(
         &self,
         _org_id: &OrganizationId,
+        _search: Option<String>,
     ) -> Result<u64, ApplicationError> {
         Ok(self.app.as_ref().map(|_| 1).unwrap_or(0))
     }

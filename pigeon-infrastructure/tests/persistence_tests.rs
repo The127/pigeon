@@ -287,7 +287,7 @@ async fn read_store_list_returns_applications_ordered_by_created_at_desc() {
         uow.commit().await.unwrap();
     }
 
-    let listed = read_store.list_by_org(&org_id, 0, 10).await.unwrap();
+    let listed = read_store.list_by_org(&org_id, None, 0, 10).await.unwrap();
     assert_eq!(listed.len(), 3);
     // Ordered by created_at DESC — last inserted should be first
     for i in 0..listed.len() - 1 {
@@ -310,7 +310,7 @@ async fn read_store_list_respects_offset_and_limit() {
         uow.commit().await.unwrap();
     }
 
-    let page = read_store.list_by_org(&org_id, 2, 2).await.unwrap();
+    let page = read_store.list_by_org(&org_id, None, 2, 2).await.unwrap();
     assert_eq!(page.len(), 2);
 }
 
@@ -328,7 +328,7 @@ async fn read_store_count_returns_total() {
         uow.commit().await.unwrap();
     }
 
-    let count = read_store.count_by_org(&org_id).await.unwrap();
+    let count = read_store.count_by_org(&org_id, None).await.unwrap();
     assert_eq!(count, 3);
 }
 
@@ -1629,12 +1629,12 @@ async fn cross_tenant_application_isolation() {
     assert!(found.is_some());
 
     // Org A's list only returns its own apps
-    let list_a = read_store.list_by_org(&org_a, 0, 100).await.unwrap();
+    let list_a = read_store.list_by_org(&org_a, None, 0, 100).await.unwrap();
     assert_eq!(list_a.len(), 1);
     assert_eq!(list_a[0].name(), "app-a");
 
     // Org B's list only returns its own apps
-    let list_b = read_store.list_by_org(&org_b, 0, 100).await.unwrap();
+    let list_b = read_store.list_by_org(&org_b, None, 0, 100).await.unwrap();
     assert_eq!(list_b.len(), 1);
     assert_eq!(list_b[0].name(), "app-b");
 }

@@ -32,22 +32,47 @@ impl AuditReadStore for PgAuditReadStore {
     async fn list_by_org(
         &self,
         org_id: &OrganizationId,
+        command_filter: Option<String>,
+        success_filter: Option<bool>,
         offset: u64,
         limit: u64,
     ) -> Result<Vec<AuditLogEntry>, ApplicationError> {
-        let rows = sqlx::query_as::<_, AuditLogRow>(
+        let mut sql = String::from(
             "SELECT id, command_name, actor, org_id, timestamp, success, error_message \
              FROM audit_log \
-             WHERE org_id = $1 \
-             ORDER BY timestamp DESC \
-             LIMIT $2 OFFSET $3",
-        )
-        .bind(org_id.as_uuid())
-        .bind(limit as i64)
-        .bind(offset as i64)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+             WHERE org_id = $1",
+        );
+        let mut param_idx = 2u32;
+        if command_filter.is_some() {
+            sql.push_str(&format!(
+                " AND command_name ILIKE '%' || ${p} || '%'",
+                p = param_idx,
+            ));
+            param_idx += 1;
+        }
+        if success_filter.is_some() {
+            sql.push_str(&format!(" AND success = ${param_idx}"));
+            param_idx += 1;
+        }
+        sql.push_str(&format!(
+            " ORDER BY timestamp DESC LIMIT ${} OFFSET ${}",
+            param_idx,
+            param_idx + 1,
+        ));
+
+        let mut q = sqlx::query_as::<_, AuditLogRow>(&sql).bind(org_id.as_uuid());
+        if let Some(ref cf) = command_filter {
+            q = q.bind(cf.as_str());
+        }
+        if let Some(sf) = success_filter {
+            q = q.bind(sf);
+        }
+        let rows = q
+            .bind(limit as i64)
+            .bind(offset as i64)
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(rows
             .into_iter()
@@ -66,14 +91,35 @@ impl AuditReadStore for PgAuditReadStore {
     async fn count_by_org(
         &self,
         org_id: &OrganizationId,
+        command_filter: Option<String>,
+        success_filter: Option<bool>,
     ) -> Result<u64, ApplicationError> {
-        let row: (i64,) = sqlx::query_as(
-            "SELECT COUNT(*) FROM audit_log WHERE org_id = $1",
-        )
-        .bind(org_id.as_uuid())
-        .fetch_one(&self.pool)
-        .await
-        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+        let mut sql = String::from("SELECT COUNT(*) FROM audit_log WHERE org_id = $1");
+        let mut param_idx = 2u32;
+        if command_filter.is_some() {
+            sql.push_str(&format!(
+                " AND command_name ILIKE '%' || ${p} || '%'",
+                p = param_idx,
+            ));
+            param_idx += 1;
+        }
+        if success_filter.is_some() {
+            sql.push_str(&format!(" AND success = ${param_idx}"));
+            param_idx += 1;
+        }
+        let _ = param_idx;
+
+        let mut q = sqlx::query_as::<_, (i64,)>(&sql).bind(org_id.as_uuid());
+        if let Some(ref cf) = command_filter {
+            q = q.bind(cf.as_str());
+        }
+        if let Some(sf) = success_filter {
+            q = q.bind(sf);
+        }
+        let row = q
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| ApplicationError::Internal(e.to_string()))?;
 
         Ok(row.0 as u64)
     }

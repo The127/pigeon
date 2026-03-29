@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::application::ApplicationId;
+use pigeon_domain::event_type::EventTypeId;
 use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
@@ -15,6 +16,7 @@ use crate::queries::PaginatedResult;
 pub struct ListMessagesByApp {
     pub app_id: ApplicationId,
     pub org_id: OrganizationId,
+    pub event_type_id: Option<EventTypeId>,
     pub offset: u64,
     pub limit: u64,
 }
@@ -41,11 +43,11 @@ impl QueryHandler<ListMessagesByApp> for ListMessagesByAppHandler {
     ) -> Result<PaginatedResult<MessageWithStatus>, ApplicationError> {
         let items = self
             .read_store
-            .list_by_app(&query.app_id, &query.org_id, query.offset, query.limit)
+            .list_by_app(&query.app_id, &query.org_id, query.event_type_id.clone(), query.offset, query.limit)
             .await?;
         let total = self
             .read_store
-            .count_by_app(&query.app_id, &query.org_id)
+            .count_by_app(&query.app_id, &query.org_id, query.event_type_id)
             .await?;
 
         Ok(PaginatedResult {
@@ -76,14 +78,15 @@ mod tests {
     #[tokio::test]
     async fn returns_empty_list() {
         let mut mock = MockMessageReadStore::new();
-        mock.expect_list_by_app().returning(|_, _, _, _| Ok(vec![]));
-        mock.expect_count_by_app().returning(|_, _| Ok(0));
+        mock.expect_list_by_app().returning(|_, _, _, _, _| Ok(vec![]));
+        mock.expect_count_by_app().returning(|_, _, _| Ok(0));
 
         let handler = ListMessagesByAppHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListMessagesByApp {
                 app_id: ApplicationId::new(),
                 org_id: OrganizationId::new(),
+                event_type_id: None,
                 offset: 0,
                 limit: 10,
             })
@@ -102,14 +105,15 @@ mod tests {
 
         let mut mock = MockMessageReadStore::new();
         mock.expect_list_by_app()
-            .returning(move |_, _, _, _| Ok(items_clone.clone()));
-        mock.expect_count_by_app().returning(|_, _| Ok(5));
+            .returning(move |_, _, _, _, _| Ok(items_clone.clone()));
+        mock.expect_count_by_app().returning(|_, _, _| Ok(5));
 
         let handler = ListMessagesByAppHandler::new(Arc::new(mock));
         let result = handler
             .handle(ListMessagesByApp {
                 app_id: ApplicationId::new(),
                 org_id: OrganizationId::new(),
+                event_type_id: None,
                 offset: 0,
                 limit: 10,
             })

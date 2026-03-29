@@ -5,7 +5,7 @@ use axum::Json;
 use pigeon_application::queries::list_audit_log::ListAuditLog;
 
 use crate::dto::audit::AuditLogResponse;
-use crate::dto::pagination::ListQuery;
+use crate::dto::pagination::AuditLogListQuery;
 use crate::extractors::OrgId;
 use crate::state::AppState;
 
@@ -13,7 +13,7 @@ use crate::state::AppState;
 #[utoipa::path(
     get,
     path = "/api/v1/audit-log",
-    params(ListQuery),
+    params(AuditLogListQuery),
     responses(
         (status = 200, description = "Paginated list of audit log entries"),
     ),
@@ -22,12 +22,14 @@ use crate::state::AppState;
 pub async fn list_audit_log(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
-    Query(query): Query<ListQuery>,
+    Query(query): Query<AuditLogListQuery>,
 ) -> Result<impl IntoResponse, crate::error::ApiError> {
     let result = state
         .list_audit_log
         .handle(ListAuditLog {
             org_id,
+            command_filter: query.command,
+            success_filter: query.success,
             offset: query.offset.unwrap_or(0),
             limit: query.limit.unwrap_or(50),
         })
