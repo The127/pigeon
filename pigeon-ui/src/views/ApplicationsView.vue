@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useApplications, useCreateApplication, useDeleteApplication } from '@/api/applications'
+import { useToast } from '@/composables/useToast'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -36,6 +37,7 @@ import ErrorState from '@/components/ErrorState.vue'
 import { Plus, LayoutGrid, MoreHorizontal, Trash2 } from 'lucide-vue-next'
 
 const router = useRouter()
+const toast = useToast()
 const { data, isLoading, error } = useApplications()
 const createApp = useCreateApplication()
 const deleteApp = useDeleteApplication()
@@ -67,10 +69,12 @@ function handleCreate() {
     {
       onSuccess: () => {
         dialogOpen.value = false
+        toast.success('Application created')
         newName.value = ''
         newUid.value = ''
         uidTouched.value = false
       },
+      onError: (e) => toast.error(e.message),
     },
   )
 }
@@ -78,8 +82,11 @@ function handleCreate() {
 function handleDelete() {
   const id = deleteTarget.value?.id
   if (!id) return
-  deleteApp.mutate(id)
   deleteTarget.value = null
+  deleteApp.mutate(id, {
+    onSuccess: () => toast.success('Application deleted'),
+    onError: (e) => toast.error(e.message),
+  })
 }
 </script>
 

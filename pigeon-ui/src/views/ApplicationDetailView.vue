@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToast } from '@/composables/useToast'
 import {
   useApplication,
   useUpdateApplication,
@@ -58,6 +59,7 @@ import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil, Send, Chec
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 const appId = computed(() => route.params.id as string)
 
 const { data: app, isLoading, error } = useApplication(appId)
@@ -82,7 +84,10 @@ function handleUpdateApp() {
   if (!app.value) return
   updateApp.mutate(
     { name: editName.value, version: app.value.version },
-    { onSuccess: () => { editDialogOpen.value = false } },
+    {
+      onSuccess: () => { editDialogOpen.value = false; toast.success('Application updated') },
+      onError: (e: Error) => toast.error(e.message),
+    },
   )
 }
 
@@ -91,7 +96,8 @@ const deleteAppOpen = ref(false)
 
 function handleDeleteApp() {
   deleteApp.mutate(appId.value, {
-    onSuccess: () => router.push('/apps'),
+    onSuccess: () => { toast.success('Application deleted'); router.push('/apps') },
+    onError: (e) => toast.error(e.message),
   })
 }
 
@@ -103,7 +109,10 @@ const createEt = useCreateEventType(appId)
 function handleCreateEventType() {
   createEt.mutate(
     { name: etName.value },
-    { onSuccess: () => { etDialogOpen.value = false; etName.value = '' } },
+    {
+      onSuccess: () => { etDialogOpen.value = false; etName.value = ''; toast.success('Event type created') },
+      onError: (e: Error) => toast.error(e.message),
+    },
   )
 }
 
@@ -114,8 +123,11 @@ const deleteEtTarget = ref<{ id: string; name: string } | null>(null)
 function handleDeleteEventType() {
   const id = deleteEtTarget.value?.id
   if (!id) return
-  deleteEt.mutate(id)
   deleteEtTarget.value = null
+  deleteEt.mutate(id, {
+    onSuccess: () => toast.success('Event type deleted'),
+    onError: (e) => toast.error(e.message),
+  })
 }
 
 // --- Create Endpoint ---
@@ -141,7 +153,9 @@ function handleCreateEndpoint() {
         epUrl.value = ''
         epSecret.value = ''
         epEventTypeIds.value = []
+        toast.success('Endpoint created')
       },
+      onError: (e: Error) => toast.error(e.message),
     },
   )
 }
@@ -159,8 +173,11 @@ const deleteEpTarget = ref<{ id: string; url: string } | null>(null)
 function handleDeleteEndpoint() {
   const id = deleteEpTarget.value?.id
   if (!id) return
-  deleteEp.mutate(id)
   deleteEpTarget.value = null
+  deleteEp.mutate(id, {
+    onSuccess: () => toast.success('Endpoint deleted'),
+    onError: (e) => toast.error(e.message),
+  })
 }
 
 // --- Send Message ---
@@ -185,7 +202,9 @@ function handleSendMessage() {
           attempts: data.attempts_created,
           duplicate: data.was_duplicate,
         }
+        toast.success(data.was_duplicate ? 'Duplicate message (idempotent)' : `Message sent — ${data.attempts_created} attempt(s)`)
       },
+      onError: (e: Error) => toast.error(e.message),
     },
   )
 }
@@ -238,9 +257,23 @@ function statusColor(status: string) {
   }
 }
 
+function handleRetrigger(messageId: string) {
+  retriggerMsg.mutate(messageId, {
+    onSuccess: () => toast.success('Message retriggered'),
+    onError: (e) => toast.error(e.message),
+  })
+}
+
 // --- Dead Letters ---
 const { data: deadLettersData, isLoading: dlLoading } = useDeadLetters(appId)
 const replayDl = useReplayDeadLetter(appId)
+
+function handleReplay(deadLetterId: string) {
+  replayDl.mutate(deadLetterId, {
+    onSuccess: () => toast.success('Dead letter replayed'),
+    onError: (e) => toast.error(e.message),
+  })
+}
 </script>
 
 <template>
@@ -718,7 +751,7 @@ const replayDl = useReplayDeadLetter(appId)
                         size="sm"
                         variant="outline"
                         :disabled="retriggerMsg.isPending.value"
-                        @click.stop="retriggerMsg.mutate(msg.id)"
+                        @click.stop="handleRetrigger(msg.id)"
                       >
                         <RotateCcw class="mr-2 h-4 w-4" />
                         {{ retriggerMsg.isPending.value ? 'Retriggering...' : 'Retrigger delivery' }}
@@ -772,7 +805,7 @@ const replayDl = useReplayDeadLetter(appId)
                     size="icon"
                     class="h-8 w-8"
                     :disabled="replayDl.isPending.value"
-                    @click="replayDl.mutate(dl.id)"
+                    @click="handleReplay(dl.id)"
                   >
                     <RotateCcw class="h-4 w-4" />
                   </Button>

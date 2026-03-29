@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useToast } from '@/composables/useToast'
 import {
   useEventTypes,
   useUpdateEventType,
@@ -48,6 +49,7 @@ import {
 
 const route = useRoute()
 const router = useRouter()
+const toast = useToast()
 const appId = computed(() => route.params.id as string)
 const etId = computed(() => route.params.etId as string)
 
@@ -83,7 +85,10 @@ function handleUpdate() {
   if (!eventType.value) return
   updateEt.mutate(
     { id: etId.value, body: { name: editName.value, version: eventType.value.version } },
-    { onSuccess: () => { editDialogOpen.value = false } },
+    {
+      onSuccess: () => { editDialogOpen.value = false; toast.success('Event type updated') },
+      onError: (e: Error) => toast.error(e.message),
+    },
   )
 }
 
@@ -92,9 +97,11 @@ const deleteDialogOpen = ref(false)
 const deleteEt = useDeleteEventType(appId)
 
 function handleDelete() {
-  deleteEt.mutate(etId.value)
   deleteDialogOpen.value = false
-  router.push(`/apps/${appId.value}`)
+  deleteEt.mutate(etId.value, {
+    onSuccess: () => { toast.success('Event type deleted'); router.push(`/apps/${appId.value}`) },
+    onError: (e) => toast.error(e.message),
+  })
 }
 
 function messageStatusLabel(msg: RecentMessage) {
