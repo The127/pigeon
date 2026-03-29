@@ -121,10 +121,10 @@ const deleteEt = useDeleteEventType(appId)
 const deleteEtTarget = ref<{ id: string; name: string } | null>(null)
 
 function handleDeleteEventType() {
-  if (!deleteEtTarget.value) return
-  deleteEt.mutate(deleteEtTarget.value.id, {
-    onSuccess: () => { deleteEtTarget.value = null },
-  })
+  const id = deleteEtTarget.value?.id
+  if (!id) return
+  deleteEt.mutate(id)
+  deleteEtTarget.value = null
 }
 
 // --- Create Endpoint ---
@@ -159,10 +159,10 @@ const deleteEp = useDeleteEndpoint(appId)
 const deleteEpTarget = ref<{ id: string; url: string } | null>(null)
 
 function handleDeleteEndpoint() {
-  if (!deleteEpTarget.value) return
-  deleteEp.mutate(deleteEpTarget.value.id, {
-    onSuccess: () => { deleteEpTarget.value = null },
-  })
+  const id = deleteEpTarget.value?.id
+  if (!id) return
+  deleteEp.mutate(id)
+  deleteEpTarget.value = null
 }
 
 // --- Send Message ---

@@ -86,12 +86,10 @@ function handleCreate() {
 }
 
 function handleDelete() {
-  if (!deleteTarget.value) return
-  deleteApp.mutate(deleteTarget.value.id, {
-    onSuccess: () => {
-      deleteTarget.value = null
-    },
-  })
+  const id = deleteTarget.value?.id
+  if (!id) return
+  deleteApp.mutate(id)
+  deleteTarget.value = null
 }
 </script>
 
