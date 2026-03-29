@@ -3,6 +3,7 @@ pub mod attempts;
 pub mod auth_config;
 pub mod dead_letters;
 pub mod endpoints;
+pub mod event_type_stats;
 pub mod event_types;
 pub mod health;
 pub mod messages;

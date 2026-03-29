@@ -35,7 +35,7 @@ use crate::dto::organization::{
 };
 use crate::dto::pagination::PaginatedResponse;
 use crate::error::ErrorBody;
-use crate::handlers::{applications, endpoints, event_types, health, messages, oidc_configs, organizations, stats};
+use crate::handlers::{applications, endpoints, event_type_stats, event_types, health, messages, oidc_configs, organizations, stats};
 use crate::state::AppState;
 
 #[derive(OpenApi)]
@@ -65,6 +65,7 @@ use crate::state::AppState;
         dead_letters::get_dead_letter,
         dead_letters::replay,
         stats::get_stats,
+        event_type_stats::get_event_type_stats,
         organizations::create_organization,
         organizations::get_organization,
         organizations::list_organizations,
@@ -95,6 +96,9 @@ use crate::state::AppState;
         dead_letters::ReplayDeadLetterResponse,
         dto::stats::AppStatsResponse,
         dto::stats::TimeBucketResponse,
+        dto::event_type_stats::EventTypeStatsResponse,
+        dto::event_type_stats::EventTypeTimeBucketResponse,
+        dto::event_type_stats::RecentMessageResponse,
         CreateOrganizationRequest,
         UpdateOrganizationRequest,
         OrganizationResponse,
@@ -125,6 +129,10 @@ pub fn router(state: AppState) -> Router {
             get(event_types::get_event_type)
                 .put(event_types::update_event_type)
                 .delete(event_types::delete_event_type),
+        )
+        .route(
+            "/{app_id}/event-types/{id}/stats",
+            get(event_type_stats::get_event_type_stats),
         )
         .route(
             "/{app_id}/endpoints",
@@ -255,6 +263,10 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
             get(event_types::get_event_type)
                 .put(event_types::update_event_type)
                 .delete(event_types::delete_event_type),
+        )
+        .route(
+            "/{app_id}/event-types/{id}/stats",
+            get(event_type_stats::get_event_type_stats),
         )
         .route(
             "/{app_id}/endpoints",

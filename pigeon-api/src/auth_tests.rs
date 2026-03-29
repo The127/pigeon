@@ -36,8 +36,10 @@ use pigeon_application::queries::list_endpoints_by_app::ListEndpointsByApp;
 use pigeon_application::queries::list_event_types_by_app::ListEventTypesByApp;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrg;
 use pigeon_application::queries::get_app_stats::GetAppStats;
+use pigeon_application::queries::get_event_type_stats::GetEventTypeStats;
 use pigeon_application::queries::list_organizations::ListOrganizations;
 use pigeon_application::queries::PaginatedResult;
+use pigeon_application::ports::event_type_stats_read_store::EventTypeStats;
 use pigeon_application::ports::stats_read_store::AppStats;
 use pigeon_domain::application::Application;
 use pigeon_domain::endpoint::Endpoint;
@@ -212,6 +214,23 @@ impl QueryHandler<GetAppStats> for S {
     }
 }
 #[async_trait]
+impl QueryHandler<GetEventTypeStats> for S {
+    async fn handle(&self, _: GetEventTypeStats) -> Result<EventTypeStats, ApplicationError> {
+        Ok(EventTypeStats {
+            total_messages: 0,
+            total_attempts: 0,
+            total_pending: 0,
+            total_succeeded: 0,
+            total_failed: 0,
+            total_dead_lettered: 0,
+            success_rate: 0.0,
+            subscribed_endpoints: 0,
+            time_series: vec![],
+            recent_messages: vec![],
+        })
+    }
+}
+#[async_trait]
 impl QueryHandler<pigeon_application::queries::get_message_by_id::GetMessageById> for S {
     async fn handle(
         &self,
@@ -348,6 +367,7 @@ fn test_state() -> AppState {
         get_endpoint: Arc::new(S),
         list_endpoints: Arc::new(S),
         get_app_stats: Arc::new(S),
+        get_event_type_stats: Arc::new(S),
         get_message: Arc::new(S),
         list_messages: Arc::new(S),
         list_attempts: Arc::new(S),

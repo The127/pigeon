@@ -383,6 +383,7 @@ mod tests {
             get_endpoint: Arc::new(StubGetEp),
             list_endpoints: Arc::new(StubListEp),
             get_app_stats: Arc::new(StubGetAppStatsHandler),
+            get_event_type_stats: Arc::new(StubGetEventTypeStatsHandler),
             get_message: Arc::new(StubGetMessageHandler),
             list_messages: Arc::new(StubListMessagesHandler),
             list_attempts: Arc::new(StubListAttemptsHandler),

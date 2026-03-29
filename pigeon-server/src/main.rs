@@ -31,6 +31,7 @@ use pigeon_application::commands::update_endpoint::UpdateEndpointHandler;
 use pigeon_application::commands::update_event_type::UpdateEventTypeHandler;
 use pigeon_application::commands::update_organization::UpdateOrganizationHandler;
 use pigeon_application::queries::get_app_stats::GetAppStatsHandler;
+use pigeon_application::queries::get_event_type_stats::GetEventTypeStatsHandler;
 use pigeon_application::queries::get_application_by_id::GetApplicationByIdHandler;
 use pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterByIdHandler;
 use pigeon_application::queries::get_message_by_id::GetMessageByIdHandler;
@@ -58,7 +59,7 @@ use pigeon_infrastructure::persistence::{
     PgApplicationReadStore, PgAttemptReadStore, PgDeadLetterReadStore, PgDeliveryQueue,
     PgEndpointReadStore, PgEventOutbox, PgEventTypeReadStore, PgHealthChecker,
     PgMessageReadStore, PgOidcConfigReadStore, PgOrganizationReadStore, PgProjectionStore,
-    PgStatsReadStore, PgUnitOfWorkFactory,
+    PgEventTypeStatsReadStore, PgStatsReadStore, PgUnitOfWorkFactory,
 };
 
 mod bootstrap;
@@ -304,6 +305,7 @@ async fn run_api(
     let attempt_read_store = Arc::new(PgAttemptReadStore::new(pool.clone()));
     let dead_letter_read_store = Arc::new(PgDeadLetterReadStore::new(pool.clone()));
     let stats_read_store = Arc::new(PgStatsReadStore::new(pool.clone()));
+    let event_type_stats_read_store = Arc::new(PgEventTypeStatsReadStore::new(pool.clone()));
     let health_checker = Arc::new(PgHealthChecker::new(pool));
 
     let idempotency_ttl = Duration::hours(24);
@@ -349,6 +351,7 @@ async fn run_api(
         app_read_store: read_store.clone(),
         jwks_provider: Arc::new(CachedJwksProvider::new(jwks_cache_ttl)),
         get_app_stats: Arc::new(GetAppStatsHandler::new(stats_read_store)),
+        get_event_type_stats: Arc::new(GetEventTypeStatsHandler::new(event_type_stats_read_store)),
         get_message: Arc::new(GetMessageByIdHandler::new(message_read_store.clone())),
         list_messages: Arc::new(ListMessagesByAppHandler::new(message_read_store.clone())),
         list_attempts: Arc::new(ListAttemptsByMessageHandler::new(attempt_read_store.clone())),
