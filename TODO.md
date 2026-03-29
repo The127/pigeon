@@ -103,12 +103,8 @@ Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurab
 
 ## Priority: Medium
 
-### Search & Filtering
-- Application list: search by name/UID
-- Messages list: filter by event type, status (delivered/pending/failed/dead lettered), date range
-- Dead letters list: filter by endpoint, replayed/unreplayed
-- Endpoints list: filter by enabled/disabled
-- Pagination controls on all lists (currently hardcoded limit=100)
+### ~~Search & Filtering~~
+Application search (name/UID ILIKE), message filter (event type), dead letter filter (endpoint + replayed status), audit log filter (command name ILIKE + success/failure). Dynamic SQL with conditional WHERE clauses. Reactive UI via TanStack Query. Pagination on audit log.
 
 ### ~~Dark Mode~~
 Auto (system default), light, and dark modes. Theme toggle in sidebar footer cycles through modes. Preference stored in localStorage. Amber accent in both themes. Animated amber orbs on login page.
