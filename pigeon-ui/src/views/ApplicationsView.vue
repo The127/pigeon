@@ -34,6 +34,21 @@ const createApp = useCreateApplication()
 const dialogOpen = ref(false)
 const newName = ref('')
 const newUid = ref('')
+const uidTouched = ref(false)
+
+function slugify(value: string): string {
+  return value
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function onNameInput() {
+  if (!uidTouched.value) {
+    newUid.value = slugify(newName.value)
+  }
+}
 
 function handleCreate() {
   createApp.mutate(
@@ -43,6 +58,7 @@ function handleCreate() {
         dialogOpen.value = false
         newName.value = ''
         newUid.value = ''
+        uidTouched.value = false
       },
     },
   )
@@ -75,6 +91,7 @@ function handleCreate() {
                   id="name"
                   v-model="newName"
                   placeholder="My Application"
+                  @input="onNameInput"
                 />
               </FormField>
 
@@ -87,6 +104,7 @@ function handleCreate() {
                   id="uid"
                   v-model="newUid"
                   placeholder="my-application"
+                  @input="uidTouched = true"
                 />
               </FormField>
 
