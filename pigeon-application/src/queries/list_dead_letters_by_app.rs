@@ -82,4 +82,34 @@ mod tests {
         assert!(result.items.is_empty());
         assert_eq!(result.total, 0);
     }
+
+    #[tokio::test]
+    async fn returns_items_with_pagination() {
+        use pigeon_domain::dead_letter::DeadLetterState;
+
+        let dl = DeadLetter::reconstitute(DeadLetterState::fake());
+        let items = vec![dl];
+        let items_clone = items.clone();
+
+        let mut mock = MockDeadLetterReadStore::new();
+        mock.expect_list_by_app()
+            .returning(move |_, _, _, _| Ok(items_clone.clone()));
+        mock.expect_count_by_app().returning(|_, _| Ok(3));
+
+        let handler = ListDeadLettersByAppHandler::new(Arc::new(mock));
+        let result = handler
+            .handle(ListDeadLettersByApp {
+                app_id: ApplicationId::new(),
+                org_id: OrganizationId::new(),
+                offset: 0,
+                limit: 10,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result.items.len(), 1);
+        assert_eq!(result.total, 3);
+        assert_eq!(result.offset, 0);
+        assert_eq!(result.limit, 10);
+    }
 }

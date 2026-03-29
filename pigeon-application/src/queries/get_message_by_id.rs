@@ -38,3 +38,46 @@ impl QueryHandler<GetMessageById> for GetMessageByIdHandler {
         self.read_store.find_by_id(&query.id, &query.org_id).await
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ports::stores::MockMessageReadStore;
+    use pigeon_domain::message::MessageState;
+
+    #[tokio::test]
+    async fn returns_message_when_found() {
+        let msg = Message::reconstitute(MessageState::fake());
+        let id = msg.id().clone();
+        let msg_clone = msg.clone();
+
+        let mut mock = MockMessageReadStore::new();
+        mock.expect_find_by_id()
+            .returning(move |_, _| Ok(Some(msg_clone.clone())));
+
+        let handler = GetMessageByIdHandler::new(Arc::new(mock));
+        let result = handler
+            .handle(GetMessageById { id, org_id: OrganizationId::new() })
+            .await
+            .unwrap();
+
+        assert!(result.is_some());
+    }
+
+    #[tokio::test]
+    async fn returns_none_when_not_found() {
+        let mut mock = MockMessageReadStore::new();
+        mock.expect_find_by_id().returning(|_, _| Ok(None));
+
+        let handler = GetMessageByIdHandler::new(Arc::new(mock));
+        let result = handler
+            .handle(GetMessageById {
+                id: MessageId::new(),
+                org_id: OrganizationId::new(),
+            })
+            .await
+            .unwrap();
+
+        assert!(result.is_none());
+    }
+}
