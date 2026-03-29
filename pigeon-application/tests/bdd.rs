@@ -137,6 +137,7 @@ pub struct AppWorld {
 
     // Retrigger Message
     retrigger_result: Option<Result<RetriggerMessageResult, ApplicationError>>,
+    existing_attempts: Option<Vec<pigeon_domain::attempt::Attempt>>,
 
     // OIDC Config
     create_oidc_config_result: Option<Result<OidcConfig, ApplicationError>>,
@@ -1821,19 +1822,90 @@ async fn given_message_with_no_matching_endpoints(world: &mut AppWorld) {
     world.log = Some(log);
 }
 
+#[given("a message exists with an endpoint that already has an attempt")]
+async fn given_message_with_existing_attempt(world: &mut AppWorld) {
+    let log = OperationLog::new();
+    let app_id = ApplicationId::new();
+    let event_type_id = EventTypeId::new();
+    let org_id = OrganizationId::new();
+
+    let msg = Message::new(
+        app_id.clone(),
+        event_type_id.clone(),
+        serde_json::json!({"test": true}),
+        Some("retrigger-dedup-key".into()),
+        chrono::Duration::hours(24),
+    )
+    .unwrap();
+
+    let ep = Endpoint::new(
+        app_id.clone(),
+        "https://ep.com/hook".into(),
+        "whsec_test".into(),
+        vec![event_type_id.clone()],
+    )
+    .unwrap();
+
+    // Store the endpoint ID so we can create a matching attempt
+    let ep_id = ep.id().clone();
+    let msg_id = msg.id().clone();
+
+    // Create an existing attempt for this endpoint+message
+    let existing_attempt = pigeon_domain::attempt::Attempt::reconstitute(
+        pigeon_domain::attempt::AttemptState {
+            id: pigeon_domain::attempt::AttemptId::new(),
+            message_id: msg_id,
+            endpoint_id: ep_id,
+            status: pigeon_domain::attempt::AttemptStatus::Succeeded,
+            response_code: Some(200),
+            response_body: None,
+            attempted_at: Some(chrono::Utc::now()),
+            next_attempt_at: None,
+            attempt_number: 1,
+            duration_ms: Some(50),
+            version: pigeon_domain::version::Version::new(0),
+        },
+    );
+
+    world.org_id = Some(org_id);
+    world.app_id = Some(app_id);
+    world.event_type_id = Some(event_type_id);
+    world.endpoints = Some(vec![ep]);
+    world.msg_data = Some(SharedMessageData::default());
+    world.msg_data.as_ref().unwrap().messages.lock().unwrap().push(msg);
+    // Store the existing attempt so the "when" step can use it
+    world.existing_attempts = Some(vec![existing_attempt]);
+    world.log = Some(log);
+}
+
 #[when("the retrigger message command is executed")]
 async fn when_retrigger_executed(world: &mut AppWorld) {
+    use pigeon_application::ports::message_status::MessageWithStatus;
+    use pigeon_application::ports::stores::MockAttemptReadStore;
+
     let log = world.log.as_ref().unwrap().clone();
     let org_id = world.org_id.as_ref().unwrap().clone();
     let endpoints = world.endpoints.take().unwrap_or_default();
     let messages = world.msg_data.as_ref().unwrap().messages.lock().unwrap().clone();
     let message_id = messages.first().unwrap().id().clone();
+    let existing_attempts = world.existing_attempts.take().unwrap_or_default();
 
     let mut mock_msg_store = MockMessageReadStore::new();
     let msg_clone = messages.first().unwrap().clone();
     mock_msg_store
         .expect_find_by_id()
-        .returning(move |_, _| Ok(Some(msg_clone.clone())));
+        .returning(move |_, _| Ok(Some(MessageWithStatus {
+            message: msg_clone.clone(),
+            attempts_created: 0,
+            succeeded: 0,
+            failed: 0,
+            dead_lettered: 0,
+        })));
+
+    let mut mock_att_store = MockAttemptReadStore::new();
+    mock_att_store
+        .expect_list_by_message()
+        .returning(move |_, _| Ok(existing_attempts.clone()));
 
     let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), endpoints));
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
@@ -1842,6 +1914,7 @@ async fn when_retrigger_executed(world: &mut AppWorld) {
         factory,
         Arc::new(mock_msg_store),
         endpoint_store,
+        Arc::new(mock_att_store),
     );
 
     world.retrigger_result = Some(
@@ -1853,12 +1926,17 @@ async fn when_retrigger_executed(world: &mut AppWorld) {
 
 #[when("a non-existent message is retriggered")]
 async fn when_retrigger_nonexistent(world: &mut AppWorld) {
+    use pigeon_application::ports::stores::MockAttemptReadStore;
+
     let log = OperationLog::new();
 
     let mut mock_msg_store = MockMessageReadStore::new();
     mock_msg_store
         .expect_find_by_id()
         .returning(|_, _| Ok(None));
+
+    let mut mock_att_store = MockAttemptReadStore::new();
+    mock_att_store.expect_list_by_message().returning(|_, _| Ok(vec![]));
 
     let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), vec![]));
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
@@ -1867,6 +1945,7 @@ async fn when_retrigger_nonexistent(world: &mut AppWorld) {
         factory,
         Arc::new(mock_msg_store),
         endpoint_store,
+        Arc::new(mock_att_store),
     );
 
     world.retrigger_result = Some(

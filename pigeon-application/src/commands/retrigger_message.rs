@@ -9,7 +9,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::stores::{EndpointReadStore, MessageReadStore};
+use crate::ports::stores::{AttemptReadStore, EndpointReadStore, MessageReadStore};
 use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
@@ -36,6 +36,7 @@ pub struct RetriggerMessageHandler {
     uow_factory: Arc<dyn UnitOfWorkFactory>,
     message_read_store: Arc<dyn MessageReadStore>,
     endpoint_read_store: Arc<dyn EndpointReadStore>,
+    attempt_read_store: Arc<dyn AttemptReadStore>,
 }
 
 impl RetriggerMessageHandler {
@@ -43,11 +44,13 @@ impl RetriggerMessageHandler {
         uow_factory: Arc<dyn UnitOfWorkFactory>,
         message_read_store: Arc<dyn MessageReadStore>,
         endpoint_read_store: Arc<dyn EndpointReadStore>,
+        attempt_read_store: Arc<dyn AttemptReadStore>,
     ) -> Self {
         Self {
             uow_factory,
             message_read_store,
             endpoint_read_store,
+            attempt_read_store,
         }
     }
 }
@@ -65,7 +68,7 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
             .ok_or(ApplicationError::NotFound)?;
         let message = message_with_status.message;
 
-        let endpoints = self
+        let all_endpoints = self
             .endpoint_read_store
             .find_enabled_by_app_and_event_type(
                 message.app_id(),
@@ -74,16 +77,31 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
             )
             .await?;
 
-        if endpoints.is_empty() {
+        // Filter out endpoints that already have attempts for this message
+        let existing_attempts = self
+            .attempt_read_store
+            .list_by_message(message.id(), &command.org_id)
+            .await?;
+        let existing_endpoint_ids: std::collections::HashSet<_> = existing_attempts
+            .iter()
+            .map(|a| a.endpoint_id().clone())
+            .collect();
+
+        let new_endpoints: Vec<_> = all_endpoints
+            .into_iter()
+            .filter(|ep| !existing_endpoint_ids.contains(ep.id()))
+            .collect();
+
+        if new_endpoints.is_empty() {
             return Err(ApplicationError::Validation(
-                "no enabled endpoints match this message's event type".to_string(),
+                "no new endpoints to deliver to — all matching endpoints already have attempts".to_string(),
             ));
         }
 
-        let attempts_created = endpoints.len();
+        let attempts_created = new_endpoints.len();
 
         let mut uow = self.uow_factory.begin().await?;
-        for endpoint in &endpoints {
+        for endpoint in &new_endpoints {
             let attempt = Attempt::new(
                 message.id().clone(),
                 endpoint.id().clone(),
@@ -104,16 +122,23 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
 mod tests {
     use super::*;
     use crate::ports::message_status::MessageWithStatus;
-    use crate::ports::stores::MockMessageReadStore;
+    use crate::ports::stores::{MockAttemptReadStore, MockMessageReadStore};
     use crate::test_support::fakes::{
         FakeEndpointReadStore, FakeUnitOfWorkFactory, OperationLog,
     };
+    use pigeon_domain::attempt::AttemptState;
     use pigeon_domain::endpoint::Endpoint;
     use pigeon_domain::message::MessageState;
     use pigeon_domain::organization::OrganizationId;
 
     fn wrap(msg: Message) -> MessageWithStatus {
         MessageWithStatus { message: msg, attempts_created: 0, succeeded: 0, failed: 0, dead_lettered: 0 }
+    }
+
+    fn empty_attempt_store() -> Arc<MockAttemptReadStore> {
+        let mut mock = MockAttemptReadStore::new();
+        mock.expect_list_by_message().returning(|_, _| Ok(vec![]));
+        Arc::new(mock)
     }
 
     #[tokio::test]
@@ -145,6 +170,7 @@ mod tests {
             factory,
             Arc::new(msg_store),
             endpoint_store,
+            empty_attempt_store(),
         );
 
         let result = handler
@@ -174,6 +200,7 @@ mod tests {
             factory,
             Arc::new(msg_store),
             endpoint_store,
+            empty_attempt_store(),
         );
 
         let result = handler
@@ -205,6 +232,7 @@ mod tests {
             factory,
             Arc::new(msg_store),
             endpoint_store,
+            empty_attempt_store(),
         );
 
         let result = handler
@@ -252,6 +280,7 @@ mod tests {
             factory,
             Arc::new(msg_store),
             endpoint_store,
+            empty_attempt_store(),
         );
 
         let result = handler
@@ -269,5 +298,71 @@ mod tests {
             .filter(|e| *e == "attempt_store:insert")
             .count();
         assert_eq!(insert_count, 3);
+    }
+
+    #[tokio::test]
+    async fn skips_endpoints_that_already_have_attempts() {
+        let log = OperationLog::new();
+        let msg = Message::reconstitute(MessageState::fake());
+        let msg_clone = msg.clone();
+        let app_id = msg.app_id().clone();
+        let event_type_id = msg.event_type_id().clone();
+        let message_id = msg.id().clone();
+
+        let mut msg_store = MockMessageReadStore::new();
+        msg_store
+            .expect_find_by_id()
+            .returning(move |_, _| Ok(Some(wrap(msg_clone.clone()))));
+
+        let ep = Endpoint::new(
+            app_id.clone(),
+            "https://a.com/hook".into(),
+            "whsec_a".into(),
+            vec![event_type_id.clone()],
+        )
+        .unwrap();
+        let ep_id = ep.id().clone();
+
+        // Simulate an existing attempt for this endpoint
+        let existing_attempt = Attempt::reconstitute(AttemptState {
+            id: pigeon_domain::attempt::AttemptId::new(),
+            message_id: message_id.clone(),
+            endpoint_id: ep_id,
+            status: pigeon_domain::attempt::AttemptStatus::Succeeded,
+            response_code: Some(200),
+            response_body: None,
+            attempted_at: Some(Utc::now()),
+            next_attempt_at: None,
+            attempt_number: 1,
+            duration_ms: Some(50),
+            version: pigeon_domain::version::Version::new(0),
+        });
+
+        let mut att_store = MockAttemptReadStore::new();
+        att_store
+            .expect_list_by_message()
+            .returning(move |_, _| Ok(vec![existing_attempt.clone()]));
+
+        let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), vec![ep]));
+        let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
+
+        let handler = RetriggerMessageHandler::new(
+            factory,
+            Arc::new(msg_store),
+            endpoint_store,
+            Arc::new(att_store),
+        );
+
+        let result = handler
+            .handle(RetriggerMessage {
+                message_id,
+                org_id: OrganizationId::new(),
+            })
+            .await;
+
+        // Should fail because the only matching endpoint already has an attempt
+        assert!(matches!(result, Err(ApplicationError::Validation(_))));
+        // No UoW should have been started
+        assert!(!log.entries().contains(&"uow_factory:begin".to_string()));
     }
 }

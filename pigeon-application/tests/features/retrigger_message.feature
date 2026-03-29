@@ -14,6 +14,11 @@ Feature: Retrigger Message
     When the retrigger message command is executed
     Then the retrigger should fail with a validation error
 
+  Scenario: Retriggering skips endpoints that already have attempts
+    Given a message exists with an endpoint that already has an attempt
+    When the retrigger message command is executed
+    Then the retrigger should fail with a validation error
+
   Scenario: Retriggering a non-existent message fails
     When a non-existent message is retriggered
     Then the retrigger should fail with a not found error
