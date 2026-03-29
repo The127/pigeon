@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use pigeon_domain::message::{Message, MessageId};
+use pigeon_domain::message::MessageId;
 use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
 use crate::mediator::handler::QueryHandler;
 use crate::mediator::query::Query;
+use crate::ports::message_status::MessageWithStatus;
 use crate::ports::stores::MessageReadStore;
 
 #[derive(Debug)]
@@ -16,7 +17,7 @@ pub struct GetMessageById {
 }
 
 impl Query for GetMessageById {
-    type Output = Option<Message>;
+    type Output = Option<MessageWithStatus>;
 }
 
 pub struct GetMessageByIdHandler {
@@ -34,7 +35,7 @@ impl QueryHandler<GetMessageById> for GetMessageByIdHandler {
     async fn handle(
         &self,
         query: GetMessageById,
-    ) -> Result<Option<Message>, ApplicationError> {
+    ) -> Result<Option<MessageWithStatus>, ApplicationError> {
         self.read_store.find_by_id(&query.id, &query.org_id).await
     }
 }
@@ -43,17 +44,27 @@ impl QueryHandler<GetMessageById> for GetMessageByIdHandler {
 mod tests {
     use super::*;
     use crate::ports::stores::MockMessageReadStore;
-    use pigeon_domain::message::MessageState;
+    use pigeon_domain::message::{Message, MessageState};
+
+    fn fake_msg_with_status() -> MessageWithStatus {
+        MessageWithStatus {
+            message: Message::reconstitute(MessageState::fake()),
+            attempts_created: 2,
+            succeeded: 1,
+            failed: 1,
+            dead_lettered: 0,
+        }
+    }
 
     #[tokio::test]
     async fn returns_message_when_found() {
-        let msg = Message::reconstitute(MessageState::fake());
-        let id = msg.id().clone();
-        let msg_clone = msg.clone();
+        let mws = fake_msg_with_status();
+        let id = mws.message.id().clone();
+        let mws_clone = mws.clone();
 
         let mut mock = MockMessageReadStore::new();
         mock.expect_find_by_id()
-            .returning(move |_, _| Ok(Some(msg_clone.clone())));
+            .returning(move |_, _| Ok(Some(mws_clone.clone())));
 
         let handler = GetMessageByIdHandler::new(Arc::new(mock));
         let result = handler
@@ -62,6 +73,7 @@ mod tests {
             .unwrap();
 
         assert!(result.is_some());
+        assert_eq!(result.unwrap().attempts_created, 2);
     }
 
     #[tokio::test]

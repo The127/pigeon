@@ -4,7 +4,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use pigeon_application::commands::send_message::SendMessageResult;
-use pigeon_domain::message::Message;
+use pigeon_application::ports::message_status::MessageWithStatus;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct SendMessageRequest {
@@ -33,10 +33,15 @@ pub struct MessageResponse {
     pub payload: serde_json::Value,
     pub idempotency_key: String,
     pub created_at: DateTime<Utc>,
+    pub attempts_created: u32,
+    pub succeeded: u32,
+    pub failed: u32,
+    pub dead_lettered: u32,
 }
 
-impl From<Message> for MessageResponse {
-    fn from(msg: Message) -> Self {
+impl From<MessageWithStatus> for MessageResponse {
+    fn from(mws: MessageWithStatus) -> Self {
+        let msg = mws.message;
         Self {
             id: *msg.id().as_uuid(),
             app_id: *msg.app_id().as_uuid(),
@@ -44,6 +49,10 @@ impl From<Message> for MessageResponse {
             payload: msg.payload().clone(),
             idempotency_key: msg.idempotency_key().as_str().to_string(),
             created_at: *msg.created_at(),
+            attempts_created: mws.attempts_created,
+            succeeded: mws.succeeded,
+            failed: mws.failed,
+            dead_lettered: mws.dead_lettered,
         }
     }
 }

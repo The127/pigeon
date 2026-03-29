@@ -58,11 +58,12 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
         &self,
         command: RetriggerMessage,
     ) -> Result<RetriggerMessageResult, ApplicationError> {
-        let message = self
+        let message_with_status = self
             .message_read_store
             .find_by_id(&command.message_id, &command.org_id)
             .await?
             .ok_or(ApplicationError::NotFound)?;
+        let message = message_with_status.message;
 
         let endpoints = self
             .endpoint_read_store
@@ -102,6 +103,7 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ports::message_status::MessageWithStatus;
     use crate::ports::stores::MockMessageReadStore;
     use crate::test_support::fakes::{
         FakeEndpointReadStore, FakeUnitOfWorkFactory, OperationLog,
@@ -109,6 +111,10 @@ mod tests {
     use pigeon_domain::endpoint::Endpoint;
     use pigeon_domain::message::MessageState;
     use pigeon_domain::organization::OrganizationId;
+
+    fn wrap(msg: Message) -> MessageWithStatus {
+        MessageWithStatus { message: msg, attempts_created: 0, succeeded: 0, failed: 0, dead_lettered: 0 }
+    }
 
     #[tokio::test]
     async fn retriggers_to_matching_endpoints() {
@@ -122,7 +128,7 @@ mod tests {
         let mut msg_store = MockMessageReadStore::new();
         msg_store
             .expect_find_by_id()
-            .returning(move |_, _| Ok(Some(msg_clone.clone())));
+            .returning(move |_, _| Ok(Some(wrap(msg_clone.clone()))));
 
         let ep = Endpoint::new(
             app_id.clone(),
@@ -190,7 +196,7 @@ mod tests {
         let mut msg_store = MockMessageReadStore::new();
         msg_store
             .expect_find_by_id()
-            .returning(move |_, _| Ok(Some(msg_clone.clone())));
+            .returning(move |_, _| Ok(Some(wrap(msg_clone.clone()))));
 
         let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), vec![]));
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
@@ -225,7 +231,7 @@ mod tests {
         let mut msg_store = MockMessageReadStore::new();
         msg_store
             .expect_find_by_id()
-            .returning(move |_, _| Ok(Some(msg_clone.clone())));
+            .returning(move |_, _| Ok(Some(wrap(msg_clone.clone()))));
 
         let endpoints: Vec<Endpoint> = (0..3)
             .map(|i| {

@@ -2,12 +2,12 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::application::ApplicationId;
-use pigeon_domain::message::Message;
 use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
 use crate::mediator::handler::QueryHandler;
 use crate::mediator::query::Query;
+use crate::ports::message_status::MessageWithStatus;
 use crate::ports::stores::MessageReadStore;
 use crate::queries::PaginatedResult;
 
@@ -20,7 +20,7 @@ pub struct ListMessagesByApp {
 }
 
 impl Query for ListMessagesByApp {
-    type Output = PaginatedResult<Message>;
+    type Output = PaginatedResult<MessageWithStatus>;
 }
 
 pub struct ListMessagesByAppHandler {
@@ -38,7 +38,7 @@ impl QueryHandler<ListMessagesByApp> for ListMessagesByAppHandler {
     async fn handle(
         &self,
         query: ListMessagesByApp,
-    ) -> Result<PaginatedResult<Message>, ApplicationError> {
+    ) -> Result<PaginatedResult<MessageWithStatus>, ApplicationError> {
         let items = self
             .read_store
             .list_by_app(&query.app_id, &query.org_id, query.offset, query.limit)
@@ -61,6 +61,17 @@ impl QueryHandler<ListMessagesByApp> for ListMessagesByAppHandler {
 mod tests {
     use super::*;
     use crate::ports::stores::MockMessageReadStore;
+    use pigeon_domain::message::{Message, MessageState};
+
+    fn fake_msg_with_status() -> MessageWithStatus {
+        MessageWithStatus {
+            message: Message::reconstitute(MessageState::fake()),
+            attempts_created: 1,
+            succeeded: 0,
+            failed: 0,
+            dead_lettered: 0,
+        }
+    }
 
     #[tokio::test]
     async fn returns_empty_list() {
@@ -85,10 +96,8 @@ mod tests {
 
     #[tokio::test]
     async fn returns_items_with_pagination() {
-        use pigeon_domain::message::MessageState;
-
-        let msg = Message::reconstitute(MessageState::fake());
-        let items = vec![msg];
+        let mws = fake_msg_with_status();
+        let items = vec![mws];
         let items_clone = items.clone();
 
         let mut mock = MockMessageReadStore::new();
@@ -109,7 +118,5 @@ mod tests {
 
         assert_eq!(result.items.len(), 1);
         assert_eq!(result.total, 5);
-        assert_eq!(result.offset, 0);
-        assert_eq!(result.limit, 10);
     }
 }

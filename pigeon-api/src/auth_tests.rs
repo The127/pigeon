@@ -215,7 +215,7 @@ impl QueryHandler<pigeon_application::queries::get_message_by_id::GetMessageById
     async fn handle(
         &self,
         _: pigeon_application::queries::get_message_by_id::GetMessageById,
-    ) -> Result<Option<pigeon_domain::message::Message>, ApplicationError> {
+    ) -> Result<Option<pigeon_application::ports::message_status::MessageWithStatus>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -224,7 +224,7 @@ impl QueryHandler<pigeon_application::queries::list_messages_by_app::ListMessage
     async fn handle(
         &self,
         _: pigeon_application::queries::list_messages_by_app::ListMessagesByApp,
-    ) -> Result<PaginatedResult<pigeon_domain::message::Message>, ApplicationError> {
+    ) -> Result<PaginatedResult<pigeon_application::ports::message_status::MessageWithStatus>, ApplicationError> {
         unimplemented!()
     }
 }

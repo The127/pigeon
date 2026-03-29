@@ -11,6 +11,7 @@ use pigeon_application::commands::send_test_event::{SendTestEvent, SendTestEvent
 use pigeon_application::error::ApplicationError;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
 use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore, OrganizationReadStore};
+use pigeon_application::ports::message_status::MessageWithStatus;
 use pigeon_application::ports::stats_read_store::AppStats;
 use pigeon_application::queries::get_app_stats::GetAppStats;
 use pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById;
@@ -52,7 +53,7 @@ impl QueryHandler<GetAppStats> for StubGetAppStatsHandler {
 pub(crate) struct StubGetMessageHandler;
 #[async_trait]
 impl QueryHandler<GetMessageById> for StubGetMessageHandler {
-    async fn handle(&self, _q: GetMessageById) -> Result<Option<Message>, ApplicationError> {
+    async fn handle(&self, _q: GetMessageById) -> Result<Option<MessageWithStatus>, ApplicationError> {
         Ok(None)
     }
 }
@@ -63,7 +64,7 @@ impl QueryHandler<ListMessagesByApp> for StubListMessagesHandler {
     async fn handle(
         &self,
         _q: ListMessagesByApp,
-    ) -> Result<PaginatedResult<Message>, ApplicationError> {
+    ) -> Result<PaginatedResult<MessageWithStatus>, ApplicationError> {
         Ok(PaginatedResult { items: vec![], total: 0, offset: 0, limit: 20 })
     }
 }

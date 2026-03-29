@@ -6,6 +6,8 @@ use pigeon_domain::dead_letter::{DeadLetter, DeadLetterId};
 use pigeon_domain::endpoint::{Endpoint, EndpointId};
 use pigeon_domain::event_type::{EventType, EventTypeId};
 use pigeon_domain::message::{Message, MessageId};
+
+use crate::ports::message_status::MessageWithStatus;
 use pigeon_domain::oidc_config::{OidcConfig, OidcConfigId};
 use pigeon_domain::organization::{Organization, OrganizationId};
 
@@ -209,14 +211,14 @@ pub trait MessageReadStore: Send + Sync {
         &self,
         id: &MessageId,
         org_id: &OrganizationId,
-    ) -> Result<Option<Message>, ApplicationError>;
+    ) -> Result<Option<MessageWithStatus>, ApplicationError>;
     async fn list_by_app(
         &self,
         app_id: &ApplicationId,
         org_id: &OrganizationId,
         offset: u64,
         limit: u64,
-    ) -> Result<Vec<Message>, ApplicationError>;
+    ) -> Result<Vec<MessageWithStatus>, ApplicationError>;
     async fn count_by_app(
         &self,
         app_id: &ApplicationId,
