@@ -30,6 +30,11 @@ use pigeon_application::commands::update_endpoint::UpdateEndpointHandler;
 use pigeon_application::commands::update_event_type::UpdateEventTypeHandler;
 use pigeon_application::commands::update_organization::UpdateOrganizationHandler;
 use pigeon_application::queries::get_application_by_id::GetApplicationByIdHandler;
+use pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterByIdHandler;
+use pigeon_application::queries::get_message_by_id::GetMessageByIdHandler;
+use pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessageHandler;
+use pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByAppHandler;
+use pigeon_application::queries::list_messages_by_app::ListMessagesByAppHandler;
 use pigeon_application::queries::get_endpoint_by_id::GetEndpointByIdHandler;
 use pigeon_application::queries::get_event_type_by_id::GetEventTypeByIdHandler;
 use pigeon_application::queries::get_oidc_config_by_id::GetOidcConfigByIdHandler;
@@ -48,9 +53,10 @@ use pigeon_application::services::outbox_worker::{
 };
 use pigeon_infrastructure::http::ReqwestWebhookClient;
 use pigeon_infrastructure::persistence::{
-    PgApplicationReadStore, PgDeadLetterReadStore, PgDeliveryQueue, PgEndpointReadStore,
-    PgEventOutbox, PgEventTypeReadStore, PgHealthChecker, PgOidcConfigReadStore,
-    PgOrganizationReadStore, PgProjectionStore, PgUnitOfWorkFactory,
+    PgApplicationReadStore, PgAttemptReadStore, PgDeadLetterReadStore, PgDeliveryQueue,
+    PgEndpointReadStore, PgEventOutbox, PgEventTypeReadStore, PgHealthChecker,
+    PgMessageReadStore, PgOidcConfigReadStore, PgOrganizationReadStore, PgProjectionStore,
+    PgUnitOfWorkFactory,
 };
 
 mod bootstrap;
@@ -292,6 +298,9 @@ async fn run_api(
     let endpoint_read_store = Arc::new(PgEndpointReadStore::new(pool.clone()));
     let organization_read_store = Arc::new(PgOrganizationReadStore::new(pool.clone()));
     let oidc_config_read_store = Arc::new(PgOidcConfigReadStore::new(pool.clone()));
+    let message_read_store = Arc::new(PgMessageReadStore::new(pool.clone()));
+    let attempt_read_store = Arc::new(PgAttemptReadStore::new(pool.clone()));
+    let dead_letter_read_store = Arc::new(PgDeadLetterReadStore::new(pool.clone()));
     let health_checker = Arc::new(PgHealthChecker::new(pool));
 
     let idempotency_ttl = Duration::hours(24);
@@ -336,6 +345,11 @@ async fn run_api(
         org_read_store: organization_read_store,
         app_read_store: read_store.clone(),
         jwks_provider: Arc::new(CachedJwksProvider::new(jwks_cache_ttl)),
+        get_message: Arc::new(GetMessageByIdHandler::new(message_read_store.clone())),
+        list_messages: Arc::new(ListMessagesByAppHandler::new(message_read_store)),
+        list_attempts: Arc::new(ListAttemptsByMessageHandler::new(attempt_read_store)),
+        get_dead_letter: Arc::new(GetDeadLetterByIdHandler::new(dead_letter_read_store.clone())),
+        list_dead_letters: Arc::new(ListDeadLettersByAppHandler::new(dead_letter_read_store)),
         replay_dead_letter: Arc::new(ReplayDeadLetterHandler::new(uow_factory.clone())),
         retry_attempt: Arc::new(RetryAttemptHandler::new(uow_factory.clone())),
         send_test_event: Arc::new(SendTestEventHandler::new(

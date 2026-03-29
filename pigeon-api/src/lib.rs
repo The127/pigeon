@@ -119,7 +119,26 @@ pub fn router(state: AppState) -> Router {
                 .put(endpoints::update_endpoint)
                 .delete(endpoints::delete_endpoint),
         )
-        .route("/{app_id}/messages", post(messages::send_message))
+        .route(
+            "/{app_id}/messages",
+            post(messages::send_message).get(messages::list_messages),
+        )
+        .route(
+            "/{app_id}/messages/{id}",
+            get(messages::get_message),
+        )
+        .route(
+            "/{app_id}/messages/{msg_id}/attempts",
+            get(messages::list_attempts),
+        )
+        .route(
+            "/{app_id}/dead-letters",
+            get(handlers::dead_letters::list_dead_letters),
+        )
+        .route(
+            "/{app_id}/dead-letters/{id}",
+            get(handlers::dead_letters::get_dead_letter),
+        )
         .route(
             "/{app_id}/dead-letters/{id}/replay",
             post(handlers::dead_letters::replay),
@@ -225,7 +244,26 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
                 .put(endpoints::update_endpoint)
                 .delete(endpoints::delete_endpoint),
         )
-        .route("/{app_id}/messages", post(messages::send_message))
+        .route(
+            "/{app_id}/messages",
+            post(messages::send_message).get(messages::list_messages),
+        )
+        .route(
+            "/{app_id}/messages/{id}",
+            get(messages::get_message),
+        )
+        .route(
+            "/{app_id}/messages/{msg_id}/attempts",
+            get(messages::list_attempts),
+        )
+        .route(
+            "/{app_id}/dead-letters",
+            get(handlers::dead_letters::list_dead_letters),
+        )
+        .route(
+            "/{app_id}/dead-letters/{id}",
+            get(handlers::dead_letters::get_dead_letter),
+        )
         .route(
             "/{app_id}/dead-letters/{id}/replay",
             post(handlers::dead_letters::replay),

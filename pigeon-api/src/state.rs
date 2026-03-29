@@ -31,6 +31,11 @@ use pigeon_application::queries::list_applications::ListApplications;
 use pigeon_application::queries::list_endpoints_by_app::ListEndpointsByApp;
 use pigeon_application::queries::list_event_types_by_app::ListEventTypesByApp;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrg;
+use pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById;
+use pigeon_application::queries::get_message_by_id::GetMessageById;
+use pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage;
+use pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByApp;
+use pigeon_application::queries::list_messages_by_app::ListMessagesByApp;
 use pigeon_application::queries::list_organizations::ListOrganizations;
 
 use crate::auth::JwksProvider;
@@ -53,6 +58,11 @@ pub struct AppState {
     pub delete_endpoint: Arc<dyn CommandHandler<DeleteEndpoint>>,
     pub get_endpoint: Arc<dyn QueryHandler<GetEndpointById>>,
     pub list_endpoints: Arc<dyn QueryHandler<ListEndpointsByApp>>,
+    pub get_message: Arc<dyn QueryHandler<GetMessageById>>,
+    pub list_messages: Arc<dyn QueryHandler<ListMessagesByApp>>,
+    pub list_attempts: Arc<dyn QueryHandler<ListAttemptsByMessage>>,
+    pub get_dead_letter: Arc<dyn QueryHandler<GetDeadLetterById>>,
+    pub list_dead_letters: Arc<dyn QueryHandler<ListDeadLettersByApp>>,
     pub replay_dead_letter: Arc<dyn CommandHandler<ReplayDeadLetter>>,
     pub retry_attempt: Arc<dyn CommandHandler<RetryAttempt>>,
     pub send_test_event: Arc<dyn CommandHandler<SendTestEvent>>,

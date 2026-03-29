@@ -1,14 +1,20 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use uuid::Uuid;
 
 use pigeon_application::commands::send_message::SendMessage;
+use pigeon_application::queries::get_message_by_id::GetMessageById;
+use pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage;
+use pigeon_application::queries::list_messages_by_app::ListMessagesByApp;
 use pigeon_domain::application::ApplicationId;
 use pigeon_domain::event_type::EventTypeId;
+use pigeon_domain::message::MessageId;
 
-use crate::dto::message::{SendMessageRequest, SendMessageResponse};
+use crate::dto::attempt::AttemptResponse;
+use crate::dto::message::{MessageResponse, SendMessageRequest, SendMessageResponse};
+use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
 use crate::extractors::OrgId;
 use crate::state::AppState;
@@ -63,6 +69,118 @@ pub async fn send_message(
     };
 
     Ok((status, Json(response)))
+}
+
+/// List messages for an application
+#[utoipa::path(
+    get,
+    path = "/api/v1/applications/{app_id}/messages",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ListQuery,
+    ),
+    responses(
+        (status = 200, description = "Paginated list of messages"),
+    ),
+    tag = "messages"
+)]
+pub async fn list_messages(
+    State(state): State<AppState>,
+    OrgId(org_id): OrgId,
+    Path(app_id): Path<Uuid>,
+    Query(query): Query<ListQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let app_id = ApplicationId::from_uuid(app_id);
+    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+
+    let result = state
+        .list_messages
+        .handle(ListMessagesByApp {
+            app_id,
+            org_id,
+            offset: query.offset.unwrap_or(0),
+            limit: query.limit.unwrap_or(20),
+        })
+        .await
+        .map_err(ApiError)?;
+
+    let response = serde_json::json!({
+        "items": result.items.into_iter().map(MessageResponse::from).collect::<Vec<_>>(),
+        "total": result.total,
+        "offset": result.offset,
+        "limit": result.limit,
+    });
+
+    Ok(Json(response))
+}
+
+/// Get a message by ID
+#[utoipa::path(
+    get,
+    path = "/api/v1/applications/{app_id}/messages/{id}",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("id" = Uuid, Path, description = "Message ID"),
+    ),
+    responses(
+        (status = 200, description = "Message found", body = MessageResponse),
+        (status = 404, description = "Message not found", body = ErrorBody),
+    ),
+    tag = "messages"
+)]
+pub async fn get_message(
+    State(state): State<AppState>,
+    OrgId(org_id): OrgId,
+    Path((app_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let app_id = ApplicationId::from_uuid(app_id);
+    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+
+    let msg = state
+        .get_message
+        .handle(GetMessageById {
+            id: MessageId::from_uuid(id),
+            org_id,
+        })
+        .await
+        .map_err(ApiError)?
+        .ok_or(ApiError(pigeon_application::error::ApplicationError::NotFound))?;
+
+    Ok(Json(MessageResponse::from(msg)))
+}
+
+/// List delivery attempts for a message
+#[utoipa::path(
+    get,
+    path = "/api/v1/applications/{app_id}/messages/{msg_id}/attempts",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("msg_id" = Uuid, Path, description = "Message ID"),
+    ),
+    responses(
+        (status = 200, description = "List of attempts", body = Vec<AttemptResponse>),
+    ),
+    tag = "messages"
+)]
+pub async fn list_attempts(
+    State(state): State<AppState>,
+    OrgId(org_id): OrgId,
+    Path((app_id, msg_id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let app_id = ApplicationId::from_uuid(app_id);
+    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+
+    let attempts = state
+        .list_attempts
+        .handle(ListAttemptsByMessage {
+            message_id: MessageId::from_uuid(msg_id),
+            org_id,
+        })
+        .await
+        .map_err(ApiError)?;
+
+    let response: Vec<AttemptResponse> = attempts.into_iter().map(AttemptResponse::from).collect();
+    Ok(Json(response))
 }
 
 #[cfg(test)]
@@ -350,6 +468,11 @@ mod tests {
             delete_endpoint: Arc::new(StubDeleteEpHandler),
             get_endpoint: Arc::new(StubGetEpHandler),
             list_endpoints: Arc::new(StubListEpHandler),
+            get_message: Arc::new(StubGetMessageHandler),
+            list_messages: Arc::new(StubListMessagesHandler),
+            list_attempts: Arc::new(StubListAttemptsHandler),
+            get_dead_letter: Arc::new(StubGetDeadLetterHandler),
+            list_dead_letters: Arc::new(StubListDeadLettersHandler),
             health_checker: Arc::new(StubHealthChecker),
             create_organization: Arc::new(StubCreateOrgHandler),
             update_organization: Arc::new(StubUpdateOrgHandler),

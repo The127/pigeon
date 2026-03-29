@@ -7,21 +7,74 @@ use pigeon_application::commands::delete_oidc_config::DeleteOidcConfig;
 use pigeon_application::commands::replay_dead_letter::ReplayDeadLetter;
 use pigeon_application::commands::retry_attempt::RetryAttempt;
 use pigeon_application::commands::send_test_event::{SendTestEvent, SendTestEventResult};
-use pigeon_domain::attempt::Attempt;
-use pigeon_domain::dead_letter::DeadLetter;
 use pigeon_application::error::ApplicationError;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
 use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore, OrganizationReadStore};
-use pigeon_domain::organization::Organization;
+use pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById;
+use pigeon_application::queries::get_message_by_id::GetMessageById;
 use pigeon_application::queries::get_oidc_config_by_id::GetOidcConfigById;
+use pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage;
+use pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByApp;
+use pigeon_application::queries::list_messages_by_app::ListMessagesByApp;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrg;
 use pigeon_application::queries::PaginatedResult;
 use pigeon_domain::application::{Application, ApplicationId};
+use pigeon_domain::attempt::Attempt;
+use pigeon_domain::dead_letter::DeadLetter;
+use pigeon_domain::message::Message;
 use pigeon_domain::oidc_config::{OidcConfig, OidcConfigId};
-use pigeon_domain::organization::OrganizationId;
+use pigeon_domain::organization::{Organization, OrganizationId};
 use uuid::Uuid;
 
 use crate::auth::{AuthContext, JwksProvider};
+
+// --- Stub message/attempt/dead-letter query handlers ---
+
+pub(crate) struct StubGetMessageHandler;
+#[async_trait]
+impl QueryHandler<GetMessageById> for StubGetMessageHandler {
+    async fn handle(&self, _q: GetMessageById) -> Result<Option<Message>, ApplicationError> {
+        Ok(None)
+    }
+}
+
+pub(crate) struct StubListMessagesHandler;
+#[async_trait]
+impl QueryHandler<ListMessagesByApp> for StubListMessagesHandler {
+    async fn handle(
+        &self,
+        _q: ListMessagesByApp,
+    ) -> Result<PaginatedResult<Message>, ApplicationError> {
+        Ok(PaginatedResult { items: vec![], total: 0, offset: 0, limit: 20 })
+    }
+}
+
+pub(crate) struct StubListAttemptsHandler;
+#[async_trait]
+impl QueryHandler<ListAttemptsByMessage> for StubListAttemptsHandler {
+    async fn handle(&self, _q: ListAttemptsByMessage) -> Result<Vec<Attempt>, ApplicationError> {
+        Ok(vec![])
+    }
+}
+
+pub(crate) struct StubGetDeadLetterHandler;
+#[async_trait]
+impl QueryHandler<GetDeadLetterById> for StubGetDeadLetterHandler {
+    async fn handle(&self, _q: GetDeadLetterById) -> Result<Option<DeadLetter>, ApplicationError> {
+        Ok(None)
+    }
+}
+
+pub(crate) struct StubListDeadLettersHandler;
+#[async_trait]
+impl QueryHandler<ListDeadLettersByApp> for StubListDeadLettersHandler {
+    async fn handle(
+        &self,
+        _q: ListDeadLettersByApp,
+    ) -> Result<PaginatedResult<DeadLetter>, ApplicationError> {
+        Ok(PaginatedResult { items: vec![], total: 0, offset: 0, limit: 20 })
+    }
+}
 
 // --- Stub OIDC config handlers ---
 

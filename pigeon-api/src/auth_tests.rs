@@ -186,6 +186,51 @@ impl QueryHandler<ListEndpointsByApp> for S {
     }
 }
 #[async_trait]
+impl QueryHandler<pigeon_application::queries::get_message_by_id::GetMessageById> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::queries::get_message_by_id::GetMessageById,
+    ) -> Result<Option<pigeon_domain::message::Message>, ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
+impl QueryHandler<pigeon_application::queries::list_messages_by_app::ListMessagesByApp> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::queries::list_messages_by_app::ListMessagesByApp,
+    ) -> Result<PaginatedResult<pigeon_domain::message::Message>, ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
+impl QueryHandler<pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage,
+    ) -> Result<Vec<pigeon_domain::attempt::Attempt>, ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
+impl QueryHandler<pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById,
+    ) -> Result<Option<pigeon_domain::dead_letter::DeadLetter>, ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
+impl QueryHandler<pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByApp> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByApp,
+    ) -> Result<PaginatedResult<pigeon_domain::dead_letter::DeadLetter>, ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
 impl pigeon_application::ports::health::HealthChecker for S {
     async fn check(&self) -> bool {
         true
@@ -276,6 +321,11 @@ fn test_state() -> AppState {
         delete_endpoint: Arc::new(S),
         get_endpoint: Arc::new(S),
         list_endpoints: Arc::new(S),
+        get_message: Arc::new(S),
+        list_messages: Arc::new(S),
+        list_attempts: Arc::new(S),
+        get_dead_letter: Arc::new(S),
+        list_dead_letters: Arc::new(S),
         health_checker: Arc::new(S),
         create_organization: Arc::new(S),
         update_organization: Arc::new(S),

@@ -4,6 +4,7 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use pigeon_application::commands::send_message::SendMessageResult;
+use pigeon_domain::message::Message;
 
 #[derive(Debug, Deserialize, ToSchema)]
 pub struct SendMessageRequest {
@@ -22,6 +23,29 @@ pub struct SendMessageResponse {
     pub created_at: DateTime<Utc>,
     pub attempts_created: usize,
     pub was_duplicate: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+pub struct MessageResponse {
+    pub id: Uuid,
+    pub app_id: Uuid,
+    pub event_type_id: Uuid,
+    pub payload: serde_json::Value,
+    pub idempotency_key: String,
+    pub created_at: DateTime<Utc>,
+}
+
+impl From<Message> for MessageResponse {
+    fn from(msg: Message) -> Self {
+        Self {
+            id: *msg.id().as_uuid(),
+            app_id: *msg.app_id().as_uuid(),
+            event_type_id: *msg.event_type_id().as_uuid(),
+            payload: msg.payload().clone(),
+            idempotency_key: msg.idempotency_key().as_str().to_string(),
+            created_at: *msg.created_at(),
+        }
+    }
 }
 
 impl From<SendMessageResult> for SendMessageResponse {

@@ -5,7 +5,7 @@ use pigeon_domain::attempt::Attempt;
 use pigeon_domain::dead_letter::{DeadLetter, DeadLetterId};
 use pigeon_domain::endpoint::{Endpoint, EndpointId};
 use pigeon_domain::event_type::{EventType, EventTypeId};
-use pigeon_domain::message::Message;
+use pigeon_domain::message::{Message, MessageId};
 use pigeon_domain::oidc_config::{OidcConfig, OidcConfigId};
 use pigeon_domain::organization::{Organization, OrganizationId};
 
@@ -183,6 +183,55 @@ pub trait DeadLetterReadStore: Send + Sync {
         &self,
         endpoint_id: &EndpointId,
     ) -> Result<u64, ApplicationError>;
+    async fn find_by_id(
+        &self,
+        id: &DeadLetterId,
+        org_id: &OrganizationId,
+    ) -> Result<Option<DeadLetter>, ApplicationError>;
+    async fn list_by_app(
+        &self,
+        app_id: &ApplicationId,
+        org_id: &OrganizationId,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<DeadLetter>, ApplicationError>;
+    async fn count_by_app(
+        &self,
+        app_id: &ApplicationId,
+        org_id: &OrganizationId,
+    ) -> Result<u64, ApplicationError>;
+}
+
+#[cfg_attr(feature = "test-support", mockall::automock)]
+#[async_trait]
+pub trait MessageReadStore: Send + Sync {
+    async fn find_by_id(
+        &self,
+        id: &MessageId,
+        org_id: &OrganizationId,
+    ) -> Result<Option<Message>, ApplicationError>;
+    async fn list_by_app(
+        &self,
+        app_id: &ApplicationId,
+        org_id: &OrganizationId,
+        offset: u64,
+        limit: u64,
+    ) -> Result<Vec<Message>, ApplicationError>;
+    async fn count_by_app(
+        &self,
+        app_id: &ApplicationId,
+        org_id: &OrganizationId,
+    ) -> Result<u64, ApplicationError>;
+}
+
+#[cfg_attr(feature = "test-support", mockall::automock)]
+#[async_trait]
+pub trait AttemptReadStore: Send + Sync {
+    async fn list_by_message(
+        &self,
+        message_id: &MessageId,
+        org_id: &OrganizationId,
+    ) -> Result<Vec<Attempt>, ApplicationError>;
 }
 
 #[cfg_attr(feature = "test-support", mockall::automock)]

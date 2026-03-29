@@ -1,6 +1,7 @@
 mod change_tracker;
 mod pg_application_read_store;
 mod pg_application_store;
+mod pg_attempt_read_store;
 mod pg_attempt_store;
 mod pg_dead_letter_read_store;
 mod pg_dead_letter_store;
@@ -12,6 +13,7 @@ mod pg_endpoint_store;
 mod pg_event_type_read_store;
 mod pg_event_type_store;
 mod pg_health_checker;
+mod pg_message_read_store;
 mod pg_message_store;
 mod pg_oidc_config_read_store;
 mod pg_oidc_config_store;
@@ -21,7 +23,9 @@ mod pg_unit_of_work;
 mod pg_unit_of_work_factory;
 
 pub use pg_application_read_store::PgApplicationReadStore;
+pub use pg_attempt_read_store::PgAttemptReadStore;
 pub use pg_dead_letter_read_store::PgDeadLetterReadStore;
+pub use pg_message_read_store::PgMessageReadStore;
 pub use pg_delivery_queue::PgDeliveryQueue;
 pub use pg_event_outbox::PgEventOutbox;
 pub use pg_projection_store::PgProjectionStore;
