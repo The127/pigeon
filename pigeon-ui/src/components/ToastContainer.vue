@@ -30,7 +30,11 @@ const progressStyles = {
   <slot />
 
   <div
-    class="fixed bottom-4 right-4 z-50 flex flex-col items-end"
+    class="fixed bottom-4 right-4 z-50"
+    :style="{
+      width: '20rem',
+      height: toasts.length ? `${isHovered ? (toasts.length - 1) * 64 + 52 : (toasts.length - 1) * 8 + 52}px` : '0',
+    }"
     @mouseenter="isHovered = true"
     @mouseleave="isHovered = false"
   >
