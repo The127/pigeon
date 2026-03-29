@@ -44,11 +44,13 @@ impl PipelineBehavior for TransactionBehavior {
 mod tests {
     use super::*;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
+    use pigeon_domain::organization::OrganizationId;
 
     fn make_ctx() -> RequestContext {
         RequestContext {
             command_name: "TestCommand",
             actor: "user_1".into(),
+            org_id: OrganizationId::new(),
         }
     }
 

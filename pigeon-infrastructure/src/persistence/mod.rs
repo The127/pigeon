@@ -1,4 +1,5 @@
 mod change_tracker;
+mod pg_audit_store;
 mod pg_application_read_store;
 mod pg_application_store;
 mod pg_attempt_read_store;
@@ -25,6 +26,7 @@ mod pg_stats_read_store;
 mod pg_unit_of_work;
 mod pg_unit_of_work_factory;
 
+pub use pg_audit_store::PgAuditStore;
 pub use pg_application_read_store::PgApplicationReadStore;
 pub use pg_attempt_read_store::PgAttemptReadStore;
 pub use pg_dead_letter_read_store::PgDeadLetterReadStore;

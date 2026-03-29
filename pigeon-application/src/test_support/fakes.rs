@@ -757,8 +757,9 @@ impl FakeAuditStore {
 #[async_trait]
 impl AuditStore for FakeAuditStore {
     async fn record(&self, entry: AuditEntry) -> Result<(), ApplicationError> {
+        let status = if entry.success { "success" } else { "failure" };
         self.log
-            .record(&format!("audit:record:{}", entry.command_name));
+            .record(&format!("audit:record:{}:{}", entry.command_name, status));
         Ok(())
     }
 }

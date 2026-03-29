@@ -26,15 +26,23 @@ impl PipelineBehavior for AuditBehavior {
     ) -> Result<(), ApplicationError> {
         let result = next().await;
 
-        if result.is_ok() {
-            self.audit_store
-                .record(AuditEntry {
-                    command_name: context.command_name,
-                    actor: context.actor.clone(),
-                    timestamp: Utc::now(),
-                })
-                .await?;
-        }
+        let (success, error_message) = match &result {
+            Ok(()) => (true, None),
+            Err(e) => (false, Some(e.to_string())),
+        };
+
+        // Record audit for both success and failure — best effort, don't fail the request
+        let _ = self
+            .audit_store
+            .record(AuditEntry {
+                command_name: context.command_name,
+                actor: context.actor.clone(),
+                org_id: context.org_id.clone(),
+                timestamp: Utc::now(),
+                success,
+                error_message,
+            })
+            .await;
 
         result
     }
@@ -44,11 +52,13 @@ impl PipelineBehavior for AuditBehavior {
 mod tests {
     use super::*;
     use crate::test_support::fakes::{FakeAuditStore, OperationLog};
+    use pigeon_domain::organization::OrganizationId;
 
     fn make_ctx() -> RequestContext {
         RequestContext {
             command_name: "CreateApplication",
             actor: "user_42".into(),
+            org_id: OrganizationId::new(),
         }
     }
 
@@ -71,11 +81,11 @@ mod tests {
         let result = behavior.handle(&mut make_ctx(), success_next()).await;
 
         assert!(result.is_ok());
-        assert_eq!(log.entries(), vec!["audit:record:CreateApplication"]);
+        assert_eq!(log.entries(), vec!["audit:record:CreateApplication:success"]);
     }
 
     #[tokio::test]
-    async fn skips_audit_on_failure() {
+    async fn records_audit_on_failure() {
         let log = OperationLog::new();
         let audit_store = Arc::new(FakeAuditStore::new(log.clone()));
         let behavior = AuditBehavior::new(audit_store);
@@ -83,7 +93,7 @@ mod tests {
         let result = behavior.handle(&mut make_ctx(), failing_next()).await;
 
         assert!(result.is_err());
-        assert!(log.entries().is_empty());
+        assert_eq!(log.entries(), vec!["audit:record:CreateApplication:failure"]);
     }
 
     #[tokio::test]

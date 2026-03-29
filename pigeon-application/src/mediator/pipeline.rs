@@ -2,12 +2,14 @@ use std::future::Future;
 use std::pin::Pin;
 
 use async_trait::async_trait;
+use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
 
 pub struct RequestContext {
     pub command_name: &'static str,
     pub actor: String,
+    pub org_id: OrganizationId,
 }
 
 /// Type-erased next step in the pipeline. Returns `Result<(), _>` because
@@ -61,6 +63,7 @@ mod tests {
         let mut ctx = RequestContext {
             command_name: "TestCommand",
             actor: "user_1".into(),
+            org_id: OrganizationId::new(),
         };
         let audit_next: NextFn = {
             Box::new(move || {
@@ -72,6 +75,7 @@ mod tests {
         let mut outer_ctx = RequestContext {
             command_name: "TestCommand",
             actor: "user_1".into(),
+            org_id: OrganizationId::new(),
         };
         let result = txn.handle(&mut outer_ctx, audit_next).await;
 
@@ -81,7 +85,7 @@ mod tests {
             log.entries(),
             vec![
                 "uow_factory:begin",
-                "audit:record:TestCommand",
+                "audit:record:TestCommand:success",
                 "uow:commit",
             ]
         );
@@ -103,6 +107,7 @@ mod tests {
         let mut ctx = RequestContext {
             command_name: "TestCommand",
             actor: "user_1".into(),
+            org_id: OrganizationId::new(),
         };
         let audit_next: NextFn = {
             Box::new(move || {
@@ -113,14 +118,15 @@ mod tests {
         let mut outer_ctx = RequestContext {
             command_name: "TestCommand",
             actor: "user_1".into(),
+            org_id: OrganizationId::new(),
         };
         let result = txn.handle(&mut outer_ctx, audit_next).await;
 
         assert!(result.is_err());
-        // begin -> handler fails -> audit skipped -> rollback
+        // begin -> handler fails -> audit records failure -> rollback
         assert_eq!(
             log.entries(),
-            vec!["uow_factory:begin", "uow:rollback"]
+            vec!["uow_factory:begin", "audit:record:TestCommand:failure", "uow:rollback"]
         );
     }
 
@@ -135,6 +141,7 @@ mod tests {
         let mut ctx = RequestContext {
             command_name: "TestCommand",
             actor: "user_1".into(),
+            org_id: OrganizationId::new(),
         };
 
         let result = execute_with_behavior(&txn, &mut ctx, handler).await;
