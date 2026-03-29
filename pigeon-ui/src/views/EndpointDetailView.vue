@@ -257,10 +257,10 @@ function lastDeliveryLabel() {
           <DialogDescription>Update endpoint configuration.</DialogDescription>
         </DialogHeader>
         <form class="space-y-4" @submit.prevent="handleUpdate">
-          <FormField label="Name" html-for="edit-ep-name">
+          <FormField label="Name" html-for="edit-ep-name" required>
             <Input id="edit-ep-name" v-model="editName" />
           </FormField>
-          <FormField label="URL" html-for="edit-ep-url">
+          <FormField label="URL" html-for="edit-ep-url" required>
             <Input id="edit-ep-url" v-model="editUrl" />
           </FormField>
           <FormField label="Signing Secret" html-for="edit-ep-secret" description="Leave blank to keep current. Clear and save empty to remove.">

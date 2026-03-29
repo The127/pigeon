@@ -6,12 +6,16 @@ defineProps<{
   htmlFor?: string
   description?: string
   error?: string
+  required?: boolean
 }>()
 </script>
 
 <template>
   <div class="space-y-2">
-    <Label :for="htmlFor">{{ label }}</Label>
+    <Label :for="htmlFor">
+      {{ label }}
+      <span v-if="required" class="text-destructive ml-0.5">*</span>
+    </Label>
     <slot />
     <p v-if="description && !error" class="text-xs text-muted-foreground">
       {{ description }}

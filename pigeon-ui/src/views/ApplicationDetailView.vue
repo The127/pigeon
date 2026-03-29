@@ -336,7 +336,7 @@ function handleReplay(deadLetterId: string) {
             <DialogDescription>Update the application name.</DialogDescription>
           </DialogHeader>
           <form class="space-y-4" @submit.prevent="handleUpdateApp">
-            <FormField label="Name" html-for="edit-name">
+            <FormField label="Name" html-for="edit-name" required>
               <Input id="edit-name" v-model="editName" />
             </FormField>
             <DialogFooter>
@@ -495,7 +495,7 @@ function handleReplay(deadLetterId: string) {
                   <DialogDescription>Define an event type that endpoints can subscribe to.</DialogDescription>
                 </DialogHeader>
                 <form class="space-y-4" @submit.prevent="handleCreateEventType">
-                  <FormField label="Name" html-for="et-name" description="e.g. order.placed, user.created">
+                  <FormField label="Name" html-for="et-name" required description="e.g. order.placed, user.created">
                     <Input id="et-name" v-model="etName" placeholder="order.placed" />
                   </FormField>
                   <DialogFooter>
@@ -594,7 +594,7 @@ function handleReplay(deadLetterId: string) {
                   <FormField label="Name" html-for="ep-name" description="Optional — a friendly name will be auto-generated if left blank.">
                     <Input id="ep-name" v-model="epName" placeholder="e.g. production-webhook" />
                   </FormField>
-                  <FormField label="URL" html-for="ep-url">
+                  <FormField label="URL" html-for="ep-url" required>
                     <Input id="ep-url" v-model="epUrl" placeholder="https://example.com/webhook" />
                   </FormField>
                   <FormField label="Signing Secret" html-for="ep-secret" description="Optional — used to sign payloads with HMAC-SHA256. Leave blank to skip signing.">
@@ -897,7 +897,7 @@ function handleReplay(deadLetterId: string) {
         <TabsContent value="send" class="space-y-4">
           <div class="max-w-lg space-y-4">
             <form class="space-y-4" @submit.prevent="handleSendMessage">
-              <FormField label="Event Type" html-for="msg-et">
+              <FormField label="Event Type" html-for="msg-et" required>
                 <select
                   id="msg-et"
                   v-model="msgEventTypeId"

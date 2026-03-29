@@ -112,7 +112,7 @@ function handleDelete() {
             </DialogHeader>
 
             <form class="space-y-4" @submit.prevent="handleCreate">
-              <FormField label="Name" html-for="name">
+              <FormField label="Name" html-for="name" required>
                 <Input
                   id="name"
                   v-model="newName"

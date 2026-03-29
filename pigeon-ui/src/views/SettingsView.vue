@@ -14,9 +14,9 @@ const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string; descrip
 
 const colorblindOptions: { value: string; label: string }[] = [
   { value: 'none', label: 'None' },
-  { value: 'deuteranopia', label: 'Deuteranopia (red-green)' },
-  { value: 'protanopia', label: 'Protanopia (red-green)' },
-  { value: 'tritanopia', label: 'Tritanopia (blue-yellow)' },
+  { value: 'deuteranopia', label: 'Deuteranopia (reduced green)' },
+  { value: 'protanopia', label: 'Protanopia (reduced red)' },
+  { value: 'tritanopia', label: 'Tritanopia (reduced blue)' },
 ]
 
 const accentOptions: { value: AccentColor; label: string; color: string }[] = [

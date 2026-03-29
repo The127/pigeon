@@ -270,7 +270,7 @@ function messageStatusLabel(msg: RecentMessage) {
           <DialogDescription>Update the event type name.</DialogDescription>
         </DialogHeader>
         <form class="space-y-4" @submit.prevent="handleUpdate">
-          <FormField label="Name" html-for="edit-et-name">
+          <FormField label="Name" html-for="edit-et-name" required>
             <Input id="edit-et-name" v-model="editName" />
           </FormField>
           <DialogFooter>
