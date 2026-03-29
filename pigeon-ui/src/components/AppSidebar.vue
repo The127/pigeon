@@ -4,6 +4,12 @@ import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, Sun, Moon, Monitor, Scro
 import { useAuth } from '@/auth'
 import { useTheme, type ThemeMode } from '@/composables/useTheme'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import PigeonLogo from '@/components/PigeonLogo.vue'
 import { Separator } from '@/components/ui/separator'
 import {
@@ -39,19 +45,8 @@ const themeOptions: { value: ThemeMode; icon: typeof Sun; label: string }[] = [
   { value: 'dark', icon: Moon, label: 'Dark' },
 ]
 
-function cycleTheme() {
-  const order: ThemeMode[] = ['auto', 'light', 'dark']
-  const next = order[(order.indexOf(mode.value) + 1) % order.length]
-  setMode(next)
-}
-
-const currentThemeIcon = () => {
-  return themeOptions.find(o => o.value === mode.value)?.icon || Monitor
-}
-
-const currentThemeLabel = () => {
-  return themeOptions.find(o => o.value === mode.value)?.label || 'System'
-}
+const currentThemeIcon = () => themeOptions.find(o => o.value === mode.value)?.icon || Monitor
+const currentThemeLabel = () => themeOptions.find(o => o.value === mode.value)?.label || 'System'
 </script>
 
 <template>
@@ -116,23 +111,37 @@ const currentThemeLabel = () => {
       <!-- Footer -->
       <div class="space-y-1 p-2">
         <!-- Theme toggle -->
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <Button
-              variant="ghost"
-              size="sm"
-              class="w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              :class="collapsed ? 'justify-center px-0' : 'justify-start'"
-              @click="cycleTheme"
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <DropdownMenuTrigger as-child>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  class="w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  :class="collapsed ? 'justify-center px-0' : 'justify-start'"
+                >
+                  <component :is="currentThemeIcon()" class="h-4 w-4 shrink-0" />
+                  <span v-show="!collapsed" class="ml-2">{{ currentThemeLabel() }}</span>
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent v-if="collapsed" side="right">
+              Theme
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent :side="collapsed ? 'right' : 'top'" align="start">
+            <DropdownMenuItem
+              v-for="opt in themeOptions"
+              :key="opt.value"
+              :class="mode === opt.value ? 'bg-accent' : ''"
+              @click="setMode(opt.value)"
             >
-              <component :is="currentThemeIcon()" class="h-4 w-4 shrink-0" />
-              <span v-show="!collapsed" class="ml-2">{{ currentThemeLabel() }}</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent v-if="collapsed" side="right">
-            Theme: {{ currentThemeLabel() }}
-          </TooltipContent>
-        </Tooltip>
+              <component :is="opt.icon" class="mr-2 h-4 w-4" />
+              {{ opt.label }}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <!-- Sign out -->
         <Tooltip>
