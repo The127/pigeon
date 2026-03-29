@@ -7,7 +7,7 @@ use axum::extract::{Request, State};
 use axum::http::StatusCode;
 use axum::middleware::Next;
 use axum::response::Response;
-use jsonwebtoken::{decode, decode_header, Algorithm, DecodingKey, Validation};
+use jsonwebtoken::{decode, decode_header, DecodingKey, Validation};
 use pigeon_domain::organization::OrganizationId;
 use tokio::sync::RwLock;
 use tracing::warn;
@@ -252,7 +252,7 @@ pub async fn auth_middleware(
         .ok_or((StatusCode::UNAUTHORIZED, "Token missing kid header"))?;
 
     // 3. Decode claims without validation to get iss and aud
-    let mut no_validate = Validation::new(Algorithm::RS256);
+    let mut no_validate = Validation::new(header.alg);
     no_validate.insecure_disable_signature_validation();
     no_validate.validate_exp = false;
     no_validate.validate_aud = false;
@@ -332,7 +332,7 @@ pub async fn auth_middleware(
     })?;
 
     // 7. Validate JWT
-    let mut validation = Validation::new(Algorithm::RS256);
+    let mut validation = Validation::new(header.alg);
     validation.set_issuer(&[issuer]);
     validation.set_audience(&[audience]);
 
@@ -424,6 +424,125 @@ mod tests {
         fn fetch_count(&self) -> usize {
             self.fetch_count.load(Ordering::SeqCst)
         }
+    }
+
+    // --- Algorithm detection tests ---
+    // These verify that auth_middleware uses the algorithm from the JWT header
+    // rather than hardcoding RS256, supporting EdDSA (Ed25519) and other algorithms.
+
+    use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+    use rsa::pkcs1::EncodeRsaPrivateKey;
+    use serde::Serialize;
+
+    #[derive(Serialize)]
+    struct TestClaims {
+        sub: String,
+        iss: String,
+        aud: Vec<String>,
+        exp: u64,
+        iat: u64,
+    }
+
+    fn test_claims() -> TestClaims {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        TestClaims {
+            sub: "test-user".into(),
+            iss: "https://auth.example.com".into(),
+            aud: vec!["pigeon-api".into()],
+            exp: now + 3600,
+            iat: now,
+        }
+    }
+
+    fn ed25519_keypair() -> (EncodingKey, DecodingKey) {
+        use ed25519_dalek::pkcs8::EncodePrivateKey;
+        let signing_key = ed25519_dalek::SigningKey::generate(&mut rand::rngs::OsRng);
+        let pkcs8_der = signing_key.to_pkcs8_der().unwrap();
+        let encoding_key = EncodingKey::from_ed_der(pkcs8_der.as_bytes());
+        let verifying_key = signing_key.verifying_key();
+        let decoding_key = DecodingKey::from_ed_der(verifying_key.as_bytes());
+        (encoding_key, decoding_key)
+    }
+
+    #[test]
+    fn unvalidated_decode_accepts_eddsa_token() {
+        let (encoding_key, _) = ed25519_keypair();
+
+        let mut header = Header::new(Algorithm::EdDSA);
+        header.kid = Some("test-key-1".into());
+
+        let token = encode(&header, &test_claims(), &encoding_key).unwrap();
+
+        // The unvalidated decode step should work (uses header.alg, not hardcoded RS256)
+        let decoded_header = decode_header(&token).unwrap();
+        assert_eq!(decoded_header.alg, Algorithm::EdDSA);
+
+        let mut no_validate = Validation::new(decoded_header.alg);
+        no_validate.insecure_disable_signature_validation();
+        no_validate.validate_exp = false;
+        no_validate.validate_aud = false;
+        no_validate.set_required_spec_claims::<String>(&[]);
+
+        let result = decode::<super::Claims>(
+            &token,
+            &DecodingKey::from_secret(b"dummy"),
+            &no_validate,
+        );
+        assert!(result.is_ok(), "EdDSA token unvalidated decode failed: {result:?}");
+
+        let claims = result.unwrap().claims;
+        assert_eq!(claims.sub, "test-user");
+        assert_eq!(claims.iss.unwrap(), "https://auth.example.com");
+    }
+
+    #[test]
+    fn unvalidated_decode_accepts_rs256_token() {
+        let rsa_key = rsa::RsaPrivateKey::new(&mut rand::rngs::OsRng, 2048).unwrap();
+        let der = rsa_key.to_pkcs1_der().unwrap();
+        let encoding_key = EncodingKey::from_rsa_der(der.as_bytes());
+
+        let mut header = Header::new(Algorithm::RS256);
+        header.kid = Some("test-key-rs".into());
+
+        let token = encode(&header, &test_claims(), &encoding_key).unwrap();
+
+        let decoded_header = decode_header(&token).unwrap();
+        assert_eq!(decoded_header.alg, Algorithm::RS256);
+
+        let mut no_validate = Validation::new(decoded_header.alg);
+        no_validate.insecure_disable_signature_validation();
+        no_validate.validate_exp = false;
+        no_validate.validate_aud = false;
+        no_validate.set_required_spec_claims::<String>(&[]);
+
+        let result = decode::<super::Claims>(
+            &token,
+            &DecodingKey::from_secret(b"dummy"),
+            &no_validate,
+        );
+        assert!(result.is_ok(), "RS256 token unvalidated decode failed: {result:?}");
+    }
+
+    #[test]
+    fn full_eddsa_validation_succeeds() {
+        let (encoding_key, decoding_key) = ed25519_keypair();
+
+        let mut header = Header::new(Algorithm::EdDSA);
+        header.kid = Some("ed-key-1".into());
+
+        let token = encode(&header, &test_claims(), &encoding_key).unwrap();
+
+        let decoded_header = decode_header(&token).unwrap();
+        let mut validation = Validation::new(decoded_header.alg);
+        validation.set_issuer(&["https://auth.example.com"]);
+        validation.set_audience(&["pigeon-api"]);
+
+        let result = decode::<super::Claims>(&token, &decoding_key, &validation);
+        assert!(result.is_ok(), "EdDSA full validation failed: {result:?}");
+        assert_eq!(result.unwrap().claims.sub, "test-user");
     }
 
     #[tokio::test]

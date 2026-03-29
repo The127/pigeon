@@ -27,3 +27,6 @@ pigeon-application = { path = "../pigeon-application", features = ["test-support
 pigeon-domain = { path = "../pigeon-domain", features = ["test-support"] }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tower = "0.5"
+ed25519-dalek = { version = "2", features = ["rand_core", "pkcs8"] }
+rsa = { version = "0.9", features = ["pkcs5"] }
+rand = "0.8"
