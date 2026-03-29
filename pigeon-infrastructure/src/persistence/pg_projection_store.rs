@@ -86,6 +86,25 @@ impl ProjectionStore for PgProjectionStore {
         Ok(())
     }
 
+    async fn add_message_attempts(
+        &self,
+        message_id: &MessageId,
+        count: u32,
+    ) -> Result<(), ApplicationError> {
+        sqlx::query(
+            "UPDATE message_delivery_status \
+             SET attempts_created = attempts_created + $2 \
+             WHERE message_id = $1",
+        )
+        .bind(message_id.as_uuid())
+        .bind(count as i32)
+        .execute(&self.pool)
+        .await
+        .map_err(|e| ApplicationError::Internal(e.to_string()))?;
+
+        Ok(())
+    }
+
     async fn increment_message_succeeded(
         &self,
         message_id: &MessageId,

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use chrono::Utc;
 use pigeon_domain::attempt::Attempt;
+use pigeon_domain::event::DomainEvent;
 use pigeon_domain::message::{Message, MessageId};
 use pigeon_domain::organization::OrganizationId;
 
@@ -109,6 +110,10 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
             );
             uow.attempt_store().insert(&attempt).await?;
         }
+        uow.emit_event(DomainEvent::MessageRetriggered {
+            message_id: message.id().clone(),
+            attempts_created: attempts_created as u32,
+        });
         uow.commit().await?;
 
         Ok(RetriggerMessageResult {

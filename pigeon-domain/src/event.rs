@@ -15,6 +15,10 @@ pub enum DomainEvent {
         event_type_id: EventTypeId,
         attempts_created: u32,
     },
+    MessageRetriggered {
+        message_id: MessageId,
+        attempts_created: u32,
+    },
     DeadLettered {
         message_id: MessageId,
         endpoint_id: EndpointId,
@@ -51,6 +55,7 @@ impl DomainEvent {
     pub fn event_type(&self) -> &'static str {
         match self {
             DomainEvent::MessageCreated { .. } => "message_created",
+            DomainEvent::MessageRetriggered { .. } => "message_retriggered",
             DomainEvent::DeadLettered { .. } => "dead_lettered",
             DomainEvent::AttemptSucceeded { .. } => "attempt_succeeded",
             DomainEvent::AttemptFailed { .. } => "attempt_failed",
@@ -70,6 +75,13 @@ impl DomainEvent {
                 "message_id": message_id.as_uuid(),
                 "app_id": app_id.as_uuid(),
                 "event_type_id": event_type_id.as_uuid(),
+                "attempts_created": attempts_created,
+            }),
+            DomainEvent::MessageRetriggered {
+                message_id,
+                attempts_created,
+            } => serde_json::json!({
+                "message_id": message_id.as_uuid(),
                 "attempts_created": attempts_created,
             }),
             DomainEvent::DeadLettered {
@@ -141,6 +153,14 @@ impl DomainEvent {
                     message_id: MessageId::from_uuid(message_id),
                     app_id: ApplicationId::from_uuid(app_id),
                     event_type_id: EventTypeId::from_uuid(event_type_id),
+                    attempts_created,
+                })
+            }
+            "message_retriggered" => {
+                let message_id = parse_uuid(payload, "message_id")?;
+                let attempts_created = payload.get("attempts_created")?.as_u64()? as u32;
+                Some(DomainEvent::MessageRetriggered {
+                    message_id: MessageId::from_uuid(message_id),
                     attempts_created,
                 })
             }
@@ -227,6 +247,17 @@ mod tests {
             app_id: ApplicationId::new(),
             event_type_id: EventTypeId::new(),
             attempts_created: 3,
+        };
+        let json = event.to_json();
+        let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();
+        assert_eq!(event, restored);
+    }
+
+    #[test]
+    fn roundtrip_message_retriggered() {
+        let event = DomainEvent::MessageRetriggered {
+            message_id: MessageId::new(),
+            attempts_created: 2,
         };
         let json = event.to_json();
         let restored = DomainEvent::from_outbox(event.event_type(), &json).unwrap();

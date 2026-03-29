@@ -77,6 +77,9 @@ impl UnitOfWork for PgUnitOfWork {
 
         for change in changes {
             match change {
+                Change::ExplicitEvent(_) => {
+                    // Handled by collect_events(), no SQL needed
+                }
                 Change::InsertApplication(app) => {
                     sqlx::query(
                         "INSERT INTO applications (id, org_id, name, uid, created_at) \
@@ -448,5 +451,12 @@ impl UnitOfWork for PgUnitOfWork {
 
     fn oidc_config_store(&mut self) -> &mut dyn OidcConfigStore {
         &mut self.oidc_config_store
+    }
+
+    fn emit_event(&mut self, event: pigeon_domain::event::DomainEvent) {
+        self.tracker
+            .lock()
+            .unwrap()
+            .record(Change::ExplicitEvent(event));
     }
 }

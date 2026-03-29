@@ -9,6 +9,7 @@ use pigeon_domain::oidc_config::{OidcConfig, OidcConfigId};
 use pigeon_domain::organization::{Organization, OrganizationId};
 
 pub(crate) enum Change {
+    ExplicitEvent(DomainEvent),
     InsertApplication(Application),
     SaveApplication(Application),
     DeleteApplication(ApplicationId),
@@ -183,6 +184,9 @@ impl ChangeTracker {
         let mut events = Vec::new();
         for change in &self.changes {
             match change {
+                Change::ExplicitEvent(event) => {
+                    events.push(event.clone());
+                }
                 Change::InsertMessage(msg) => {
                     let attempts_created = self
                         .changes

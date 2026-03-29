@@ -68,6 +68,18 @@ impl ProjectionStore for FakeProjectionStore {
         Ok(())
     }
 
+    async fn add_message_attempts(
+        &self,
+        message_id: &MessageId,
+        count: u32,
+    ) -> Result<(), ApplicationError> {
+        let mut msgs = self.data.messages.lock().unwrap();
+        if let Some(status) = msgs.get_mut(message_id) {
+            status.attempts_created += count as i32;
+        }
+        Ok(())
+    }
+
     async fn init_message_status(
         &self,
         message_id: &MessageId,

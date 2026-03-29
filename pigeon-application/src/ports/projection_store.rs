@@ -28,6 +28,13 @@ pub trait ProjectionStore: Send + Sync {
         attempts_created: u32,
     ) -> Result<(), ApplicationError>;
 
+    /// Add to the attempts_created count for a message (used by retrigger).
+    async fn add_message_attempts(
+        &self,
+        message_id: &MessageId,
+        count: u32,
+    ) -> Result<(), ApplicationError>;
+
     /// Increment the succeeded count for a message.
     async fn increment_message_succeeded(
         &self,

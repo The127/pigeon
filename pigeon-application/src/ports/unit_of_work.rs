@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use pigeon_domain::event::DomainEvent;
 
 use crate::error::ApplicationError;
 
@@ -19,6 +20,8 @@ pub trait UnitOfWork: Send {
     fn endpoint_store(&mut self) -> &mut dyn EndpointStore;
     fn organization_store(&mut self) -> &mut dyn OrganizationStore;
     fn oidc_config_store(&mut self) -> &mut dyn OidcConfigStore;
+    /// Queue a domain event to be published via the transactional outbox on commit.
+    fn emit_event(&mut self, event: DomainEvent);
 }
 
 // No #[automock] on UnitOfWorkFactory — returns Box<dyn UnitOfWork> which needs

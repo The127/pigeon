@@ -846,6 +846,10 @@ impl UnitOfWork for FakeUnitOfWork {
     fn oidc_config_store(&mut self) -> &mut dyn OidcConfigStore {
         &mut self.oidc_config_store
     }
+
+    fn emit_event(&mut self, event: pigeon_domain::event::DomainEvent) {
+        self.log.record(&format!("uow:emit_event:{}", event.event_type()));
+    }
 }
 
 // --- Fake UnitOfWorkFactory ---

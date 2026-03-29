@@ -61,6 +61,14 @@ impl EventSubscriber for DeliveryProjectionSubscriber {
                     r1
                 }
             }
+            DomainEvent::MessageRetriggered {
+                message_id,
+                attempts_created,
+            } => {
+                self.store
+                    .add_message_attempts(message_id, *attempts_created)
+                    .await
+            }
             DomainEvent::DeadLettered { message_id, .. } => {
                 self.store
                     .increment_message_dead_lettered(message_id)
