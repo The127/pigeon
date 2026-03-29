@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { LayoutGrid, LogOut, Send, PanelLeftClose, PanelLeft } from 'lucide-vue-next'
+import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft } from 'lucide-vue-next'
 import { useAuth } from '@/auth'
 import { Button } from '@/components/ui/button'
+import PigeonLogo from '@/components/PigeonLogo.vue'
 import { Separator } from '@/components/ui/separator'
 import {
   Tooltip,
@@ -42,9 +43,7 @@ const displayName = () => {
         :class="collapsed ? 'justify-center' : 'justify-between'"
       >
         <div v-if="!collapsed" class="flex items-center gap-2">
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary">
-            <Send class="h-4 w-4 text-sidebar-primary-foreground" />
-          </div>
+          <PigeonLogo size="sm" />
           <span class="text-sm font-semibold text-sidebar-foreground">Pigeon</span>
         </div>
         <Tooltip>

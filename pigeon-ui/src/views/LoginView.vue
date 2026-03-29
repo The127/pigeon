@@ -2,7 +2,8 @@
 import { useAuth } from '@/auth'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { Send, Zap, RefreshCcw, Activity, ArrowRight, Check } from 'lucide-vue-next'
+import { Zap, RefreshCcw, Activity, ArrowRight, Check } from 'lucide-vue-next'
+import PigeonLogo from '@/components/PigeonLogo.vue'
 
 const { login } = useAuth()
 
@@ -46,9 +47,7 @@ const features = [
       <!-- Content -->
       <div class="relative z-10 flex flex-1 flex-col justify-center px-12 xl:px-16">
         <div class="flex items-center gap-3 mb-8">
-          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/10 ring-1 ring-primary-foreground/20">
-            <Send class="h-5 w-5 text-primary-foreground" />
-          </div>
+          <PigeonLogo />
           <span class="font-mono text-sm font-medium tracking-widest uppercase text-primary-foreground/60">
             Pigeon
           </span>
@@ -101,9 +100,7 @@ const features = [
       <div class="w-full max-w-sm space-y-8">
         <!-- Mobile logo -->
         <div class="flex items-center gap-3 lg:hidden">
-          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
-            <Send class="h-5 w-5 text-primary-foreground" />
-          </div>
+          <PigeonLogo />
           <span class="font-mono text-sm font-medium tracking-widest uppercase text-muted-foreground">
             Pigeon
           </span>
