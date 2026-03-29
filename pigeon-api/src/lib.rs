@@ -60,6 +60,7 @@ use crate::state::AppState;
         messages::list_messages,
         messages::get_message,
         messages::list_attempts,
+        messages::retrigger_message,
         dead_letters::list_dead_letters,
         dead_letters::get_dead_letter,
         dead_letters::replay,
@@ -147,6 +148,10 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/{app_id}/messages/{msg_id}/attempts",
             get(messages::list_attempts),
+        )
+        .route(
+            "/{app_id}/messages/{id}/retrigger",
+            post(messages::retrigger_message),
         )
         .route(
             "/{app_id}/dead-letters",
@@ -273,6 +278,10 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
         .route(
             "/{app_id}/messages/{msg_id}/attempts",
             get(messages::list_attempts),
+        )
+        .route(
+            "/{app_id}/messages/{id}/retrigger",
+            post(messages::retrigger_message),
         )
         .route(
             "/{app_id}/dead-letters",

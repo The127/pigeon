@@ -10,6 +10,7 @@ pub mod delete_event_type;
 pub mod delete_oidc_config;
 pub mod delete_organization;
 pub mod replay_dead_letter;
+pub mod retrigger_message;
 pub mod retry_attempt;
 pub mod send_message;
 pub mod send_test_event;

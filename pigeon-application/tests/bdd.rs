@@ -31,9 +31,13 @@ use pigeon_application::commands::create_oidc_config::{
 use pigeon_application::commands::delete_oidc_config::{
     DeleteOidcConfig, DeleteOidcConfigHandler,
 };
+use pigeon_application::commands::retrigger_message::{
+    RetriggerMessage, RetriggerMessageHandler, RetriggerMessageResult,
+};
 use pigeon_application::commands::send_message::{
     SendMessage, SendMessageHandler, SendMessageResult,
 };
+use pigeon_application::ports::stores::MockMessageReadStore;
 use pigeon_application::commands::update_application::{
     UpdateApplication, UpdateApplicationHandler,
 };
@@ -130,6 +134,9 @@ pub struct AppWorld {
     org_data: Option<SharedOrganizationData>,
     update_org_result: Option<Result<Organization, ApplicationError>>,
     delete_org_result: Option<Result<(), ApplicationError>>,
+
+    // Retrigger Message
+    retrigger_result: Option<Result<RetriggerMessageResult, ApplicationError>>,
 
     // OIDC Config
     create_oidc_config_result: Option<Result<OidcConfig, ApplicationError>>,
@@ -1747,6 +1754,159 @@ async fn when_delete_nonexistent_oidc_config(world: &mut AppWorld) {
 #[then("the deletion should fail with a not found error")]
 async fn then_oidc_deletion_not_found(world: &mut AppWorld) {
     let result = world.delete_oidc_config_result.as_ref().unwrap();
+    assert!(
+        matches!(result, Err(ApplicationError::NotFound)),
+        "expected NotFound error, got: {:?}",
+        result
+    );
+}
+
+// ===== Retrigger Message steps =====
+
+#[given("a message exists with a matching enabled endpoint")]
+async fn given_message_with_matching_endpoint(world: &mut AppWorld) {
+    let log = OperationLog::new();
+    let app_id = ApplicationId::new();
+    let event_type_id = EventTypeId::new();
+    let org_id = OrganizationId::new();
+
+    let msg = Message::new(
+        app_id.clone(),
+        event_type_id.clone(),
+        serde_json::json!({"test": true}),
+        Some("retrigger-key".into()),
+        chrono::Duration::hours(24),
+    )
+    .unwrap();
+
+    let ep = Endpoint::new(
+        app_id.clone(),
+        "https://ep.com/hook".into(),
+        "whsec_test".into(),
+        vec![event_type_id.clone()],
+    )
+    .unwrap();
+
+    world.org_id = Some(org_id);
+    world.app_id = Some(app_id);
+    world.event_type_id = Some(event_type_id);
+    world.endpoints = Some(vec![ep]);
+    world.msg_data = Some(SharedMessageData::default());
+    world.msg_data.as_ref().unwrap().messages.lock().unwrap().push(msg);
+    world.log = Some(log);
+}
+
+#[given("a message exists with no matching endpoints")]
+async fn given_message_with_no_matching_endpoints(world: &mut AppWorld) {
+    let log = OperationLog::new();
+    let app_id = ApplicationId::new();
+    let event_type_id = EventTypeId::new();
+    let org_id = OrganizationId::new();
+
+    let msg = Message::new(
+        app_id.clone(),
+        event_type_id.clone(),
+        serde_json::json!({"test": true}),
+        None,
+        chrono::Duration::hours(24),
+    )
+    .unwrap();
+
+    world.org_id = Some(org_id);
+    world.app_id = Some(app_id);
+    world.event_type_id = Some(event_type_id);
+    world.endpoints = Some(vec![]);
+    world.msg_data = Some(SharedMessageData::default());
+    world.msg_data.as_ref().unwrap().messages.lock().unwrap().push(msg);
+    world.log = Some(log);
+}
+
+#[when("the retrigger message command is executed")]
+async fn when_retrigger_executed(world: &mut AppWorld) {
+    let log = world.log.as_ref().unwrap().clone();
+    let org_id = world.org_id.as_ref().unwrap().clone();
+    let endpoints = world.endpoints.take().unwrap_or_default();
+    let messages = world.msg_data.as_ref().unwrap().messages.lock().unwrap().clone();
+    let message_id = messages.first().unwrap().id().clone();
+
+    let mut mock_msg_store = MockMessageReadStore::new();
+    let msg_clone = messages.first().unwrap().clone();
+    mock_msg_store
+        .expect_find_by_id()
+        .returning(move |_, _| Ok(Some(msg_clone.clone())));
+
+    let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), endpoints));
+    let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
+
+    let handler = RetriggerMessageHandler::new(
+        factory,
+        Arc::new(mock_msg_store),
+        endpoint_store,
+    );
+
+    world.retrigger_result = Some(
+        handler
+            .handle(RetriggerMessage { message_id, org_id })
+            .await,
+    );
+}
+
+#[when("a non-existent message is retriggered")]
+async fn when_retrigger_nonexistent(world: &mut AppWorld) {
+    let log = OperationLog::new();
+
+    let mut mock_msg_store = MockMessageReadStore::new();
+    mock_msg_store
+        .expect_find_by_id()
+        .returning(|_, _| Ok(None));
+
+    let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), vec![]));
+    let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
+
+    let handler = RetriggerMessageHandler::new(
+        factory,
+        Arc::new(mock_msg_store),
+        endpoint_store,
+    );
+
+    world.retrigger_result = Some(
+        handler
+            .handle(RetriggerMessage {
+                message_id: pigeon_domain::message::MessageId::new(),
+                org_id: OrganizationId::new(),
+            })
+            .await,
+    );
+    world.log = Some(log);
+}
+
+#[then("new delivery attempts should be created")]
+async fn then_retrigger_attempts_created(world: &mut AppWorld) {
+    let result = world.retrigger_result.as_ref().unwrap();
+    assert!(result.is_ok(), "expected Ok, got: {:?}", result);
+    assert!(result.as_ref().unwrap().attempts_created > 0);
+}
+
+#[then("the attempt count should match the number of matching endpoints")]
+async fn then_retrigger_attempt_count_matches(world: &mut AppWorld) {
+    let result = world.retrigger_result.as_ref().unwrap().as_ref().unwrap();
+    // We set up 1 endpoint in the "matching" scenario
+    assert_eq!(result.attempts_created, 1);
+}
+
+#[then("the retrigger should fail with a validation error")]
+async fn then_retrigger_validation_error(world: &mut AppWorld) {
+    let result = world.retrigger_result.as_ref().unwrap();
+    assert!(
+        matches!(result, Err(ApplicationError::Validation(_))),
+        "expected Validation error, got: {:?}",
+        result
+    );
+}
+
+#[then("the retrigger should fail with a not found error")]
+async fn then_retrigger_not_found(world: &mut AppWorld) {
+    let result = world.retrigger_result.as_ref().unwrap();
     assert!(
         matches!(result, Err(ApplicationError::NotFound)),
         "expected NotFound error, got: {:?}",

@@ -22,6 +22,7 @@ use pigeon_application::commands::delete_event_type::DeleteEventTypeHandler;
 use pigeon_application::commands::delete_oidc_config::DeleteOidcConfigHandler;
 use pigeon_application::commands::delete_organization::DeleteOrganizationHandler;
 use pigeon_application::commands::replay_dead_letter::ReplayDeadLetterHandler;
+use pigeon_application::commands::retrigger_message::RetriggerMessageHandler;
 use pigeon_application::commands::retry_attempt::RetryAttemptHandler;
 use pigeon_application::commands::send_message::SendMessageHandler;
 use pigeon_application::commands::send_test_event::SendTestEventHandler;
@@ -327,7 +328,7 @@ async fn run_api(
         update_endpoint: Arc::new(UpdateEndpointHandler::new(uow_factory.clone())),
         delete_endpoint: Arc::new(DeleteEndpointHandler::new(uow_factory.clone())),
         get_endpoint: Arc::new(GetEndpointByIdHandler::new(endpoint_read_store.clone())),
-        list_endpoints: Arc::new(ListEndpointsByAppHandler::new(endpoint_read_store)),
+        list_endpoints: Arc::new(ListEndpointsByAppHandler::new(endpoint_read_store.clone())),
         create_organization: Arc::new(CreateOrganizationHandler::new(uow_factory.clone())),
         update_organization: Arc::new(UpdateOrganizationHandler::new(uow_factory.clone())),
         delete_organization: Arc::new(DeleteOrganizationHandler::new(uow_factory.clone())),
@@ -349,12 +350,13 @@ async fn run_api(
         jwks_provider: Arc::new(CachedJwksProvider::new(jwks_cache_ttl)),
         get_app_stats: Arc::new(GetAppStatsHandler::new(stats_read_store)),
         get_message: Arc::new(GetMessageByIdHandler::new(message_read_store.clone())),
-        list_messages: Arc::new(ListMessagesByAppHandler::new(message_read_store)),
+        list_messages: Arc::new(ListMessagesByAppHandler::new(message_read_store.clone())),
         list_attempts: Arc::new(ListAttemptsByMessageHandler::new(attempt_read_store)),
         get_dead_letter: Arc::new(GetDeadLetterByIdHandler::new(dead_letter_read_store.clone())),
         list_dead_letters: Arc::new(ListDeadLettersByAppHandler::new(dead_letter_read_store)),
         replay_dead_letter: Arc::new(ReplayDeadLetterHandler::new(uow_factory.clone())),
         retry_attempt: Arc::new(RetryAttemptHandler::new(uow_factory.clone())),
+        retrigger_message: Arc::new(RetriggerMessageHandler::new(uow_factory.clone(), message_read_store.clone(), endpoint_read_store)),
         send_test_event: Arc::new(SendTestEventHandler::new(
             uow_factory.clone(),
             event_type_read_store.clone(),

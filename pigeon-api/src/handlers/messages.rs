@@ -4,6 +4,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use uuid::Uuid;
 
+use pigeon_application::commands::retrigger_message::RetriggerMessage;
 use pigeon_application::commands::send_message::SendMessage;
 use pigeon_application::queries::get_message_by_id::GetMessageById;
 use pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage;
@@ -180,6 +181,46 @@ pub async fn list_attempts(
         .map_err(ApiError)?;
 
     let response: Vec<AttemptResponse> = attempts.into_iter().map(AttemptResponse::from).collect();
+    Ok(Json(response))
+}
+
+/// Retrigger a message, creating new delivery attempts for currently matching endpoints
+#[utoipa::path(
+    post,
+    path = "/api/v1/applications/{app_id}/messages/{id}/retrigger",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("id" = Uuid, Path, description = "Message ID"),
+    ),
+    responses(
+        (status = 200, description = "Message retriggered", body = SendMessageResponse),
+        (status = 404, description = "Message not found", body = ErrorBody),
+        (status = 400, description = "No matching endpoints", body = ErrorBody),
+    ),
+    tag = "messages"
+)]
+pub async fn retrigger_message(
+    State(state): State<AppState>,
+    OrgId(org_id): OrgId,
+    Path((app_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let app_id = ApplicationId::from_uuid(app_id);
+    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+
+    let result = state
+        .retrigger_message
+        .handle(RetriggerMessage {
+            message_id: MessageId::from_uuid(id),
+            org_id,
+        })
+        .await
+        .map_err(ApiError)?;
+
+    let response = serde_json::json!({
+        "message_id": result.message.id().as_uuid(),
+        "attempts_created": result.attempts_created,
+    });
+
     Ok(Json(response))
 }
 
@@ -490,6 +531,7 @@ mod tests {
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),
+            retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,

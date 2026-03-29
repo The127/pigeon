@@ -5,6 +5,7 @@ use axum::response::Response;
 use pigeon_application::commands::create_oidc_config::CreateOidcConfig;
 use pigeon_application::commands::delete_oidc_config::DeleteOidcConfig;
 use pigeon_application::commands::replay_dead_letter::ReplayDeadLetter;
+use pigeon_application::commands::retrigger_message::RetriggerMessage;
 use pigeon_application::commands::retry_attempt::RetryAttempt;
 use pigeon_application::commands::send_test_event::{SendTestEvent, SendTestEventResult};
 use pigeon_application::error::ApplicationError;
@@ -312,6 +313,14 @@ pub(crate) struct StubRetryAttemptHandler;
 #[async_trait]
 impl CommandHandler<RetryAttempt> for StubRetryAttemptHandler {
     async fn handle(&self, _c: RetryAttempt) -> Result<Attempt, ApplicationError> {
+        Err(ApplicationError::Internal("stub".into()))
+    }
+}
+
+pub(crate) struct StubRetriggerMessageHandler;
+#[async_trait]
+impl CommandHandler<RetriggerMessage> for StubRetriggerMessageHandler {
+    async fn handle(&self, _c: RetriggerMessage) -> Result<pigeon_application::commands::retrigger_message::RetriggerMessageResult, ApplicationError> {
         Err(ApplicationError::Internal("stub".into()))
     }
 }
