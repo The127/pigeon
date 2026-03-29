@@ -41,7 +41,11 @@ const features = [
     <!-- Left: Hero panel -->
     <div class="relative hidden overflow-hidden bg-primary lg:flex lg:flex-col lg:justify-between">
       <!-- Animated background -->
-      <div class="login-bg absolute inset-0" />
+      <div class="absolute inset-0 overflow-hidden">
+        <div class="login-orb login-orb-1" />
+        <div class="login-orb login-orb-2" />
+        <div class="login-orb login-orb-3" />
+      </div>
 
       <!-- Content -->
       <div class="relative z-10 flex flex-1 flex-col justify-center px-12 xl:px-16">
@@ -173,32 +177,51 @@ const features = [
   }
 }
 
-.login-bg {
-  background:
-    radial-gradient(
-      ellipse 80% 50% at 20% 40%,
-      rgba(255, 255, 255, 0.04) 0%,
-      transparent 70%
-    ),
-    radial-gradient(
-      ellipse 60% 40% at 80% 70%,
-      rgba(255, 255, 255, 0.03) 0%,
-      transparent 60%
-    );
-  animation: bg-drift 20s ease-in-out infinite alternate;
+.login-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
 }
 
-@keyframes bg-drift {
-  0% {
-    background-position: 0% 0%, 100% 100%;
-    opacity: 0.6;
-  }
-  50% {
-    opacity: 1;
-  }
-  100% {
-    background-position: 30% 60%, 70% 30%;
-    opacity: 0.6;
-  }
+.login-orb-1 {
+  width: 500px;
+  height: 500px;
+  top: -10%;
+  left: -10%;
+  background: rgba(255, 255, 255, 0.04);
+  animation: orb-drift-1 25s ease-in-out infinite alternate;
+}
+
+.login-orb-2 {
+  width: 400px;
+  height: 400px;
+  bottom: -5%;
+  right: -5%;
+  background: rgba(255, 255, 255, 0.03);
+  animation: orb-drift-2 20s ease-in-out infinite alternate;
+}
+
+.login-orb-3 {
+  width: 300px;
+  height: 300px;
+  top: 40%;
+  left: 30%;
+  background: rgba(255, 255, 255, 0.02);
+  animation: orb-drift-3 30s ease-in-out infinite alternate;
+}
+
+@keyframes orb-drift-1 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(15%, 20%); }
+}
+
+@keyframes orb-drift-2 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-20%, -15%); }
+}
+
+@keyframes orb-drift-3 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(10%, -25%); }
 }
 </style>
