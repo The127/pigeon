@@ -1,7 +1,17 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { LayoutGrid, LogOut, Send } from 'lucide-vue-next'
+import { LayoutGrid, LogOut, Send, PanelLeftClose, PanelLeft } from 'lucide-vue-next'
 import { useAuth } from '@/auth'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+
+const collapsed = defineModel<boolean>('collapsed', { default: false })
 
 const route = useRoute()
 const { user, logout } = useAuth()
@@ -13,41 +23,94 @@ const nav = [
 function isActive(path: string) {
   return route.path.startsWith(path)
 }
+
+const displayName = () => {
+  if (!user.value) return 'Sign out'
+  return user.value.profile.email || user.value.profile.name || 'Sign out'
+}
 </script>
 
 <template>
-  <aside class="flex h-screen w-56 flex-col border-r border-sidebar-border bg-sidebar">
-    <div class="flex h-14 items-center gap-2 border-b border-sidebar-border px-4">
-      <Send class="h-5 w-5 text-sidebar-primary" />
-      <span class="text-sm font-semibold text-sidebar-foreground">Pigeon</span>
-    </div>
-
-    <nav class="flex-1 space-y-1 p-2">
-      <RouterLink
-        v-for="item in nav"
-        :key="item.to"
-        :to="item.to"
-        class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
-        :class="
-          isActive(item.to)
-            ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-            : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-        "
+  <TooltipProvider :delay-duration="0">
+    <aside
+      class="flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-200"
+      :class="collapsed ? 'w-16' : 'w-56'"
+    >
+      <!-- Header -->
+      <div
+        class="flex h-14 items-center border-b border-sidebar-border px-3"
+        :class="collapsed ? 'justify-center' : 'justify-between'"
       >
-        <component :is="item.icon" class="h-4 w-4" />
-        {{ item.name }}
-      </RouterLink>
-    </nav>
+        <div v-if="!collapsed" class="flex items-center gap-2">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sidebar-primary">
+            <Send class="h-4 w-4 text-sidebar-primary-foreground" />
+          </div>
+          <span class="text-sm font-semibold text-sidebar-foreground">Pigeon</span>
+        </div>
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="h-8 w-8 shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              @click="collapsed = !collapsed"
+            >
+              <PanelLeftClose v-if="!collapsed" class="h-4 w-4" />
+              <PanelLeft v-else class="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="right">
+            {{ collapsed ? 'Expand' : 'Collapse' }} sidebar
+          </TooltipContent>
+        </Tooltip>
+      </div>
 
-    <div class="border-t border-sidebar-border p-2">
-      <button
-        class="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent"
-        @click="logout"
-      >
-        <LogOut class="h-4 w-4" />
-        <span v-if="user">{{ user.profile.email || user.profile.name || 'Sign out' }}</span>
-        <span v-else>Sign out</span>
-      </button>
-    </div>
-  </aside>
+      <!-- Nav -->
+      <nav class="flex-1 space-y-1 p-2">
+        <Tooltip v-for="item in nav" :key="item.to">
+          <TooltipTrigger as-child>
+            <RouterLink
+              :to="item.to"
+              class="flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors"
+              :class="[
+                isActive(item.to)
+                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                  : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                collapsed ? 'justify-center px-0' : '',
+              ]"
+            >
+              <component :is="item.icon" class="h-4 w-4 shrink-0" />
+              <span v-show="!collapsed">{{ item.name }}</span>
+            </RouterLink>
+          </TooltipTrigger>
+          <TooltipContent v-if="collapsed" side="right">
+            {{ item.name }}
+          </TooltipContent>
+        </Tooltip>
+      </nav>
+
+      <Separator class="bg-sidebar-border" />
+
+      <!-- Footer -->
+      <div class="p-2">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button
+              variant="ghost"
+              size="sm"
+              class="w-full text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              :class="collapsed ? 'justify-center px-0' : 'justify-start'"
+              @click="logout"
+            >
+              <LogOut class="h-4 w-4 shrink-0" />
+              <span v-show="!collapsed" class="ml-2 truncate">{{ displayName() }}</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent v-if="collapsed" side="right">
+            {{ displayName() }}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+    </aside>
+  </TooltipProvider>
 </template>

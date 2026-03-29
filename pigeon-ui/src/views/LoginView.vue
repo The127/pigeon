@@ -1,20 +1,166 @@
 <script setup lang="ts">
 import { useAuth } from '@/auth'
+import { Button } from '@/components/ui/button'
+import { Separator } from '@/components/ui/separator'
+import { Send, Zap, RefreshCcw, Activity, ArrowRight, Check } from 'lucide-vue-next'
 
 const { login } = useAuth()
+
+const features = [
+  { icon: Zap, title: 'Fan-out delivery', desc: 'One message, every subscribed endpoint' },
+  { icon: RefreshCcw, title: 'Automatic retries', desc: 'Exponential backoff with dead letter queue' },
+  { icon: Activity, title: 'Observability', desc: 'Per-endpoint stats and delivery tracking' },
+]
 </script>
 
 <template>
-  <div class="flex min-h-screen items-center justify-center">
-    <div class="w-full max-w-sm space-y-6 text-center">
-      <h1 class="text-2xl font-semibold tracking-tight">Pigeon</h1>
-      <p class="text-sm text-muted-foreground">Sign in to manage your webhooks</p>
-      <button
-        class="inline-flex h-10 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow hover:bg-primary/90"
-        @click="login"
-      >
-        Sign in with SSO
-      </button>
+  <div class="grid min-h-screen lg:grid-cols-2">
+    <!-- Left: Hero panel -->
+    <div class="relative hidden overflow-hidden bg-primary lg:flex lg:flex-col lg:justify-between">
+      <!-- Animated delivery lines -->
+      <div class="absolute inset-0 overflow-hidden opacity-[0.07]">
+        <svg class="h-full w-full" xmlns="http://www.w3.org/2000/svg">
+          <line
+            v-for="i in 12"
+            :key="i"
+            :x1="60 + (i % 3) * 30 + '%'"
+            y1="0%"
+            :x2="10 + (i % 4) * 20 + '%'"
+            y2="100%"
+            stroke="currentColor"
+            stroke-width="1"
+            class="text-primary-foreground"
+          >
+            <animate
+              attributeName="stroke-dashoffset"
+              :from="800 + i * 40"
+              to="0"
+              :dur="3 + (i % 3) * 0.7 + 's'"
+              repeatCount="indefinite"
+            />
+            <set attributeName="stroke-dasharray" to="4 12" />
+          </line>
+        </svg>
+      </div>
+
+      <!-- Content -->
+      <div class="relative z-10 flex flex-1 flex-col justify-center px-12 xl:px-16">
+        <div class="flex items-center gap-3 mb-8">
+          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-foreground/10 ring-1 ring-primary-foreground/20">
+            <Send class="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span class="font-mono text-sm font-medium tracking-widest uppercase text-primary-foreground/60">
+            Pigeon
+          </span>
+        </div>
+
+        <h1 class="text-4xl font-bold tracking-tight text-primary-foreground xl:text-5xl" style="line-height: 1.1;">
+          Webhook delivery<br />you don't worry about.
+        </h1>
+
+        <p class="mt-4 max-w-md text-base text-primary-foreground/60 leading-relaxed">
+          Self-hosted infrastructure for reliable, observable webhook dispatch.
+          Send once, deliver everywhere.
+        </p>
+
+        <Separator class="my-8 bg-primary-foreground/10" />
+
+        <div class="space-y-5">
+          <div
+            v-for="(feature, i) in features"
+            :key="i"
+            class="flex items-start gap-3 login-feature"
+            :style="{ animationDelay: `${0.8 + i * 0.15}s` }"
+          >
+            <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-foreground/10">
+              <component :is="feature.icon" class="h-3.5 w-3.5 text-primary-foreground/80" />
+            </div>
+            <div>
+              <p class="text-sm font-medium text-primary-foreground">{{ feature.title }}</p>
+              <p class="text-sm text-primary-foreground/50">{{ feature.desc }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bottom status bar -->
+      <div class="relative z-10 border-t border-primary-foreground/10 px-12 py-4 xl:px-16">
+        <div class="flex items-center gap-6 font-mono text-xs text-primary-foreground/40">
+          <span class="flex items-center gap-1.5">
+            <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            All systems operational
+          </span>
+          <span>HMAC-SHA256</span>
+          <span>Exponential backoff</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right: Sign-in -->
+    <div class="flex flex-col items-center justify-center px-6 py-12">
+      <div class="w-full max-w-sm space-y-8">
+        <!-- Mobile logo -->
+        <div class="flex items-center gap-3 lg:hidden">
+          <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+            <Send class="h-5 w-5 text-primary-foreground" />
+          </div>
+          <span class="font-mono text-sm font-medium tracking-widest uppercase text-muted-foreground">
+            Pigeon
+          </span>
+        </div>
+
+        <div>
+          <h2 class="text-2xl font-semibold tracking-tight">Welcome back</h2>
+          <p class="mt-1 text-sm text-muted-foreground">
+            Sign in to your account to manage applications, endpoints, and deliveries.
+          </p>
+        </div>
+
+        <Button class="w-full" size="lg" @click="login">
+          Continue with SSO
+          <ArrowRight class="ml-2 h-4 w-4" />
+        </Button>
+
+        <div class="space-y-3 rounded-lg border border-border/60 bg-muted/30 p-4">
+          <p class="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+            What you can do
+          </p>
+          <div
+            v-for="item in [
+              'Create applications & event types',
+              'Configure endpoints with filtering',
+              'Monitor delivery attempts in real-time',
+              'Replay failed messages from dead letter queue',
+            ]"
+            :key="item"
+            class="flex items-center gap-2 text-sm text-muted-foreground"
+          >
+            <Check class="h-3.5 w-3.5 shrink-0 text-foreground/40" />
+            {{ item }}
+          </div>
+        </div>
+
+        <p class="text-center text-xs text-muted-foreground/60">
+          Authentication is handled by your organization's identity provider.
+        </p>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.login-feature {
+  animation: feature-in 0.5s ease-out both;
+}
+
+@keyframes feature-in {
+  from {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+</style>
