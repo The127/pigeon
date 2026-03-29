@@ -122,10 +122,10 @@ No mechanism to rotate an endpoint's `signing_secret` without breaking in-flight
 ### External Event Bus Integration
 Swap outbox handler to push events to Kafka/NATS/SQS instead of (or in addition to) logging. Enables downstream systems to react to Pigeon events.
 
-## Priority: Low
+### ~~Audit Log~~
+Every command goes through `dispatch()` which records an audit entry (command name, actor, org_id, success/failure, error message). `PgAuditStore` writes to `audit_log` table. Read API: `GET /api/v1/audit-log` with pagination. UI page at `/audit-log` with table, pagination, human-readable command names, and success/failure badges.
 
-### Audit Log Postgres Implementation
-`AuditStore` and `AuditBehavior` ports exist in the application layer. Needs a `PgAuditStore` adapter, `audit_log` migration, and wiring into the mediator pipeline. Could be replaced by domain events + outbox projection.
+## Priority: Low
 
 ### Config Crate
 Currently raw `std::env::var` calls in `PigeonConfig`. Could use `config-rs` or `envy` for typed config with layered sources (env, file, defaults).
