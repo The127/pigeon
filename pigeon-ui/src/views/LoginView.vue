@@ -141,7 +141,7 @@ const features = [
           <div
             v-for="item in [
               'Create applications & event types',
-              'Configure endpoints with filtering',
+              'Subscribe endpoints to specific event types',
               'Monitor delivery attempts in real-time',
               'Replay failed messages from dead letter queue',
             ]"
