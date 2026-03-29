@@ -659,20 +659,9 @@ const replayDl = useReplayDeadLetter(appId)
                   <TableCell :colspan="5" class="p-0">
                     <div class="px-6 py-4 space-y-3">
                       <LoadingState v-if="attLoading" message="Loading attempts..." />
-                      <template v-else-if="!attemptsData?.length">
-                        <p class="text-sm text-muted-foreground">
-                          No delivery attempts — no endpoints matched this event type when the message was sent.
-                        </p>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          :disabled="retriggerMsg.isPending.value"
-                          @click.stop="retriggerMsg.mutate(msg.id)"
-                        >
-                          <RotateCcw class="mr-2 h-4 w-4" />
-                          {{ retriggerMsg.isPending.value ? 'Retriggering...' : 'Retrigger delivery' }}
-                        </Button>
-                      </template>
+                      <p v-else-if="!attemptsData?.length" class="text-sm text-muted-foreground">
+                        No delivery attempts — no endpoints matched this event type when the message was sent.
+                      </p>
                       <Table v-else>
                         <TableHeader>
                           <TableRow>
