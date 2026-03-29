@@ -103,6 +103,13 @@ Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurab
 
 ## Priority: Medium
 
+### Search & Filtering
+- Application list: search by name/UID
+- Messages list: filter by event type, status (delivered/pending/failed/dead lettered), date range
+- Dead letters list: filter by endpoint, replayed/unreplayed
+- Endpoints list: filter by enabled/disabled
+- Pagination controls on all lists (currently hardcoded limit=100)
+
 ### Frontend: Polish
 - Dark mode toggle
 - Mobile responsive sidebar (sheet overlay on small screens)
