@@ -18,13 +18,12 @@ const maxValue = computed(() => {
   return Math.max(...props.data.map(b => b.succeeded + b.failed), 1)
 })
 
-// Cap bar width: flex-1 but max 40px. For few buckets, use fixed width.
-const barStyle = computed(() => {
-  const count = props.data.length
-  if (count <= 3) return { width: '40px', flex: 'none' }
-  if (count <= 12) return { maxWidth: '40px', flex: '1' }
-  return { minWidth: '4px', flex: '1' }
-})
+function barHeight(value: number) {
+  if (value === 0) return '0%'
+  // Minimum visible height of 4px, otherwise scale to percentage of max
+  const pct = (value / maxValue.value) * 100
+  return `max(4px, ${pct}%)`
+}
 
 function defaultLabel(bucket: string) {
   const d = new Date(bucket)
@@ -47,32 +46,26 @@ const label = computed(() => props.bucketLabel || defaultLabel)
       No delivery data for this period.
     </div>
 
-    <div v-else class="flex h-40 items-end justify-center gap-1">
+    <div v-else class="flex h-40 items-end gap-px">
       <TooltipProvider :delay-duration="0">
         <Tooltip v-for="(bucket, i) in data" :key="i">
           <TooltipTrigger as-child>
             <div
-              class="relative flex flex-col items-stretch justify-end"
-              :style="barStyle"
+              class="relative flex flex-1 flex-col items-stretch justify-end"
+              :style="{ minWidth: '4px' }"
             >
               <!-- Failed portion (stacked on top) -->
               <div
                 v-if="bucket.failed > 0"
                 class="w-full rounded-t-sm bg-destructive/70"
-                :style="{
-                  height: `${(bucket.failed / maxValue) * 100}%`,
-                  minHeight: '2px',
-                }"
+                :style="{ height: barHeight(bucket.failed) }"
               />
               <!-- Succeeded portion -->
               <div
                 v-if="bucket.succeeded > 0"
                 class="w-full bg-emerald-500"
                 :class="bucket.failed > 0 ? '' : 'rounded-t-sm'"
-                :style="{
-                  height: `${(bucket.succeeded / maxValue) * 100}%`,
-                  minHeight: '2px',
-                }"
+                :style="{ height: barHeight(bucket.succeeded) }"
               />
               <!-- Empty bar if no data -->
               <div
