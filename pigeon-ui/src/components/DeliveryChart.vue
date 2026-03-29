@@ -18,10 +18,13 @@ const maxValue = computed(() => {
   return Math.max(...props.data.map(b => b.succeeded + b.failed), 1)
 })
 
+const chartHeightPx = 160 // matches h-40
+
 function barHeight(value: number) {
-  if (value === 0) return '0%'
-  const pct = (value / maxValue.value) * 100
-  return `${Math.max(2, pct)}%`
+  if (value === 0) return '0px'
+  const pct = value / maxValue.value
+  const px = Math.max(4, Math.round(pct * chartHeightPx))
+  return `${px}px`
 }
 
 function defaultLabel(bucket: string) {
