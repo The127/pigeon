@@ -72,7 +72,7 @@ impl DeadLetterStore for PgDeadLetterStore {
             "SELECT dl.id, dl.message_id, dl.endpoint_id, dl.app_id, \
              dl.last_response_code, dl.last_response_body, \
              dl.dead_lettered_at, dl.replayed_at, \
-             xmin::text::bigint AS version \
+             dl.xmin::text::bigint AS version \
              FROM dead_letters dl \
              JOIN applications a ON a.id = dl.app_id \
              WHERE dl.id = $1 AND a.org_id = $2",
