@@ -211,9 +211,15 @@ function messageStatusLabel(msg: RecentMessage) {
           No endpoints subscribe to this event type.
         </div>
         <div v-else class="flex flex-wrap gap-2">
-          <Badge v-for="ep in subscribedEndpoints" :key="ep.id" variant="outline">
-            {{ ep.name }}
-          </Badge>
+          <RouterLink
+            v-for="ep in subscribedEndpoints"
+            :key="ep.id"
+            :to="`/apps/${appId}/endpoints/${ep.id}`"
+          >
+            <Badge variant="outline" class="hover:bg-accent transition-colors">
+              {{ ep.name }}
+            </Badge>
+          </RouterLink>
         </div>
       </div>
 
