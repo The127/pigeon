@@ -239,8 +239,9 @@ function endpointLabel(epId: string) {
 
 function messageStatus(msg: { attempts_created: number; succeeded: number; failed: number; dead_lettered: number }) {
   if (msg.attempts_created === 0) return { label: 'No endpoints', variant: 'outline' as const }
-  if (msg.dead_lettered > 0) return { label: 'Dead lettered', variant: 'destructive' as const }
   if (msg.succeeded >= msg.attempts_created) return { label: 'Delivered', variant: 'default' as const }
+  if (msg.dead_lettered > 0 && msg.succeeded === 0) return { label: 'Dead lettered', variant: 'destructive' as const }
+  if (msg.dead_lettered > 0) return { label: 'Partial', variant: 'secondary' as const }
   if (msg.failed > 0 && msg.succeeded === 0) return { label: 'Failed', variant: 'destructive' as const }
   if (msg.failed > 0) return { label: 'Partial', variant: 'secondary' as const }
   if (msg.succeeded > 0) return { label: 'Delivering', variant: 'secondary' as const }

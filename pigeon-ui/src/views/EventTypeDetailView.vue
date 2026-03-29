@@ -106,8 +106,10 @@ function handleDelete() {
 
 function messageStatusLabel(msg: RecentMessage) {
   if (msg.attempts_created === 0) return { label: 'No endpoints', variant: 'outline' as const }
-  if (msg.dead_lettered > 0) return { label: 'Dead lettered', variant: 'destructive' as const }
   if (msg.succeeded >= msg.attempts_created) return { label: 'Delivered', variant: 'default' as const }
+  if (msg.dead_lettered > 0 && msg.succeeded === 0) return { label: 'Dead lettered', variant: 'destructive' as const }
+  if (msg.dead_lettered > 0) return { label: 'Partial', variant: 'secondary' as const }
+  if (msg.failed > 0 && msg.succeeded === 0) return { label: 'Failed', variant: 'destructive' as const }
   if (msg.failed > 0) return { label: 'Partial', variant: 'secondary' as const }
   if (msg.succeeded > 0) return { label: 'Delivering', variant: 'secondary' as const }
   return { label: 'Pending', variant: 'secondary' as const }
