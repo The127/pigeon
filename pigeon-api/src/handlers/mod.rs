@@ -9,6 +9,7 @@ pub mod messages;
 pub mod metrics;
 pub(crate) mod oidc_configs;
 pub mod organizations;
+pub mod stats;
 pub mod test_event;
 
 use pigeon_application::error::ApplicationError;

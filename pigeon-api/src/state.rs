@@ -31,6 +31,7 @@ use pigeon_application::queries::list_applications::ListApplications;
 use pigeon_application::queries::list_endpoints_by_app::ListEndpointsByApp;
 use pigeon_application::queries::list_event_types_by_app::ListEventTypesByApp;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrg;
+use pigeon_application::queries::get_app_stats::GetAppStats;
 use pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById;
 use pigeon_application::queries::get_message_by_id::GetMessageById;
 use pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage;
@@ -58,6 +59,7 @@ pub struct AppState {
     pub delete_endpoint: Arc<dyn CommandHandler<DeleteEndpoint>>,
     pub get_endpoint: Arc<dyn QueryHandler<GetEndpointById>>,
     pub list_endpoints: Arc<dyn QueryHandler<ListEndpointsByApp>>,
+    pub get_app_stats: Arc<dyn QueryHandler<GetAppStats>>,
     pub get_message: Arc<dyn QueryHandler<GetMessageById>>,
     pub list_messages: Arc<dyn QueryHandler<ListMessagesByApp>>,
     pub list_attempts: Arc<dyn QueryHandler<ListAttemptsByMessage>>,

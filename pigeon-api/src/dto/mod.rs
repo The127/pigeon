@@ -7,3 +7,4 @@ pub mod message;
 pub mod oidc_config;
 pub mod organization;
 pub mod pagination;
+pub mod stats;

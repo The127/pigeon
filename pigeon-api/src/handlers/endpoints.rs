@@ -527,6 +527,7 @@ mod tests {
             delete_endpoint: Arc::new(delete),
             get_endpoint: Arc::new(get),
             list_endpoints: Arc::new(list),
+            get_app_stats: Arc::new(StubGetAppStatsHandler),
             get_message: Arc::new(StubGetMessageHandler),
             list_messages: Arc::new(StubListMessagesHandler),
             list_attempts: Arc::new(StubListAttemptsHandler),

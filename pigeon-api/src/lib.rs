@@ -35,7 +35,7 @@ use crate::dto::organization::{
 };
 use crate::dto::pagination::PaginatedResponse;
 use crate::error::ErrorBody;
-use crate::handlers::{applications, endpoints, event_types, health, messages, oidc_configs, organizations};
+use crate::handlers::{applications, endpoints, event_types, health, messages, oidc_configs, organizations, stats};
 use crate::state::AppState;
 
 #[derive(OpenApi)]
@@ -63,6 +63,7 @@ use crate::state::AppState;
         dead_letters::list_dead_letters,
         dead_letters::get_dead_letter,
         dead_letters::replay,
+        stats::get_stats,
         organizations::create_organization,
         organizations::get_organization,
         organizations::list_organizations,
@@ -91,6 +92,8 @@ use crate::state::AppState;
         AttemptResponse,
         DeadLetterResponse,
         dead_letters::ReplayDeadLetterResponse,
+        dto::stats::AppStatsResponse,
+        dto::stats::TimeBucketResponse,
         CreateOrganizationRequest,
         UpdateOrganizationRequest,
         OrganizationResponse,
@@ -132,6 +135,7 @@ pub fn router(state: AppState) -> Router {
                 .put(endpoints::update_endpoint)
                 .delete(endpoints::delete_endpoint),
         )
+        .route("/{app_id}/stats", get(handlers::stats::get_stats))
         .route(
             "/{app_id}/messages",
             post(messages::send_message).get(messages::list_messages),
@@ -257,6 +261,7 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
                 .put(endpoints::update_endpoint)
                 .delete(endpoints::delete_endpoint),
         )
+        .route("/{app_id}/stats", get(handlers::stats::get_stats))
         .route(
             "/{app_id}/messages",
             post(messages::send_message).get(messages::list_messages),
