@@ -159,4 +159,4 @@ cd pigeon-ui && npm run generate-api
 
 ## License
 
-MIT
+AGPL-3.0
