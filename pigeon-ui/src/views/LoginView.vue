@@ -47,25 +47,25 @@ const features = [
         <div class="login-orb login-orb-3" />
       </div>
 
-      <!-- Content -->
+      <!-- Content (always light text on dark bg, regardless of theme) -->
       <div class="relative z-10 flex flex-1 flex-col justify-center px-12 xl:px-16">
         <div class="flex items-center gap-3 mb-8">
           <PigeonLogo />
-          <span class="font-mono text-sm font-medium tracking-widest uppercase text-primary-foreground/60">
+          <span class="font-mono text-sm font-medium tracking-widest uppercase text-white/60">
             Pigeon
           </span>
         </div>
 
-        <h1 class="text-4xl font-bold tracking-tight text-primary-foreground xl:text-5xl" style="line-height: 1.1;">
+        <h1 class="text-4xl font-bold tracking-tight text-white xl:text-5xl" style="line-height: 1.1;">
           Reliable webhook delivery for your infrastructure.
         </h1>
 
-        <p class="mt-4 max-w-md text-base text-primary-foreground/60 leading-relaxed">
+        <p class="mt-4 max-w-md text-base text-white/60 leading-relaxed">
           Self-hosted, observable, and built for production.
           Send once, deliver everywhere.
         </p>
 
-        <Separator class="my-8 bg-primary-foreground/10" />
+        <Separator class="my-8 bg-white/10" />
 
         <div class="space-y-5">
           <div
@@ -74,26 +74,26 @@ const features = [
             class="flex items-start gap-3 login-feature"
             :style="{ animationDelay: `${0.8 + i * 0.15}s` }"
           >
-            <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-foreground/10">
-              <component :is="feature.icon" class="h-3.5 w-3.5 text-primary-foreground/80" />
+            <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/10">
+              <component :is="feature.icon" class="h-3.5 w-3.5 text-white/80" />
             </div>
             <div>
-              <p class="text-sm font-medium text-primary-foreground">{{ feature.title }}</p>
-              <p class="text-sm text-primary-foreground/50">{{ feature.desc }}</p>
+              <p class="text-sm font-medium text-white">{{ feature.title }}</p>
+              <p class="text-sm text-white/50">{{ feature.desc }}</p>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Bottom status bar -->
-      <div class="relative z-10 flex items-center justify-between border-t border-primary-foreground/10 px-12 py-4 xl:px-16">
-        <div class="flex items-center gap-2 font-mono text-xs text-primary-foreground/40">
+      <div class="relative z-10 flex items-center justify-between border-t border-white/10 px-12 py-4 xl:px-16">
+        <div class="flex items-center gap-2 font-mono text-xs text-white/40">
           <span
             class="inline-block h-1.5 w-1.5 rounded-full"
             :class="{
               'bg-emerald-400': healthy === true,
               'bg-red-400': healthy === false,
-              'bg-primary-foreground/20 animate-pulse': healthy === null,
+              'bg-white/20 animate-pulse': healthy === null,
             }"
           />
           <span v-if="healthy === null">Checking...</span>
@@ -104,7 +104,7 @@ const features = [
           href="https://github.com/The127/pigeon"
           target="_blank"
           rel="noopener noreferrer"
-          class="font-mono text-xs text-primary-foreground/30 transition-colors hover:text-primary-foreground/60"
+          class="font-mono text-xs text-white/30 transition-colors hover:text-white/60"
         >
           GitHub
         </a>
