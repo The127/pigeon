@@ -9,7 +9,7 @@ env:
   REGISTRY: ghcr.io
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 jobs:
@@ -70,3 +70,25 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+
+  github-release:
+    name: Create GitHub Release
+    needs: [server, ui]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Docker Images
+
+            ```
+            docker pull ghcr.io/${{ github.repository }}-server:${{ github.ref_name }}
+            docker pull ghcr.io/${{ github.repository }}-ui:${{ github.ref_name }}
+            ```
+
+            **Server:** API + delivery worker. Default `CMD` runs both (`pigeon serve`). Override with `pigeon api` or `pigeon worker` for independent scaling.
+
+            **UI:** Vue SPA served by nginx. Proxies API requests to `pigeon-server:3000`.
