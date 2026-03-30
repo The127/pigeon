@@ -32,7 +32,7 @@ use pigeon_application::mediator::dispatcher::dispatch;
     ),
     tag = "organizations"
 )]
-pub async fn create_organization(
+pub(crate) async fn create_organization(
     State(state): State<AppState>,
     auth: AuthInfo,
     Json(body): Json<CreateOrganizationRequest>,
@@ -64,7 +64,7 @@ pub async fn create_organization(
     ),
     tag = "organizations"
 )]
-pub async fn get_organization(
+pub(crate) async fn get_organization(
     State(state): State<AppState>,
     Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -92,7 +92,7 @@ pub async fn get_organization(
     ),
     tag = "organizations"
 )]
-pub async fn list_organizations(
+pub(crate) async fn list_organizations(
     State(state): State<AppState>,
     Query(query): Query<ListQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
@@ -130,7 +130,7 @@ pub async fn list_organizations(
     ),
     tag = "organizations"
 )]
-pub async fn update_organization(
+pub(crate) async fn update_organization(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path(id): Path<Uuid>,
@@ -160,7 +160,7 @@ pub async fn update_organization(
     ),
     tag = "organizations"
 )]
-pub async fn delete_organization(
+pub(crate) async fn delete_organization(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path(id): Path<Uuid>,
@@ -533,7 +533,6 @@ mod tests {
             list_oidc_configs: Arc::new(StubListOidcConfigsHandler),
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             org_read_store: Arc::new(StubOrganizationReadStore),
-            app_read_store: Arc::new(StubApplicationReadStore),
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),

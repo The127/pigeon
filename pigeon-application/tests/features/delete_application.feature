@@ -1,5 +1,9 @@
 Feature: Delete Application
 
+  # Note: Cascade deletion of child entities (endpoints, event types, messages)
+  # is handled by PostgreSQL ON DELETE CASCADE constraints.
+  # See migration 20260329000002_add_cascade_deletes.sql.
+
   Scenario: Successfully deleting an application
     Given an application named "doomed-app" with uid "app_del_1" exists
     When the delete application command is executed

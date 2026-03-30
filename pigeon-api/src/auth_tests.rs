@@ -420,7 +420,6 @@ fn test_state() -> AppState {
         list_oidc_configs: Arc::new(S),
         oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
         org_read_store: Arc::new(StubOrganizationReadStore),
-        app_read_store: Arc::new(StubApplicationReadStore),
         jwks_provider: Arc::new(StubJwksProvider),
         replay_dead_letter: Arc::new(S),
         retry_attempt: Arc::new(S),

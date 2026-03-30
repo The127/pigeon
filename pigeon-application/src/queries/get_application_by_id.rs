@@ -35,11 +35,7 @@ impl QueryHandler<GetApplicationById> for GetApplicationByIdHandler {
         &self,
         query: GetApplicationById,
     ) -> Result<Option<Application>, ApplicationError> {
-        let app = self.read_store.find_by_id(&query.id).await?;
-        match app {
-            Some(ref a) if a.org_id() != &query.org_id => Ok(None),
-            other => Ok(other),
-        }
+        self.read_store.find_by_id(&query.id, &query.org_id).await
     }
 }
 
@@ -60,8 +56,8 @@ mod tests {
 
         let mut mock = MockApplicationReadStore::new();
         mock.expect_find_by_id()
-            .withf(move |arg_id| *arg_id == id)
-            .returning(move |_| Ok(Some(app.clone())));
+            .withf(move |arg_id, _org_id| *arg_id == id)
+            .returning(move |_, _| Ok(Some(app.clone())));
 
         let handler = GetApplicationByIdHandler::new(Arc::new(mock));
         let result = handler
@@ -76,7 +72,7 @@ mod tests {
     #[tokio::test]
     async fn returns_none_when_not_found() {
         let mut mock = MockApplicationReadStore::new();
-        mock.expect_find_by_id().returning(|_| Ok(None));
+        mock.expect_find_by_id().returning(|_, _| Ok(None));
 
         let handler = GetApplicationByIdHandler::new(Arc::new(mock));
         let result = handler
@@ -96,8 +92,9 @@ mod tests {
         let id = app.id().clone();
 
         let mut mock = MockApplicationReadStore::new();
+        // SQL-level filtering: wrong org_id means no rows returned
         mock.expect_find_by_id()
-            .returning(move |_| Ok(Some(app.clone())));
+            .returning(move |_, _| Ok(None));
 
         let handler = GetApplicationByIdHandler::new(Arc::new(mock));
         let result = handler

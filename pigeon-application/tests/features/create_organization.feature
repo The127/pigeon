@@ -2,6 +2,11 @@ Feature: Create Organization
 
   Organizations must always have an OIDC configuration.
 
+  Scenario: Rejecting a duplicate slug
+    Given an organization with slug "taken-slug" already exists
+    When the create organization command is executed with slug "taken-slug"
+    Then the create organization command should fail with a validation error
+
   Scenario: Successfully creating an organization with OIDC config
     Given a request to create an organization named "my-org" with slug "my-org"
     And OIDC config with issuer "https://auth.example.com" and audience "pigeon-api"

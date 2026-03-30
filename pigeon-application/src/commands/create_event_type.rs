@@ -9,6 +9,7 @@ use serde_json::Value;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
+use crate::ports::stores::EventTypeReadStore;
 use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
@@ -29,11 +30,15 @@ impl Command for CreateEventType {
 
 pub struct CreateEventTypeHandler {
     uow_factory: Arc<dyn UnitOfWorkFactory>,
+    event_type_read_store: Arc<dyn EventTypeReadStore>,
 }
 
 impl CreateEventTypeHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new(
+        uow_factory: Arc<dyn UnitOfWorkFactory>,
+        event_type_read_store: Arc<dyn EventTypeReadStore>,
+    ) -> Self {
+        Self { uow_factory, event_type_read_store }
     }
 }
 
@@ -42,6 +47,15 @@ impl CommandHandler<CreateEventType> for CreateEventTypeHandler {
     async fn handle(&self, command: CreateEventType) -> Result<EventType, ApplicationError> {
         let event_type = EventType::new(command.app_id, command.name, command.schema)
             .map_err(|e| ApplicationError::Validation(e.to_string()))?;
+
+        let existing = self.event_type_read_store
+            .find_by_app_and_name(event_type.app_id(), event_type.name(), &command.org_id)
+            .await?;
+        if existing.is_some() {
+            return Err(ApplicationError::Validation(
+                "Event type with this name already exists for this application".to_string(),
+            ));
+        }
 
         let mut uow = self.uow_factory.begin().await?;
         uow.event_type_store().insert(&event_type).await?;
@@ -54,13 +68,19 @@ impl CommandHandler<CreateEventType> for CreateEventTypeHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
+    use crate::test_support::fakes::{
+        FakeEventTypeReadStore, FakeUnitOfWorkFactory, OperationLog, SharedEventTypeData,
+    };
+
+    fn empty_read_store(log: &OperationLog) -> Arc<dyn EventTypeReadStore> {
+        Arc::new(FakeEventTypeReadStore::new(log.clone(), SharedEventTypeData::default()))
+    }
 
     #[tokio::test]
     async fn creates_event_type_successfully() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateEventTypeHandler::new(factory);
+        let handler = CreateEventTypeHandler::new(factory, empty_read_store(&log));
 
         let result = handler
             .handle(CreateEventType {
@@ -76,6 +96,7 @@ mod tests {
         assert_eq!(
             log.entries(),
             vec![
+                "event_type_read_store:find_by_app_and_name",
                 "uow_factory:begin",
                 "event_type_store:insert",
                 "uow:commit",
@@ -84,10 +105,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn rejects_duplicate_name() {
+        let log = OperationLog::new();
+        let app_id = ApplicationId::new();
+        let org_id = pigeon_domain::organization::OrganizationId::new();
+        let existing = EventType::new(app_id.clone(), "user.created".into(), None).unwrap();
+        let et_data = SharedEventTypeData::default();
+        et_data.event_types.lock().unwrap().push(existing);
+        let read_store = Arc::new(FakeEventTypeReadStore::new(log.clone(), et_data));
+        let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
+        let handler = CreateEventTypeHandler::new(factory, read_store);
+
+        let result = handler
+            .handle(CreateEventType {
+                org_id,
+                app_id,
+                name: "user.created".into(),
+                schema: None,
+            })
+            .await;
+
+        assert!(matches!(result, Err(ApplicationError::Validation(_))));
+    }
+
+    #[tokio::test]
     async fn rejects_empty_name() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateEventTypeHandler::new(factory);
+        let handler = CreateEventTypeHandler::new(factory, empty_read_store(&log));
 
         let result = handler
             .handle(CreateEventType {

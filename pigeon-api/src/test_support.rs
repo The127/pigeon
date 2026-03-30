@@ -11,7 +11,7 @@ use pigeon_application::commands::send_test_event::{SendTestEvent, SendTestEvent
 use pigeon_application::queries::list_audit_log::ListAuditLog;
 use pigeon_application::error::ApplicationError;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
-use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore, OrganizationReadStore};
+use pigeon_application::ports::stores::{OidcConfigReadStore, OrganizationReadStore};
 use pigeon_application::ports::message_status::MessageWithStatus;
 use pigeon_application::ports::stats_read_store::AppStats;
 use pigeon_application::queries::get_app_stats::GetAppStats;
@@ -25,10 +25,8 @@ use pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByApp;
 use pigeon_application::queries::list_messages_by_app::ListMessagesByApp;
 use pigeon_application::queries::list_oidc_configs_by_org::ListOidcConfigsByOrg;
 use pigeon_application::queries::PaginatedResult;
-use pigeon_domain::application::{Application, ApplicationId};
 use pigeon_domain::attempt::Attempt;
 use pigeon_domain::dead_letter::DeadLetter;
-use pigeon_domain::message::Message;
 use pigeon_domain::oidc_config::{OidcConfig, OidcConfigId};
 use pigeon_domain::organization::{Organization, OrganizationId};
 use uuid::Uuid;
@@ -260,35 +258,6 @@ impl JwksProvider for StubJwksProvider {
     }
 }
 
-// --- Stub ApplicationReadStore (returns None) ---
-
-pub(crate) struct StubApplicationReadStore;
-#[async_trait]
-impl ApplicationReadStore for StubApplicationReadStore {
-    async fn find_by_id(
-        &self,
-        _id: &ApplicationId,
-    ) -> Result<Option<Application>, ApplicationError> {
-        Ok(None)
-    }
-    async fn list_by_org(
-        &self,
-        _org_id: &OrganizationId,
-        _search: Option<String>,
-        _offset: u64,
-        _limit: u64,
-    ) -> Result<Vec<Application>, ApplicationError> {
-        Ok(vec![])
-    }
-    async fn count_by_org(
-        &self,
-        _org_id: &OrganizationId,
-        _search: Option<String>,
-    ) -> Result<u64, ApplicationError> {
-        Ok(0)
-    }
-}
-
 pub(crate) struct StubOrganizationReadStore;
 #[async_trait]
 impl OrganizationReadStore for StubOrganizationReadStore {
@@ -313,38 +282,6 @@ impl OrganizationReadStore for StubOrganizationReadStore {
     }
     async fn count(&self) -> Result<u64, ApplicationError> {
         Ok(0)
-    }
-}
-
-// --- Fake ApplicationReadStore (returns a configurable application) ---
-
-pub(crate) struct FakeApplicationReadStore {
-    pub(crate) app: Option<Application>,
-}
-
-#[async_trait]
-impl ApplicationReadStore for FakeApplicationReadStore {
-    async fn find_by_id(
-        &self,
-        _id: &ApplicationId,
-    ) -> Result<Option<Application>, ApplicationError> {
-        Ok(self.app.clone())
-    }
-    async fn list_by_org(
-        &self,
-        _org_id: &OrganizationId,
-        _search: Option<String>,
-        _offset: u64,
-        _limit: u64,
-    ) -> Result<Vec<Application>, ApplicationError> {
-        Ok(self.app.clone().into_iter().collect())
-    }
-    async fn count_by_org(
-        &self,
-        _org_id: &OrganizationId,
-        _search: Option<String>,
-    ) -> Result<u64, ApplicationError> {
-        Ok(self.app.as_ref().map(|_| 1).unwrap_or(0))
     }
 }
 

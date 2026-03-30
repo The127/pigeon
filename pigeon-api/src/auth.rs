@@ -16,7 +16,7 @@ use crate::state::AppState;
 
 /// Authenticated request context injected into request extensions.
 #[derive(Clone, Debug)]
-pub struct AuthContext {
+pub(crate) struct AuthContext {
     pub org_id: OrganizationId,
     pub user_id: String, // sub claim
 }
@@ -34,26 +34,6 @@ pub trait JwksProvider: Send + Sync {
         &self,
         jwks_url: &str,
     ) -> Result<jsonwebtoken::jwk::JwkSet, String>;
-}
-
-/// Production JWKS provider that fetches via HTTP without caching.
-pub struct HttpJwksProvider;
-
-#[async_trait]
-impl JwksProvider for HttpJwksProvider {
-    async fn get_jwks(
-        &self,
-        jwks_url: &str,
-    ) -> Result<jsonwebtoken::jwk::JwkSet, String> {
-        fetch_jwks(jwks_url).await
-    }
-
-    async fn refresh_jwks(
-        &self,
-        jwks_url: &str,
-    ) -> Result<jsonwebtoken::jwk::JwkSet, String> {
-        fetch_jwks(jwks_url).await
-    }
 }
 
 /// Caching JWKS provider that wraps HTTP fetches with a TTL-based cache.

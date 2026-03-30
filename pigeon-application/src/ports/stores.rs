@@ -20,6 +20,7 @@ pub trait ApplicationStore: Send + Sync {
     async fn find_by_id(
         &self,
         id: &ApplicationId,
+        org_id: &OrganizationId,
     ) -> Result<Option<Application>, ApplicationError>;
     async fn save(&mut self, application: &Application) -> Result<(), ApplicationError>;
     async fn delete(&mut self, id: &ApplicationId) -> Result<(), ApplicationError>;
@@ -31,6 +32,7 @@ pub trait ApplicationReadStore: Send + Sync {
     async fn find_by_id(
         &self,
         id: &ApplicationId,
+        org_id: &OrganizationId,
     ) -> Result<Option<Application>, ApplicationError>;
     async fn list_by_org(
         &self,

@@ -43,13 +43,9 @@ impl CommandHandler<UpdateApplication> for UpdateApplicationHandler {
 
         let mut app = uow
             .application_store()
-            .find_by_id(&command.id)
+            .find_by_id(&command.id, &command.org_id)
             .await?
             .ok_or(ApplicationError::NotFound)?;
-
-        if app.org_id() != &command.org_id {
-            return Err(ApplicationError::NotFound);
-        }
 
         if app.version() != command.version {
             return Err(ApplicationError::Conflict);

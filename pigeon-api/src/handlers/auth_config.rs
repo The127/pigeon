@@ -8,7 +8,7 @@ use utoipa::ToSchema;
 use crate::state::AppState;
 
 #[derive(Serialize, ToSchema)]
-pub struct AuthConfigResponse {
+pub(crate) struct AuthConfigResponse {
     pub issuer_url: String,
     pub audience: String,
 }
@@ -27,7 +27,7 @@ pub struct AuthConfigResponse {
     ),
     tag = "auth"
 )]
-pub async fn auth_config(
+pub(crate) async fn auth_config(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Result<impl IntoResponse, (StatusCode, &'static str)> {

@@ -38,18 +38,11 @@ impl CommandHandler<DeleteApplication> for DeleteApplicationHandler {
     async fn handle(&self, command: DeleteApplication) -> Result<(), ApplicationError> {
         let mut uow = self.uow_factory.begin().await?;
 
-        let existing = uow
+        let _existing = uow
             .application_store()
-            .find_by_id(&command.id)
-            .await?;
-
-        match &existing {
-            None => return Err(ApplicationError::NotFound),
-            Some(app) if app.org_id() != &command.org_id => {
-                return Err(ApplicationError::NotFound);
-            }
-            _ => {}
-        }
+            .find_by_id(&command.id, &command.org_id)
+            .await?
+            .ok_or(ApplicationError::NotFound)?;
 
         uow.application_store().delete(&command.id).await?;
         uow.commit().await?;

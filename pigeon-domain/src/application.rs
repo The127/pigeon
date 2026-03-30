@@ -42,12 +42,17 @@ pub struct Application {
 pub enum ApplicationError {
     #[error("application name must not be empty")]
     EmptyName,
+    #[error("application UID must not be empty")]
+    EmptyUid,
 }
 
 impl Application {
     pub fn new(org_id: OrganizationId, name: String, uid: String) -> Result<Self, ApplicationError> {
         if name.trim().is_empty() {
             return Err(ApplicationError::EmptyName);
+        }
+        if uid.trim().is_empty() {
+            return Err(ApplicationError::EmptyUid);
         }
 
         Ok(Self {
@@ -121,6 +126,18 @@ mod tests {
         let result = Application::new(OrganizationId::new(), "   ".into(), "app_123".into());
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn reject_empty_uid() {
+        let result = Application::new(OrganizationId::new(), "my-app".into(), "".into());
+        assert!(matches!(result, Err(ApplicationError::EmptyUid)));
+    }
+
+    #[test]
+    fn reject_whitespace_only_uid() {
+        let result = Application::new(OrganizationId::new(), "my-app".into(), "   ".into());
+        assert!(matches!(result, Err(ApplicationError::EmptyUid)));
     }
 
     #[test]

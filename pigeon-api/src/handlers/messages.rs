@@ -21,8 +21,6 @@ use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
 use pigeon_application::mediator::dispatcher::dispatch;
 
-use super::verify_app_ownership;
-
 /// Send a message to an application's endpoints
 #[utoipa::path(
     post,
@@ -36,14 +34,13 @@ use super::verify_app_ownership;
     ),
     tag = "messages"
 )]
-pub async fn send_message(
+pub(crate) async fn send_message(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path(app_id): Path<Uuid>,
     Json(body): Json<SendMessageRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = SendMessage {
         org_id: auth.org_id.clone(),
@@ -86,14 +83,13 @@ pub async fn send_message(
     ),
     tag = "messages"
 )]
-pub async fn list_messages(
+pub(crate) async fn list_messages(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path(app_id): Path<Uuid>,
     Query(query): Query<MessageListQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
 
     let result = state
         .list_messages
@@ -132,13 +128,12 @@ pub async fn list_messages(
     ),
     tag = "messages"
 )]
-pub async fn get_message(
+pub(crate) async fn get_message(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let msg = state
         .get_message
@@ -166,13 +161,12 @@ pub async fn get_message(
     ),
     tag = "messages"
 )]
-pub async fn list_attempts(
+pub(crate) async fn list_attempts(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path((app_id, msg_id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let attempts = state
         .list_attempts
@@ -202,13 +196,12 @@ pub async fn list_attempts(
     ),
     tag = "messages"
 )]
-pub async fn retrigger_message(
+pub(crate) async fn retrigger_message(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let result = dispatch(
         &*state.retrigger_message,
@@ -497,7 +490,7 @@ mod tests {
         }
     }
 
-    fn build_state(send: impl CommandHandler<SendMessage> + 'static, app_read_store: Arc<dyn pigeon_application::ports::stores::ApplicationReadStore>) -> AppState {
+    fn build_state(send: impl CommandHandler<SendMessage> + 'static) -> AppState {
         use crate::test_support::*;
         AppState {
             create_application: Arc::new(StubCreateHandler),
@@ -536,7 +529,6 @@ mod tests {
             list_oidc_configs: Arc::new(StubListOidcConfigsHandler),
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             org_read_store: Arc::new(StubOrganizationReadStore),
-            app_read_store,
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),
@@ -558,27 +550,7 @@ mod tests {
         serde_json::from_slice(&bytes).unwrap()
     }
 
-    use pigeon_domain::application::ApplicationState as DomainAppState;
-    use pigeon_domain::organization::OrganizationId;
-
     const TEST_ORG_ID: &str = "00000000-0000-0000-0000-000000000001";
-
-    fn test_org_id() -> OrganizationId {
-        OrganizationId::from_uuid(
-            Uuid::parse_str(TEST_ORG_ID).unwrap(),
-        )
-    }
-
-    fn fake_app_for(app_id: &pigeon_domain::application::ApplicationId) -> Application {
-        Application::reconstitute(DomainAppState {
-            id: app_id.clone(),
-            org_id: test_org_id(),
-            name: "test-app".to_string(),
-            uid: format!("app_{}", Uuid::new_v4()),
-            created_at: chrono::Utc::now(),
-            version: pigeon_domain::version::Version::new(0),
-        })
-    }
 
     fn dummy_send_result(attempts: usize, duplicate: bool) -> SendMessageResult {
         let msg = pigeon_domain::test_support::any_message();
@@ -598,9 +570,6 @@ mod tests {
             FakeSendMessageHandler {
                 result: Ok(dummy_send_result(2, false)),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 
@@ -637,9 +606,6 @@ mod tests {
             FakeSendMessageHandler {
                 result: Ok(dummy_send_result(0, true)),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 
@@ -676,9 +642,6 @@ mod tests {
             FakeSendMessageHandler {
                 result: Ok(dummy_send_result(0, false)),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 

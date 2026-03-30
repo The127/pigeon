@@ -7,6 +7,7 @@ use pigeon_domain::organization::Organization;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
+use crate::ports::stores::OrganizationReadStore;
 use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
@@ -28,11 +29,15 @@ impl Command for CreateOrganization {
 
 pub struct CreateOrganizationHandler {
     uow_factory: Arc<dyn UnitOfWorkFactory>,
+    org_read_store: Arc<dyn OrganizationReadStore>,
 }
 
 impl CreateOrganizationHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new(
+        uow_factory: Arc<dyn UnitOfWorkFactory>,
+        org_read_store: Arc<dyn OrganizationReadStore>,
+    ) -> Self {
+        Self { uow_factory, org_read_store }
     }
 }
 
@@ -50,6 +55,12 @@ impl CommandHandler<CreateOrganization> for CreateOrganizationHandler {
         )
         .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
+        if self.org_read_store.find_by_slug(org.slug()).await?.is_some() {
+            return Err(ApplicationError::Validation(
+                "Organization with this slug already exists".to_string(),
+            ));
+        }
+
         let mut uow = self.uow_factory.begin().await?;
         uow.organization_store().insert(&org).await?;
         uow.oidc_config_store().insert(&oidc_config).await?;
@@ -62,13 +73,19 @@ impl CommandHandler<CreateOrganization> for CreateOrganizationHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
+    use crate::test_support::fakes::{
+        FakeOrganizationReadStore, FakeUnitOfWorkFactory, OperationLog, SharedOrganizationData,
+    };
+
+    fn empty_org_store(log: &OperationLog) -> Arc<dyn OrganizationReadStore> {
+        Arc::new(FakeOrganizationReadStore::new(log.clone(), SharedOrganizationData::default()))
+    }
 
     #[tokio::test]
     async fn creates_organization_with_oidc_config() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateOrganizationHandler::new(factory.clone());
+        let handler = CreateOrganizationHandler::new(factory.clone(), empty_org_store(&log));
 
         let result = handler
             .handle(CreateOrganization {
@@ -86,6 +103,7 @@ mod tests {
         assert_eq!(
             log.entries(),
             vec![
+                "organization_read_store:find_by_slug",
                 "uow_factory:begin",
                 "organization_store:insert",
                 "oidc_config_store:insert",
@@ -105,7 +123,7 @@ mod tests {
     async fn rejects_empty_name() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateOrganizationHandler::new(factory);
+        let handler = CreateOrganizationHandler::new(factory, empty_org_store(&log));
 
         let result = handler
             .handle(CreateOrganization {
@@ -125,7 +143,7 @@ mod tests {
     async fn rejects_invalid_slug() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateOrganizationHandler::new(factory);
+        let handler = CreateOrganizationHandler::new(factory, empty_org_store(&log));
 
         let result = handler
             .handle(CreateOrganization {
@@ -145,7 +163,7 @@ mod tests {
     async fn rejects_empty_oidc_issuer() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateOrganizationHandler::new(factory);
+        let handler = CreateOrganizationHandler::new(factory, empty_org_store(&log));
 
         let result = handler
             .handle(CreateOrganization {
@@ -159,5 +177,28 @@ mod tests {
 
         assert!(matches!(result, Err(ApplicationError::Validation(_))));
         assert!(log.entries().is_empty());
+    }
+
+    #[tokio::test]
+    async fn rejects_duplicate_slug() {
+        let log = OperationLog::new();
+        let org_data = SharedOrganizationData::default();
+        let existing = pigeon_domain::organization::Organization::new("existing".into(), "taken-slug".into()).unwrap();
+        org_data.organizations.lock().unwrap().push(existing);
+        let org_store = Arc::new(FakeOrganizationReadStore::new(log.clone(), org_data));
+        let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
+        let handler = CreateOrganizationHandler::new(factory, org_store);
+
+        let result = handler
+            .handle(CreateOrganization {
+                name: "new-org".into(),
+                slug: "taken-slug".into(),
+                oidc_issuer_url: "https://auth.example.com".into(),
+                oidc_audience: "pigeon-api".into(),
+                oidc_jwks_url: "https://auth.example.com/.well-known/jwks.json".into(),
+            })
+            .await;
+
+        assert!(matches!(result, Err(ApplicationError::Validation(_))));
     }
 }

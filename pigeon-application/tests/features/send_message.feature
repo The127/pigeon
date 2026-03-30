@@ -1,5 +1,10 @@
 Feature: Send Message
 
+  # TODO: No validation that event_type_id exists — sending with a non-existent
+  #       event type silently creates a message with 0 attempts.
+  # TODO: No validation that app_id belongs to the org at this layer — relies on
+  #       API-level verify_app_ownership.
+
   Scenario: Successfully sending a message with matching endpoints
     Given an application with two enabled endpoints for event type "user.created"
     When the send message command is executed with event type "user.created"

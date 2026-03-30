@@ -10,6 +10,7 @@ use pigeon_domain::version::Version;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
+use crate::ports::stores::EventTypeReadStore;
 use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
@@ -32,17 +33,33 @@ impl Command for UpdateEndpoint {
 
 pub struct UpdateEndpointHandler {
     uow_factory: Arc<dyn UnitOfWorkFactory>,
+    event_type_read_store: Arc<dyn EventTypeReadStore>,
 }
 
 impl UpdateEndpointHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new(
+        uow_factory: Arc<dyn UnitOfWorkFactory>,
+        event_type_read_store: Arc<dyn EventTypeReadStore>,
+    ) -> Self {
+        Self { uow_factory, event_type_read_store }
     }
 }
 
 #[async_trait]
 impl CommandHandler<UpdateEndpoint> for UpdateEndpointHandler {
     async fn handle(&self, command: UpdateEndpoint) -> Result<Endpoint, ApplicationError> {
+        for et_id in &command.event_type_ids {
+            if self.event_type_read_store
+                .find_by_id(et_id, &command.org_id)
+                .await?
+                .is_none()
+            {
+                return Err(ApplicationError::Validation(
+                    format!("Event type not found: {}", et_id.as_uuid()),
+                ));
+            }
+        }
+
         let mut uow = self.uow_factory.begin().await?;
 
         let mut endpoint = uow
@@ -74,9 +91,16 @@ impl CommandHandler<UpdateEndpoint> for UpdateEndpointHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
+    use crate::test_support::fakes::{
+        FakeEventTypeReadStore, FakeUnitOfWorkFactory, OperationLog, SharedEventTypeData,
+    };
     use pigeon_domain::application::ApplicationId;
     use pigeon_domain::endpoint::Endpoint;
+    use pigeon_domain::event_type::EventType;
+
+    fn empty_et_store(log: &OperationLog) -> Arc<dyn EventTypeReadStore> {
+        Arc::new(FakeEventTypeReadStore::new(log.clone(), SharedEventTypeData::default()))
+    }
 
     fn setup_with_endpoint() -> (OperationLog, Arc<FakeUnitOfWorkFactory>, Endpoint) {
         let log = OperationLog::new();
@@ -105,7 +129,7 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateEndpointHandler::new(factory);
+        let handler = UpdateEndpointHandler::new(factory, empty_et_store(&log));
         let result = handler
             .handle(UpdateEndpoint {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
@@ -134,9 +158,10 @@ mod tests {
     #[tokio::test]
     async fn returns_not_found_when_endpoint_does_not_exist() {
         let log = OperationLog::new();
+        let et_store = empty_et_store(&log);
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = UpdateEndpointHandler::new(factory);
+        let handler = UpdateEndpointHandler::new(factory, et_store);
         let result = handler
             .handle(UpdateEndpoint {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
@@ -164,7 +189,7 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateEndpointHandler::new(factory);
+        let handler = UpdateEndpointHandler::new(factory, empty_et_store(&log));
         let result = handler
             .handle(UpdateEndpoint {
                 org_id: pigeon_domain::organization::OrganizationId::new(),
@@ -191,7 +216,7 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateEndpointHandler::new(factory);
+        let handler = UpdateEndpointHandler::new(factory, empty_et_store(&log));
         let result = handler
             .handle(UpdateEndpoint {
                 org_id: pigeon_domain::organization::OrganizationId::new(),

@@ -34,21 +34,23 @@ impl ApplicationStore for PgApplicationStore {
     async fn find_by_id(
         &self,
         id: &ApplicationId,
+        org_id: &OrganizationId,
     ) -> Result<Option<Application>, ApplicationError> {
         // Check change tracker first
         {
             let tracker = self.tracker.lock().unwrap();
             if let Some(pending) = tracker.find_pending_application(id) {
-                return Ok(pending.cloned());
+                return Ok(pending.cloned().filter(|a| a.org_id() == org_id));
             }
         }
 
         // Fall back to DB (outside any transaction — direct pool query)
         let row = sqlx::query_as::<_, ApplicationRow>(
             "SELECT id, org_id, name, uid, created_at, xmin::text::bigint AS version \
-             FROM applications WHERE id = $1",
+             FROM applications WHERE id = $1 AND org_id = $2",
         )
         .bind(id.as_uuid())
+        .bind(org_id.as_uuid())
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ApplicationError::Internal(e.to_string()))?;

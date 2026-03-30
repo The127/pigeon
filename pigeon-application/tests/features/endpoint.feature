@@ -1,5 +1,15 @@
 Feature: Endpoint CRUD
 
+  Scenario: Rejecting an endpoint with an invalid URL scheme
+    Given a request to create an endpoint with url "ftp://example.com/webhook" for an application
+    When the create endpoint command is executed
+    Then the create endpoint command should fail with a validation error
+
+  Scenario: Rejecting an endpoint with non-existent event types
+    Given a request to create an endpoint with a non-existent event type
+    When the create endpoint command is executed
+    Then the create endpoint command should fail with a validation error
+
   Scenario: Successfully creating an endpoint
     Given a request to create an endpoint with url "https://example.com/webhook" for an application
     When the create endpoint command is executed
@@ -27,6 +37,11 @@ Feature: Endpoint CRUD
     When the update endpoint command is executed with url "https://new.example.com/webhook"
     Then the endpoint should be updated with url "https://new.example.com/webhook"
     And the endpoint store should have saved the endpoint
+
+  Scenario: Rejecting update with non-existent event types
+    Given an existing endpoint with url "https://example.com/webhook"
+    When the update endpoint command is executed with a non-existent event type
+    Then the update endpoint command should fail with a validation error
 
   Scenario: Rejecting update with an empty url
     Given an existing endpoint with url "https://example.com/webhook"

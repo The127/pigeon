@@ -1,5 +1,5 @@
 /// Generates Docker-style random names (adjective-noun).
-pub fn generate_name() -> String {
+pub(crate) fn generate_name() -> String {
     use std::hash::{Hash, Hasher};
 
     let adjectives = [

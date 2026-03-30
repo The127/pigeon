@@ -1,5 +1,10 @@
 Feature: Event Type CRUD
 
+  Scenario: Rejecting a duplicate event type name
+    Given an event type named "user.created" already exists for the application
+    When the create event type command is executed with name "user.created"
+    Then the create event type command should fail with a validation error
+
   Scenario: Successfully creating an event type
     Given a request to create an event type named "user.created" for an application
     When the create event type command is executed

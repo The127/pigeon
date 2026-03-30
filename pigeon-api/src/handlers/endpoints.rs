@@ -21,8 +21,6 @@ use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
 use pigeon_application::mediator::dispatcher::dispatch;
 
-use super::verify_app_ownership;
-
 /// Create a new endpoint
 #[utoipa::path(
     post,
@@ -35,14 +33,13 @@ use super::verify_app_ownership;
     ),
     tag = "endpoints"
 )]
-pub async fn create_endpoint(
+pub(crate) async fn create_endpoint(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path(app_id): Path<Uuid>,
     Json(body): Json<CreateEndpointRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = CreateEndpoint {
         org_id: auth.org_id.clone(),
@@ -72,14 +69,13 @@ pub async fn create_endpoint(
     ),
     tag = "endpoints"
 )]
-pub async fn list_endpoints(
+pub(crate) async fn list_endpoints(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path(app_id): Path<Uuid>,
     Query(query): Query<ListQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
 
     let list_query = ListEndpointsByApp {
         app_id,
@@ -114,13 +110,12 @@ pub async fn list_endpoints(
     ),
     tag = "endpoints"
 )]
-pub async fn get_endpoint(
+pub(crate) async fn get_endpoint(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let query = GetEndpointById {
         id: EndpointId::from_uuid(id),
@@ -154,14 +149,13 @@ pub async fn get_endpoint(
     ),
     tag = "endpoints"
 )]
-pub async fn update_endpoint(
+pub(crate) async fn update_endpoint(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
     Json(body): Json<UpdateEndpointRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let command = UpdateEndpoint {
         org_id: auth.org_id.clone(),
@@ -191,13 +185,12 @@ pub async fn update_endpoint(
     ),
     tag = "endpoints"
 )]
-pub async fn delete_endpoint(
+pub(crate) async fn delete_endpoint(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let command = DeleteEndpoint {
         org_id: auth.org_id.clone(),
@@ -473,17 +466,7 @@ mod tests {
         }
     }
 
-    use pigeon_application::ports::stores::ApplicationReadStore;
-    use pigeon_domain::application::ApplicationState as DomainAppState;
-    use pigeon_domain::organization::OrganizationId;
-
     // --- Helpers ---
-
-    fn test_org_id() -> OrganizationId {
-        OrganizationId::from_uuid(
-            Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
-        )
-    }
 
     fn org_header() -> &'static str {
         "00000000-0000-0000-0000-000000000001"
@@ -493,24 +476,12 @@ mod tests {
         Endpoint::reconstitute(EndpointState::fake())
     }
 
-    fn fake_app_for(app_id: &pigeon_domain::application::ApplicationId) -> Application {
-        Application::reconstitute(DomainAppState {
-            id: app_id.clone(),
-            org_id: test_org_id(),
-            name: "test-app".to_string(),
-            uid: format!("app_{}", Uuid::new_v4()),
-            created_at: chrono::Utc::now(),
-            version: pigeon_domain::version::Version::new(0),
-        })
-    }
-
     fn build_ep_state(
         create: FakeCreateEpHandler,
         update: FakeUpdateEpHandler,
         delete: FakeDeleteEpHandler,
         get: FakeGetEpHandler,
         list: FakeListEpHandler,
-        app_read_store: Arc<dyn ApplicationReadStore>,
     ) -> AppState {
         use crate::test_support::*;
         AppState {
@@ -550,7 +521,6 @@ mod tests {
             list_oidc_configs: Arc::new(StubListOidcConfigsHandler),
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             org_read_store: Arc::new(StubOrganizationReadStore),
-            app_read_store,
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),
@@ -563,8 +533,7 @@ mod tests {
         }
     }
 
-    fn default_ep_state(ep: Endpoint, app_id: &pigeon_domain::application::ApplicationId) -> AppState {
-        use crate::test_support::FakeApplicationReadStore;
+    fn default_ep_state(ep: Endpoint) -> AppState {
         build_ep_state(
             FakeCreateEpHandler { result: Ok(ep.clone()) },
             FakeUpdateEpHandler { result: Ok(ep.clone()) },
@@ -578,7 +547,6 @@ mod tests {
                     limit: 20,
                 }),
             },
-            Arc::new(FakeApplicationReadStore { app: Some(fake_app_for(app_id)) }),
         )
     }
 
@@ -597,7 +565,7 @@ mod tests {
     async fn create_returns_201() {
         let ep = fake_endpoint();
         let app_id = ep.app_id().clone();
-        let state = default_ep_state(ep, &app_id);
+        let state = default_ep_state(ep);
         let router = test_router(state);
 
         let response = router
@@ -631,7 +599,7 @@ mod tests {
     async fn create_with_empty_url_returns_400() {
         let ep = fake_endpoint();
         let app_id = ep.app_id().clone();
-        let state = default_ep_state(ep, &app_id);
+        let state = default_ep_state(ep);
         let router = test_router(state);
 
         let response = router
@@ -662,7 +630,7 @@ mod tests {
         let ep = fake_endpoint();
         let app_id = ep.app_id().clone();
         let id = *ep.id().as_uuid();
-        let state = default_ep_state(ep, &app_id);
+        let state = default_ep_state(ep);
         let router = test_router(state);
 
         let response = router
@@ -696,9 +664,6 @@ mod tests {
             FakeListEpHandler {
                 result: Ok(PaginatedResult { items: vec![], total: 0, offset: 0, limit: 20 }),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 
@@ -721,7 +686,7 @@ mod tests {
     async fn list_returns_paginated() {
         let ep = fake_endpoint();
         let app_id = ep.app_id().clone();
-        let state = default_ep_state(ep, &app_id);
+        let state = default_ep_state(ep);
         let router = test_router(state);
 
         let response = router
@@ -750,7 +715,7 @@ mod tests {
         let ep = fake_endpoint();
         let app_id = ep.app_id().clone();
         let id = *ep.id().as_uuid();
-        let state = default_ep_state(ep, &app_id);
+        let state = default_ep_state(ep);
         let router = test_router(state);
 
         let response = router
@@ -790,9 +755,6 @@ mod tests {
             FakeListEpHandler {
                 result: Ok(PaginatedResult { items: vec![], total: 0, offset: 0, limit: 20 }),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 
@@ -825,7 +787,7 @@ mod tests {
         let ep = fake_endpoint();
         let app_id = ep.app_id().clone();
         let id = *ep.id().as_uuid();
-        let state = default_ep_state(ep, &app_id);
+        let state = default_ep_state(ep);
         let router = test_router(state);
 
         let response = router
@@ -856,9 +818,6 @@ mod tests {
             FakeListEpHandler {
                 result: Ok(PaginatedResult { items: vec![], total: 0, offset: 0, limit: 20 }),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 

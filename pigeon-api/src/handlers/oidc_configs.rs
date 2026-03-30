@@ -65,6 +65,9 @@ pub(crate) async fn create_oidc_config(
     ),
     tag = "oidc-configs"
 )]
+// Intentionally unauthenticated — OIDC config is public metadata
+// required by the frontend before login can occur.
+// Read-only, no sensitive data exposed.
 pub(crate) async fn get_oidc_config(
     State(state): State<AppState>,
     Path((_org_id, id)): Path<(Uuid, Uuid)>,
@@ -464,7 +467,6 @@ mod tests {
             list_oidc_configs: Arc::new(list),
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             org_read_store: Arc::new(StubOrganizationReadStore),
-            app_read_store: Arc::new(StubApplicationReadStore),
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),

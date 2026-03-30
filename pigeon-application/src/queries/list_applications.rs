@@ -124,16 +124,23 @@ mod tests {
         let items_a = vec![app_a.clone()];
         let items_a_clone = items_a.clone();
         let org_a_clone = org_a.clone();
+        let items_b = vec![app_b.clone()];
+        let items_b_clone = items_b.clone();
+        let org_b_clone = org_b.clone();
 
         let mut mock = MockApplicationReadStore::new();
         mock.expect_list_by_org()
             .withf(move |org_id, _, _, _| *org_id == org_a_clone)
             .returning(move |_, _, _, _| Ok(items_a_clone.clone()));
+        mock.expect_list_by_org()
+            .withf(move |org_id, _, _, _| *org_id == org_b_clone)
+            .returning(move |_, _, _, _| Ok(items_b_clone.clone()));
         mock.expect_count_by_org()
             .returning(|_, _| Ok(1));
 
         let handler = ListApplicationsHandler::new(Arc::new(mock));
-        let result = handler
+
+        let result_a = handler
             .handle(ListApplications {
                 org_id: org_a,
                 search: None,
@@ -143,8 +150,21 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.items.len(), 1);
-        assert_eq!(result.items[0].name(), app_a.name());
+        assert_eq!(result_a.items.len(), 1);
+        assert_eq!(result_a.items[0].name(), app_a.name());
+
+        let result_b = handler
+            .handle(ListApplications {
+                org_id: org_b,
+                search: None,
+                offset: 0,
+                limit: 10,
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(result_b.items.len(), 1);
+        assert_eq!(result_b.items[0].name(), app_b.name());
     }
 
     #[tokio::test]

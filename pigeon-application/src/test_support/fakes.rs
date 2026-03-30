@@ -112,10 +112,11 @@ impl ApplicationStore for FakeApplicationStore {
     async fn find_by_id(
         &self,
         id: &ApplicationId,
+        org_id: &OrganizationId,
     ) -> Result<Option<Application>, ApplicationError> {
         self.log.record("application_store:find_by_id");
         let apps = self.data.applications.lock().unwrap();
-        Ok(apps.iter().find(|a| a.id() == id).cloned())
+        Ok(apps.iter().find(|a| a.id() == id && a.org_id() == org_id).cloned())
     }
 
     async fn save(&mut self, application: &Application) -> Result<(), ApplicationError> {
@@ -153,10 +154,11 @@ impl ApplicationReadStore for FakeApplicationReadStore {
     async fn find_by_id(
         &self,
         id: &ApplicationId,
+        org_id: &OrganizationId,
     ) -> Result<Option<Application>, ApplicationError> {
         self.log.record("application_read_store:find_by_id");
         let apps = self.data.applications.lock().unwrap();
-        Ok(apps.iter().find(|a| a.id() == id).cloned())
+        Ok(apps.iter().find(|a| a.id() == id && a.org_id() == org_id).cloned())
     }
 
     async fn list_by_org(
@@ -368,7 +370,7 @@ impl MessageStore for FakeMessageStore {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct SharedAttemptData {
     pub attempts: Arc<std::sync::Mutex<Vec<Attempt>>>,
 }
@@ -700,7 +702,7 @@ impl OidcConfigStore for FakeOidcConfigStore {
     }
 }
 
-#[derive(Default, Clone)]
+#[derive(Debug, Default, Clone)]
 pub struct SharedDeadLetterData {
     pub dead_letters: Arc<std::sync::Mutex<Vec<DeadLetter>>>,
 }
@@ -781,6 +783,7 @@ pub struct FakeUnitOfWork {
 }
 
 impl FakeUnitOfWork {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         log: OperationLog,
         app_data: SharedApplicationData,
@@ -1020,6 +1023,27 @@ impl FakeUnitOfWorkFactory {
     pub fn organization_data(&self) -> &SharedOrganizationData {
         &self.org_data
     }
+
+    pub fn with_attempt_data(
+        log: OperationLog,
+        att_data: SharedAttemptData,
+    ) -> Self {
+        Self {
+            log,
+            app_data: SharedApplicationData::default(),
+            et_data: SharedEventTypeData::default(),
+            ep_data: SharedEndpointData::default(),
+            msg_data: SharedMessageData::default(),
+            att_data,
+            dl_data: SharedDeadLetterData::default(),
+            org_data: SharedOrganizationData::default(),
+            oidc_data: SharedOidcConfigData::default(),
+        }
+    }
+
+    pub fn attempt_data(&self) -> &SharedAttemptData {
+        &self.att_data
+    }
 }
 
 #[async_trait]
@@ -1128,7 +1152,8 @@ mod tests {
         let log = OperationLog::new();
         let factory = FakeUnitOfWorkFactory::new(log.clone());
 
-        let app = Application::new(OrganizationId::new(), "test-app".into(), "app_123".into()).unwrap();
+        let org_id = OrganizationId::new();
+        let app = Application::new(org_id.clone(), "test-app".into(), "app_123".into()).unwrap();
         let id = app.id().clone();
 
         // Insert in first UoW
@@ -1141,7 +1166,7 @@ mod tests {
         // Find in second UoW
         {
             let mut uow = factory.begin().await.unwrap();
-            let found = uow.application_store().find_by_id(&id).await.unwrap();
+            let found = uow.application_store().find_by_id(&id, &org_id).await.unwrap();
             assert!(found.is_some());
             assert_eq!(found.unwrap().name(), "test-app");
         }

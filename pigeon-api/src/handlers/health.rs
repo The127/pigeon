@@ -8,7 +8,7 @@ use utoipa::ToSchema;
 use crate::state::AppState;
 
 #[derive(Serialize, ToSchema)]
-pub struct HealthResponse {
+pub(crate) struct HealthResponse {
     pub status: String,
 }
 
@@ -19,7 +19,7 @@ pub struct HealthResponse {
         (status = 200, body = HealthResponse),
     )
 )]
-pub async fn liveness() -> Json<HealthResponse> {
+pub(crate) async fn liveness() -> Json<HealthResponse> {
     Json(HealthResponse {
         status: "healthy".to_string(),
     })
@@ -33,7 +33,7 @@ pub async fn liveness() -> Json<HealthResponse> {
         (status = 503, body = HealthResponse),
     )
 )]
-pub async fn readiness(State(state): State<AppState>) -> impl IntoResponse {
+pub(crate) async fn readiness(State(state): State<AppState>) -> impl IntoResponse {
     if state.health_checker.check().await {
         (
             StatusCode::OK,
@@ -402,7 +402,6 @@ mod tests {
             list_oidc_configs: Arc::new(StubListOidcConfigsHandler),
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             org_read_store: Arc::new(StubOrganizationReadStore),
-            app_read_store: Arc::new(StubApplicationReadStore),
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),

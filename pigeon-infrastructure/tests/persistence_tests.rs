@@ -63,7 +63,7 @@ async fn insert_and_find_by_id() {
 
     // Find via new UoW
     let mut uow = factory.begin().await.unwrap();
-    let found = uow.application_store().find_by_id(app.id()).await.unwrap();
+    let found = uow.application_store().find_by_id(app.id(), &org_id).await.unwrap();
     assert!(found.is_some());
     let found = found.unwrap();
     assert_eq!(found.name(), "test-app");
@@ -78,7 +78,7 @@ async fn find_by_id_returns_none_for_nonexistent() {
     let mut uow = factory.begin().await.unwrap();
     let result = uow
         .application_store()
-        .find_by_id(&ApplicationId::new())
+        .find_by_id(&ApplicationId::new(), &OrganizationId::new())
         .await
         .unwrap();
     assert!(result.is_none());
@@ -100,7 +100,7 @@ async fn save_updates_application() {
     let mut uow = factory.begin().await.unwrap();
     let mut loaded = uow
         .application_store()
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap();
@@ -112,7 +112,7 @@ async fn save_updates_application() {
     let mut uow = factory.begin().await.unwrap();
     let found = uow
         .application_store()
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap();
@@ -135,7 +135,7 @@ async fn save_with_stale_version_returns_conflict() {
     let mut uow = factory.begin().await.unwrap();
     let mut loaded = uow
         .application_store()
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap();
@@ -174,7 +174,7 @@ async fn delete_removes_application() {
 
     // Verify gone
     let mut uow = factory.begin().await.unwrap();
-    let found = uow.application_store().find_by_id(app.id()).await.unwrap();
+    let found = uow.application_store().find_by_id(app.id(), &org_id).await.unwrap();
     assert!(found.is_none());
 }
 
@@ -188,7 +188,7 @@ async fn find_by_id_overlays_pending_insert() {
     let mut uow = factory.begin().await.unwrap();
     uow.application_store().insert(&app).await.unwrap();
     // Without committing, find_by_id should return the pending insert
-    let found = uow.application_store().find_by_id(app.id()).await.unwrap();
+    let found = uow.application_store().find_by_id(app.id(), &org_id).await.unwrap();
     assert!(found.is_some());
     assert_eq!(found.unwrap().name(), "pending");
 }
@@ -208,7 +208,7 @@ async fn find_by_id_overlays_pending_delete() {
     // In new UoW: delete then find should return None
     let mut uow = factory.begin().await.unwrap();
     uow.application_store().delete(app.id()).await.unwrap();
-    let found = uow.application_store().find_by_id(app.id()).await.unwrap();
+    let found = uow.application_store().find_by_id(app.id(), &org_id).await.unwrap();
     assert!(found.is_none());
 }
 
@@ -235,7 +235,7 @@ async fn rollback_discards_changes() {
 
     // Verify not in DB
     let mut uow = factory.begin().await.unwrap();
-    let found = uow.application_store().find_by_id(app.id()).await.unwrap();
+    let found = uow.application_store().find_by_id(app.id(), &org_id).await.unwrap();
     assert!(found.is_none());
 }
 
@@ -255,7 +255,7 @@ async fn read_store_find_by_id_returns_application() {
     uow.application_store().insert(&app).await.unwrap();
     uow.commit().await.unwrap();
 
-    let found = read_store.find_by_id(app.id()).await.unwrap();
+    let found = read_store.find_by_id(app.id(), &org_id).await.unwrap();
     assert!(found.is_some());
     assert_eq!(found.unwrap().name(), "readable");
 }
@@ -265,7 +265,7 @@ async fn read_store_find_by_id_returns_none() {
     let (pool, _container) = setup().await;
     let read_store = PgApplicationReadStore::new(pool);
 
-    let result = read_store.find_by_id(&ApplicationId::new()).await.unwrap();
+    let result = read_store.find_by_id(&ApplicationId::new(), &OrganizationId::new()).await.unwrap();
     assert!(result.is_none());
 }
 
@@ -350,7 +350,7 @@ async fn version_changes_after_update() {
     uow.commit().await.unwrap();
 
     let v1 = read_store
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap()
@@ -360,7 +360,7 @@ async fn version_changes_after_update() {
     let mut uow = factory.begin().await.unwrap();
     let mut loaded = uow
         .application_store()
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap();
@@ -369,7 +369,7 @@ async fn version_changes_after_update() {
     uow.commit().await.unwrap();
 
     let v2 = read_store
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap()
@@ -394,7 +394,7 @@ async fn concurrent_update_detects_conflict() {
     let mut uow1 = factory.begin().await.unwrap();
     let mut loaded1 = uow1
         .application_store()
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap();
@@ -402,7 +402,7 @@ async fn concurrent_update_detects_conflict() {
     let mut uow2 = factory.begin().await.unwrap();
     let mut loaded2 = uow2
         .application_store()
-        .find_by_id(app.id())
+        .find_by_id(app.id(), &org_id)
         .await
         .unwrap()
         .unwrap();
@@ -1625,7 +1625,7 @@ async fn cross_tenant_application_isolation() {
     }
 
     // Org A can see its own app
-    let found = read_store.find_by_id(app_a.id()).await.unwrap();
+    let found = read_store.find_by_id(app_a.id(), &org_a).await.unwrap();
     assert!(found.is_some());
 
     // Org A's list only returns its own apps

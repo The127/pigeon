@@ -30,7 +30,7 @@ use pigeon_application::mediator::dispatcher::dispatch;
     ),
     tag = "applications"
 )]
-pub async fn create_application(
+pub(crate) async fn create_application(
     State(state): State<AppState>,
     auth: AuthInfo,
     Json(body): Json<CreateApplicationRequest>,
@@ -58,7 +58,7 @@ pub async fn create_application(
     ),
     tag = "applications"
 )]
-pub async fn get_application(
+pub(crate) async fn get_application(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path(id): Path<Uuid>,
@@ -88,7 +88,7 @@ pub async fn get_application(
     ),
     tag = "applications"
 )]
-pub async fn list_applications(
+pub(crate) async fn list_applications(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Query(query): Query<ApplicationListQuery>,
@@ -125,7 +125,7 @@ pub async fn list_applications(
     ),
     tag = "applications"
 )]
-pub async fn update_application(
+pub(crate) async fn update_application(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path(id): Path<Uuid>,
@@ -154,7 +154,7 @@ pub async fn update_application(
     ),
     tag = "applications"
 )]
-pub async fn delete_application(
+pub(crate) async fn delete_application(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path(id): Path<Uuid>,
@@ -507,7 +507,6 @@ mod tests {
             list_oidc_configs: Arc::new(StubListOidcConfigsHandler),
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             org_read_store: Arc::new(StubOrganizationReadStore),
-            app_read_store: Arc::new(StubApplicationReadStore),
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),

@@ -22,7 +22,7 @@ use pigeon_application::commands::update_event_type::UpdateEventType;
 use pigeon_application::commands::update_organization::UpdateOrganization;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
 use pigeon_application::ports::health::HealthChecker;
-use pigeon_application::ports::stores::{ApplicationReadStore, OidcConfigReadStore, OrganizationReadStore};
+use pigeon_application::ports::stores::{OidcConfigReadStore, OrganizationReadStore};
 use pigeon_application::queries::get_application_by_id::GetApplicationById;
 use pigeon_application::queries::get_endpoint_by_id::GetEndpointById;
 use pigeon_application::queries::get_event_type_by_id::GetEventTypeById;
@@ -87,7 +87,6 @@ pub struct AppState {
     pub list_oidc_configs: Arc<dyn QueryHandler<ListOidcConfigsByOrg>>,
     pub oidc_config_read_store: Arc<dyn OidcConfigReadStore>,
     pub org_read_store: Arc<dyn OrganizationReadStore>,
-    pub app_read_store: Arc<dyn ApplicationReadStore>,
     pub jwks_provider: Arc<dyn JwksProvider>,
     pub list_audit_log: Arc<dyn QueryHandler<ListAuditLog>>,
     pub audit_store: Arc<dyn pigeon_application::ports::audit_store::AuditStore>,

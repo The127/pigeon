@@ -20,8 +20,6 @@ use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
 use pigeon_application::mediator::dispatcher::dispatch;
 
-use super::verify_app_ownership;
-
 /// Create a new event type
 #[utoipa::path(
     post,
@@ -34,14 +32,13 @@ use super::verify_app_ownership;
     ),
     tag = "event_types"
 )]
-pub async fn create_event_type(
+pub(crate) async fn create_event_type(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path(app_id): Path<Uuid>,
     Json(body): Json<CreateEventTypeRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
 
     let command = CreateEventType {
         org_id: auth.org_id.clone(),
@@ -69,14 +66,13 @@ pub async fn create_event_type(
     ),
     tag = "event_types"
 )]
-pub async fn list_event_types(
+pub(crate) async fn list_event_types(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path(app_id): Path<Uuid>,
     Query(query): Query<ListQuery>,
 ) -> Result<impl IntoResponse, ApiError> {
     let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
 
     let list_query = ListEventTypesByApp {
         app_id,
@@ -111,13 +107,12 @@ pub async fn list_event_types(
     ),
     tag = "event_types"
 )]
-pub async fn get_event_type(
+pub(crate) async fn get_event_type(
     State(state): State<AppState>,
     OrgId(org_id): OrgId,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let query = GetEventTypeById {
         id: EventTypeId::from_uuid(id),
@@ -151,14 +146,13 @@ pub async fn get_event_type(
     ),
     tag = "event_types"
 )]
-pub async fn update_event_type(
+pub(crate) async fn update_event_type(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
     Json(body): Json<UpdateEventTypeRequest>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let command = UpdateEventType {
         org_id: auth.org_id.clone(),
@@ -187,13 +181,12 @@ pub async fn update_event_type(
     ),
     tag = "event_types"
 )]
-pub async fn delete_event_type(
+pub(crate) async fn delete_event_type(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path((app_id, id)): Path<(Uuid, Uuid)>,
 ) -> Result<impl IntoResponse, ApiError> {
-    let app_id = ApplicationId::from_uuid(app_id);
-    verify_app_ownership(&*state.app_read_store, &app_id, &auth.org_id).await?;
+    let _app_id = ApplicationId::from_uuid(app_id);
 
     let command = DeleteEventType {
         org_id: auth.org_id.clone(),
@@ -483,33 +476,10 @@ mod tests {
         }
     }
 
-    use pigeon_application::ports::stores::ApplicationReadStore;
-    use pigeon_domain::application::ApplicationState;
-
     // --- Helpers ---
-
-    /// Default org_id used in tests — must match the x-org-id header sent in requests.
-    fn test_org_id() -> pigeon_domain::organization::OrganizationId {
-        // Use a fixed UUID so tests can match it easily
-        pigeon_domain::organization::OrganizationId::from_uuid(
-            Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap(),
-        )
-    }
 
     fn fake_event_type() -> EventType {
         EventType::reconstitute(EventTypeState::fake())
-    }
-
-    /// Create a fake Application whose app_id and org_id match the test fixtures.
-    fn fake_app_for(app_id: &pigeon_domain::application::ApplicationId) -> Application {
-        Application::reconstitute(ApplicationState {
-            id: app_id.clone(),
-            org_id: test_org_id(),
-            name: "test-app".to_string(),
-            uid: format!("app_{}", Uuid::new_v4()),
-            created_at: chrono::Utc::now(),
-            version: pigeon_domain::version::Version::new(0),
-        })
     }
 
     fn build_et_state(
@@ -518,7 +488,6 @@ mod tests {
         delete: FakeDeleteEtHandler,
         get: FakeGetEtHandler,
         list: FakeListEtHandler,
-        app_read_store: Arc<dyn ApplicationReadStore>,
     ) -> AppState {
         use crate::test_support::*;
         AppState {
@@ -558,7 +527,6 @@ mod tests {
             list_oidc_configs: Arc::new(StubListOidcConfigsHandler),
             oidc_config_read_store: Arc::new(StubOidcConfigReadStore),
             org_read_store: Arc::new(StubOrganizationReadStore),
-            app_read_store,
             jwks_provider: Arc::new(StubJwksProvider),
             replay_dead_letter: Arc::new(StubReplayDeadLetterHandler),
             retry_attempt: Arc::new(StubRetryAttemptHandler),
@@ -571,8 +539,7 @@ mod tests {
         }
     }
 
-    fn default_et_state(et: EventType, app_id: &pigeon_domain::application::ApplicationId) -> AppState {
-        use crate::test_support::FakeApplicationReadStore;
+    fn default_et_state(et: EventType) -> AppState {
         build_et_state(
             FakeCreateEtHandler { result: Ok(et.clone()) },
             FakeUpdateEtHandler { result: Ok(et.clone()) },
@@ -586,7 +553,6 @@ mod tests {
                     limit: 20,
                 }),
             },
-            Arc::new(FakeApplicationReadStore { app: Some(fake_app_for(app_id)) }),
         )
     }
 
@@ -609,7 +575,7 @@ mod tests {
     async fn create_returns_201() {
         let et = fake_event_type();
         let app_id = et.app_id().clone();
-        let state = default_et_state(et, &app_id);
+        let state = default_et_state(et);
         let router = test_router(state);
 
         let response = router
@@ -639,7 +605,7 @@ mod tests {
     async fn create_with_empty_name_returns_400() {
         let et = fake_event_type();
         let app_id = et.app_id().clone();
-        let state = default_et_state(et, &app_id);
+        let state = default_et_state(et);
         let router = test_router(state);
 
         let response = router
@@ -668,7 +634,7 @@ mod tests {
         let et = fake_event_type();
         let app_id = et.app_id().clone();
         let id = *et.id().as_uuid();
-        let state = default_et_state(et, &app_id);
+        let state = default_et_state(et);
         let router = test_router(state);
 
         let response = router
@@ -706,9 +672,6 @@ mod tests {
                     limit: 20,
                 }),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 
@@ -731,7 +694,7 @@ mod tests {
     async fn list_returns_paginated() {
         let et = fake_event_type();
         let app_id = et.app_id().clone();
-        let state = default_et_state(et, &app_id);
+        let state = default_et_state(et);
         let router = test_router(state);
 
         let response = router
@@ -760,7 +723,7 @@ mod tests {
         let et = fake_event_type();
         let app_id = et.app_id().clone();
         let id = *et.id().as_uuid();
-        let state = default_et_state(et, &app_id);
+        let state = default_et_state(et);
         let router = test_router(state);
 
         let response = router
@@ -803,9 +766,6 @@ mod tests {
                     limit: 20,
                 }),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 
@@ -836,7 +796,7 @@ mod tests {
         let et = fake_event_type();
         let app_id = et.app_id().clone();
         let id = *et.id().as_uuid();
-        let state = default_et_state(et, &app_id);
+        let state = default_et_state(et);
         let router = test_router(state);
 
         let response = router
@@ -872,9 +832,6 @@ mod tests {
                     limit: 20,
                 }),
             },
-            Arc::new(crate::test_support::FakeApplicationReadStore {
-                app: Some(fake_app_for(&app_id)),
-            }),
         );
         let router = test_router(state);
 
@@ -893,33 +850,4 @@ mod tests {
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
     }
 
-    #[tokio::test]
-    async fn create_for_wrong_org_returns_404() {
-        let et = fake_event_type();
-        let app_id = et.app_id().clone();
-        // App belongs to test_org_id(), but we send a different org
-        let state = default_et_state(et, &app_id);
-        let router = test_router(state);
-
-        let wrong_org = Uuid::new_v4();
-        let response = router
-            .oneshot(
-                Request::builder()
-                    .method("POST")
-                    .uri(&format!("/api/v1/applications/{}/event-types", app_id.as_uuid()))
-                    .header("content-type", "application/json")
-                    .header("x-org-id", wrong_org.to_string())
-                    .body(Body::from(
-                        serde_json::to_string(&serde_json::json!({
-                            "name": "user.created"
-                        }))
-                        .unwrap(),
-                    ))
-                    .unwrap(),
-            )
-            .await
-            .unwrap();
-
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    }
 }

@@ -5,12 +5,12 @@ use serde::Serialize;
 use utoipa::ToSchema;
 
 #[derive(Debug, Serialize, ToSchema)]
-pub struct ErrorBody {
+pub(crate) struct ErrorBody {
     pub error: String,
     pub code: String,
 }
 
-pub struct ApiError(pub ApplicationError);
+pub(crate) struct ApiError(pub(crate) ApplicationError);
 
 impl From<ApplicationError> for ApiError {
     fn from(err: ApplicationError) -> Self {

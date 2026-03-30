@@ -47,6 +47,8 @@ pub struct Endpoint {
 pub enum EndpointError {
     #[error("endpoint URL must not be empty")]
     EmptyUrl,
+    #[error("endpoint URL must use http or https scheme")]
+    InvalidUrl,
 }
 
 impl Endpoint {
@@ -59,6 +61,9 @@ impl Endpoint {
     ) -> Result<Self, EndpointError> {
         if url.trim().is_empty() {
             return Err(EndpointError::EmptyUrl);
+        }
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            return Err(EndpointError::InvalidUrl);
         }
 
         let signing_secret =
@@ -134,6 +139,9 @@ impl Endpoint {
     ) -> Result<(), EndpointError> {
         if url.trim().is_empty() {
             return Err(EndpointError::EmptyUrl);
+        }
+        if !url.starts_with("http://") && !url.starts_with("https://") {
+            return Err(EndpointError::InvalidUrl);
         }
         self.url = url;
         self.signing_secret = signing_secret.filter(|s| !s.trim().is_empty());
@@ -233,6 +241,37 @@ mod tests {
         );
 
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn reject_invalid_url_scheme() {
+        let result = Endpoint::new(
+            ApplicationId::new(),
+            None,
+            "ftp://example.com/webhook".into(),
+            None,
+            vec![],
+        );
+        assert!(matches!(result, Err(EndpointError::InvalidUrl)));
+    }
+
+    #[test]
+    fn reject_bare_path_url() {
+        let result = Endpoint::new(
+            ApplicationId::new(),
+            None,
+            "/webhook".into(),
+            None,
+            vec![],
+        );
+        assert!(matches!(result, Err(EndpointError::InvalidUrl)));
+    }
+
+    #[test]
+    fn update_rejects_invalid_url_scheme() {
+        let mut ep = any_endpoint();
+        let result = ep.update("ftp://example.com".into(), None, vec![]);
+        assert!(matches!(result, Err(EndpointError::InvalidUrl)));
     }
 
     #[test]

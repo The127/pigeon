@@ -21,12 +21,14 @@ impl ApplicationReadStore for PgApplicationReadStore {
     async fn find_by_id(
         &self,
         id: &ApplicationId,
+        org_id: &OrganizationId,
     ) -> Result<Option<Application>, ApplicationError> {
         let row = sqlx::query_as::<_, ApplicationRow>(
             "SELECT id, org_id, name, uid, created_at, xmin::text::bigint AS version \
-             FROM applications WHERE id = $1",
+             FROM applications WHERE id = $1 AND org_id = $2",
         )
         .bind(id.as_uuid())
+        .bind(org_id.as_uuid())
         .fetch_optional(&self.pool)
         .await
         .map_err(|e| ApplicationError::Internal(e.to_string()))?;
