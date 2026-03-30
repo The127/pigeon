@@ -39,7 +39,7 @@ impl PgDeliveryQueue {
 struct DeliveryTaskRow {
     attempt_id: uuid::Uuid,
     endpoint_url: String,
-    signing_secret: Option<String>,
+    signing_secrets: Vec<String>,
     payload: serde_json::Value,
     attempt_number: i32,
     endpoint_id: uuid::Uuid,
@@ -68,7 +68,7 @@ impl DeliveryQueue for PgDeliveryQueue {
                  attempts.endpoint_id, \
                  attempts.message_id, \
                  (SELECT e.url FROM endpoints e WHERE e.id = attempts.endpoint_id) AS endpoint_url, \
-                 (SELECT e.signing_secret FROM endpoints e WHERE e.id = attempts.endpoint_id) AS signing_secret, \
+                 (SELECT e.signing_secrets FROM endpoints e WHERE e.id = attempts.endpoint_id) AS signing_secret, \
                  (SELECT m.payload FROM messages m WHERE m.id = attempts.message_id) AS payload, \
                  (SELECT m.app_id FROM messages m WHERE m.id = attempts.message_id) AS app_id",
         )
@@ -82,7 +82,7 @@ impl DeliveryQueue for PgDeliveryQueue {
             .map(|r| DeliveryTask {
                 attempt_id: AttemptId::from_uuid(r.attempt_id),
                 endpoint_url: r.endpoint_url,
-                signing_secret: r.signing_secret,
+                signing_secrets: r.signing_secrets,
                 payload: r.payload,
                 attempt_number: r.attempt_number as u32,
                 endpoint_id: EndpointId::from_uuid(r.endpoint_id),

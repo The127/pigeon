@@ -338,6 +338,8 @@ mod tests {
             retry_attempt: Arc::new(retry),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            rotate_signing_secret: Arc::new(StubRotateSigningSecretHandler),
+            revoke_signing_secret: Arc::new(StubRevokeSigningSecretHandler),
             health_checker: Arc::new(StubHealthChecker),
             create_organization: Arc::new(StubCreateOrgHandler),
             update_organization: Arc::new(StubUpdateOrgHandler),

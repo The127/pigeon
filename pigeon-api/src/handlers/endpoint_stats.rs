@@ -335,6 +335,8 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            rotate_signing_secret: Arc::new(StubRotateSigningSecretHandler),
+            revoke_signing_secret: Arc::new(StubRevokeSigningSecretHandler),
             list_audit_log: Arc::new(StubListAuditLogHandler),
             audit_store: Arc::new(StubAuditStore),
             uow_factory: Arc::new(pigeon_application::test_support::fakes::FakeUnitOfWorkFactory::new(pigeon_application::test_support::fakes::OperationLog::new())),

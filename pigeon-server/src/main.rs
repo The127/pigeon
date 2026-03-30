@@ -25,6 +25,8 @@ use pigeon_application::commands::replay_dead_letter::ReplayDeadLetterHandler;
 use pigeon_application::commands::retrigger_message::RetriggerMessageHandler;
 use pigeon_application::commands::retry_attempt::RetryAttemptHandler;
 use pigeon_application::commands::send_message::SendMessageHandler;
+use pigeon_application::commands::revoke_signing_secret::RevokeSigningSecretHandler;
+use pigeon_application::commands::rotate_signing_secret::RotateSigningSecretHandler;
 use pigeon_application::commands::send_test_event::SendTestEventHandler;
 use pigeon_application::commands::update_application::UpdateApplicationHandler;
 use pigeon_application::commands::update_endpoint::UpdateEndpointHandler;
@@ -368,6 +370,8 @@ async fn run_api(
         send_test_event: Arc::new(SendTestEventHandler::new(
             event_type_read_store.clone(),
         )),
+        rotate_signing_secret: Arc::new(RotateSigningSecretHandler::new()),
+        revoke_signing_secret: Arc::new(RevokeSigningSecretHandler::new()),
         health_checker,
         list_audit_log: Arc::new(ListAuditLogHandler::new(audit_read_store)),
         audit_store,

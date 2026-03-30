@@ -616,7 +616,6 @@ fn any_endpoint_for(app: &Application, et: &EventType) -> Endpoint {
         app.id().clone(),
         None,
         format!("https://example.com/webhook/{}", uuid::Uuid::new_v4()),
-        Some(format!("whsec_{}", uuid::Uuid::new_v4())),
         vec![et.id().clone()],
     )
     .unwrap()
@@ -674,7 +673,6 @@ async fn save_updates_endpoint() {
     loaded
         .update(
             "https://updated.example.com/webhook".to_string(),
-            Some("whsec_new".to_string()),
             vec![et2.id().clone()],
         )
         .unwrap();
@@ -1041,7 +1039,6 @@ async fn insert_message_and_attempts_via_uow() {
         app.id().clone(),
         None,
         format!("https://a.example.com/hook/{}", uuid::Uuid::new_v4()),
-        Some(format!("whsec_{}", uuid::Uuid::new_v4())),
         vec![et.id().clone()],
     )
     .unwrap();
@@ -1049,7 +1046,6 @@ async fn insert_message_and_attempts_via_uow() {
         app.id().clone(),
         None,
         format!("https://b.example.com/hook/{}", uuid::Uuid::new_v4()),
-        Some(format!("whsec_{}", uuid::Uuid::new_v4())),
         vec![et.id().clone()],
     )
     .unwrap();
@@ -1167,7 +1163,6 @@ async fn endpoint_read_store_finds_enabled_endpoints_by_event_type() {
         app.id().clone(),
         None,
         format!("https://a.example.com/{}", uuid::Uuid::new_v4()),
-        Some(format!("whsec_{}", uuid::Uuid::new_v4())),
         vec![et.id().clone()],
     )
     .unwrap();
@@ -1175,7 +1170,6 @@ async fn endpoint_read_store_finds_enabled_endpoints_by_event_type() {
         app.id().clone(),
         None,
         format!("https://b.example.com/{}", uuid::Uuid::new_v4()),
-        Some(format!("whsec_{}", uuid::Uuid::new_v4())),
         vec![et.id().clone()],
     )
     .unwrap();
@@ -1183,7 +1177,6 @@ async fn endpoint_read_store_finds_enabled_endpoints_by_event_type() {
         app.id().clone(),
         None,
         format!("https://c.example.com/{}", uuid::Uuid::new_v4()),
-        Some(format!("whsec_{}", uuid::Uuid::new_v4())),
         vec![et.id().clone()],
     )
     .unwrap();
@@ -1398,7 +1391,6 @@ async fn seed_pending_attempt(
         app.id().clone(),
         None,
         "https://example.com/hook".into(),
-        Some("whsec_test123".into()),
         vec![et.id().clone()],
     )
     .unwrap();
@@ -1442,7 +1434,8 @@ async fn delivery_queue_dequeue_returns_pending_attempts() {
 
     let task = &tasks[0];
     assert_eq!(task.endpoint_url, "https://example.com/hook");
-    assert_eq!(task.signing_secret.as_deref(), Some("whsec_test123"));
+    assert_eq!(task.signing_secrets.len(), 1);
+    assert!(task.signing_secrets[0].starts_with("whsec_"));
     assert_eq!(task.payload, serde_json::json!({"hello": "world"}));
     // attempt_number should be bumped from 1 to 2 by dequeue
     assert_eq!(task.attempt_number, 2);
@@ -1672,7 +1665,6 @@ async fn cross_tenant_endpoint_isolation() {
         app_a.id().clone(),
         None,
         "https://a.com/hook".into(),
-        Some("whsec_a".into()),
         vec![et_a.id().clone()],
     )
     .unwrap();
@@ -1681,7 +1673,6 @@ async fn cross_tenant_endpoint_isolation() {
         app_b.id().clone(),
         None,
         "https://b.com/hook".into(),
-        Some("whsec_b".into()),
         vec![et_b.id().clone()],
     )
     .unwrap();

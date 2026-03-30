@@ -162,7 +162,6 @@ mod tests {
             app_id.clone(),
             None,
             "https://a.com/hook".into(),
-            Some("whsec_a".into()),
             vec![event_type_id.clone()],
         )
         .unwrap();
@@ -278,7 +277,6 @@ mod tests {
                     app_id.clone(),
                     None,
                     format!("https://ep{i}.com/hook"),
-                    Some(format!("whsec_{i}")),
                     vec![event_type_id.clone()],
                 )
                 .unwrap()
@@ -333,7 +331,6 @@ mod tests {
             app_id.clone(),
             None,
             "https://a.com/hook".into(),
-            Some("whsec_a".into()),
             vec![event_type_id.clone()],
         )
         .unwrap();

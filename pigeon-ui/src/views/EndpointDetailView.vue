@@ -8,6 +8,8 @@ import {
   useDeleteEndpoint,
   useEndpointStats,
   useEventTypes,
+  useRotateSigningSecret,
+  useRevokeSigningSecret,
 } from '@/api/applications'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +24,7 @@ import {
 import { Input } from '@/components/ui/input'
 import PageHeader from '@/components/PageHeader.vue'
 import FormField from '@/components/FormField.vue'
+import SecretRevealDialog from '@/components/SecretRevealDialog.vue'
 import StatCard from '@/components/StatCard.vue'
 import DeliveryChart from '@/components/DeliveryChart.vue'
 import LoadingState from '@/components/LoadingState.vue'
@@ -35,6 +38,8 @@ import {
   Trash2,
   AlertTriangle,
   Clock,
+  RotateCcw,
+  Key,
 } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -62,7 +67,6 @@ const subscribedEventTypes = computed(() =>
 const editDialogOpen = ref(false)
 const editName = ref('')
 const editUrl = ref('')
-const editSecret = ref('')
 const editEventTypeIds = ref<string[]>([])
 const updateEp = useUpdateEndpoint(appId)
 
@@ -70,7 +74,6 @@ function openEditDialog() {
   if (!endpoint.value) return
   editName.value = endpoint.value.name
   editUrl.value = endpoint.value.url
-  editSecret.value = ''
   editEventTypeIds.value = [...endpoint.value.event_type_ids]
   editDialogOpen.value = true
 }
@@ -88,13 +91,44 @@ function handleUpdate() {
       id: epId.value,
       body: {
         url: editUrl.value,
-        signing_secret: editSecret.value || undefined as unknown as string,
         event_type_ids: editEventTypeIds.value,
         version: endpoint.value.version,
       },
     },
     {
       onSuccess: () => { editDialogOpen.value = false; toast.success('Endpoint updated') },
+      onError: (e: Error) => toast.error(e.message),
+    },
+  )
+}
+
+// Signing Secrets
+const rotateSecret = useRotateSigningSecret(appId)
+const revokeSecret = useRevokeSigningSecret(appId)
+const revealedSecret = ref('')
+const secretRevealOpen = ref(false)
+
+function handleRotate() {
+  rotateSecret.mutate(epId.value, {
+    onSuccess: (data) => {
+      revealedSecret.value = data.new_secret
+      secretRevealOpen.value = true
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+}
+
+function handleSecretRevealed() {
+  secretRevealOpen.value = false
+  revealedSecret.value = ''
+  toast.success('Signing secret rotated')
+}
+
+function handleRevoke(index: number) {
+  revokeSecret.mutate(
+    { endpointId: epId.value, index },
+    {
+      onSuccess: () => toast.success('Signing secret revoked'),
       onError: (e: Error) => toast.error(e.message),
     },
   )
@@ -247,6 +281,46 @@ function lastDeliveryLabel() {
           </RouterLink>
         </div>
       </div>
+
+      <!-- Signing Secrets -->
+      <div class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-medium flex items-center gap-2">
+            <Key class="h-4 w-4" />
+            Signing Secrets
+          </h3>
+          <Button variant="outline" size="sm" @click="handleRotate" :disabled="rotateSecret.isPending.value">
+            <RotateCcw class="mr-2 h-4 w-4" />
+            {{ rotateSecret.isPending.value ? 'Rotating...' : 'Rotate' }}
+          </Button>
+        </div>
+        <div v-if="!endpoint?.signing_secrets_masked.length" class="text-sm text-muted-foreground">
+          No signing secrets configured.
+        </div>
+        <div v-else class="space-y-2">
+          <div
+            v-for="(masked, index) in endpoint.signing_secrets_masked"
+            :key="index"
+            class="flex items-center justify-between rounded-md border px-3 py-2"
+          >
+            <div class="flex items-center gap-2">
+              <code class="text-sm font-mono">{{ masked }}</code>
+              <Badge v-if="index === 0" variant="default">current</Badge>
+              <Badge v-else variant="secondary">previous</Badge>
+            </div>
+            <Button
+              v-if="index > 0"
+              variant="ghost"
+              size="sm"
+              class="text-destructive hover:text-destructive"
+              :disabled="revokeSecret.isPending.value"
+              @click="handleRevoke(index)"
+            >
+              Revoke
+            </Button>
+          </div>
+        </div>
+      </div>
     </template>
 
     <!-- Edit dialog -->
@@ -262,9 +336,6 @@ function lastDeliveryLabel() {
           </FormField>
           <FormField label="URL" html-for="edit-ep-url" required>
             <Input id="edit-ep-url" v-model="editUrl" />
-          </FormField>
-          <FormField label="Signing Secret" html-for="edit-ep-secret" description="Leave blank to keep current. Clear and save empty to remove.">
-            <Input id="edit-ep-secret" v-model="editSecret" placeholder="whsec_..." />
           </FormField>
           <FormField v-if="eventTypesData?.items.length" label="Event Types" description="Select which events this endpoint receives.">
             <div class="flex flex-wrap gap-2">
@@ -305,5 +376,12 @@ function lastDeliveryLabel() {
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    <!-- Secret Reveal Dialog -->
+    <SecretRevealDialog
+      :open="secretRevealOpen"
+      :secret="revealedSecret"
+      @confirmed="handleSecretRevealed"
+    />
   </div>
 </template>

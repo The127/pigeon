@@ -331,6 +331,22 @@ impl CommandHandler<RetriggerMessage> for StubRetriggerMessageHandler {
     }
 }
 
+pub(crate) struct StubRotateSigningSecretHandler;
+#[async_trait]
+impl CommandHandler<pigeon_application::commands::rotate_signing_secret::RotateSigningSecret> for StubRotateSigningSecretHandler {
+    async fn handle(&self, _c: pigeon_application::commands::rotate_signing_secret::RotateSigningSecret, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<pigeon_application::commands::rotate_signing_secret::RotateSigningSecretResult, ApplicationError> {
+        Err(ApplicationError::Internal("stub".into()))
+    }
+}
+
+pub(crate) struct StubRevokeSigningSecretHandler;
+#[async_trait]
+impl CommandHandler<pigeon_application::commands::revoke_signing_secret::RevokeSigningSecret> for StubRevokeSigningSecretHandler {
+    async fn handle(&self, _c: pigeon_application::commands::revoke_signing_secret::RevokeSigningSecret, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<(), ApplicationError> {
+        Err(ApplicationError::Internal("stub".into()))
+    }
+}
+
 pub(crate) struct StubSendTestEventHandler;
 #[async_trait]
 impl CommandHandler<SendTestEvent> for StubSendTestEventHandler {

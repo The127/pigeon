@@ -159,14 +159,14 @@ impl UnitOfWork for PgUnitOfWork {
                 }
                 Change::InsertEndpoint(ep) => {
                     sqlx::query(
-                        "INSERT INTO endpoints (id, app_id, name, url, signing_secret, enabled, created_at) \
+                        "INSERT INTO endpoints (id, app_id, name, url, signing_secrets, enabled, created_at) \
                          VALUES ($1, $2, $3, $4, $5, $6, $7)",
                     )
                     .bind(ep.id().as_uuid())
                     .bind(ep.app_id().as_uuid())
                     .bind(ep.name())
                     .bind(ep.url())
-                    .bind(ep.signing_secret())
+                    .bind(&ep.signing_secrets().to_vec() as &Vec<String>)
                     .bind(ep.enabled())
                     .bind(ep.created_at())
                     .execute(&mut *tx)
@@ -187,12 +187,12 @@ impl UnitOfWork for PgUnitOfWork {
                 }
                 Change::SaveEndpoint(ep) => {
                     let result = sqlx::query(
-                        "UPDATE endpoints SET name = $1, url = $2, signing_secret = $3, enabled = $4 \
+                        "UPDATE endpoints SET name = $1, url = $2, signing_secrets = $3, enabled = $4 \
                          WHERE id = $5 AND xmin::text::bigint = $6",
                     )
                     .bind(ep.name())
                     .bind(ep.url())
-                    .bind(ep.signing_secret())
+                    .bind(&ep.signing_secrets().to_vec() as &Vec<String>)
                     .bind(ep.enabled())
                     .bind(ep.id().as_uuid())
                     .bind(ep.version().as_u64() as i64)

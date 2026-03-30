@@ -971,33 +971,6 @@ async fn given_create_ep_request(world: &mut AppWorld, url: String) {
         app_id,
         name: None,
         url,
-        signing_secret: Some("whsec_secret123".into()),
-        event_type_ids: vec![et_id],
-    });
-    world.et_data = Some(et_data);
-    world.log = Some(OperationLog::new());
-}
-
-#[given(regex = r#"a request to create an endpoint with url "([^"]*)" and signing secret "([^"]*)""#)]
-async fn given_create_ep_with_secret(world: &mut AppWorld, url: String, signing_secret: String) {
-    let signing_secret = if signing_secret.is_empty() {
-        None
-    } else {
-        Some(signing_secret)
-    };
-    let app_id = ApplicationId::new();
-    let org_id = OrganizationId::new();
-    let et = EventType::new(app_id.clone(), "test.event".into(), None).unwrap();
-    let et_id = et.id().clone();
-    let et_data = SharedEventTypeData::default();
-    et_data.event_types.lock().unwrap().push(et);
-
-    world.create_endpoint_command = Some(CreateEndpoint {
-        org_id,
-        app_id,
-        name: None,
-        url,
-        signing_secret,
         event_type_ids: vec![et_id],
     });
     world.et_data = Some(et_data);
@@ -1011,7 +984,6 @@ async fn given_create_ep_with_nonexistent_et(world: &mut AppWorld) {
         app_id: ApplicationId::new(),
         name: None,
         url: "https://example.com/webhook".into(),
-        signing_secret: None,
         event_type_ids: vec![EventTypeId::new()], // random ID, won't exist
     });
     world.log = Some(OperationLog::new());
@@ -1081,7 +1053,6 @@ async fn given_existing_ep(world: &mut AppWorld, url: String) {
         ApplicationId::new(),
         None,
         url,
-        Some("whsec_secret123".into()),
         vec![EventTypeId::new()],
     )
     .unwrap();
@@ -1117,7 +1088,6 @@ async fn when_update_ep_executed(world: &mut AppWorld, url: String) {
                 org_id: OrganizationId::new(),
                 id: ep.id().clone(),
                 url,
-                signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![],
                 version: ep.version(),
             }, &mut ctx)
@@ -1146,7 +1116,6 @@ async fn when_update_ep_with_nonexistent_et(world: &mut AppWorld) {
                 org_id: OrganizationId::new(),
                 id: ep.id().clone(),
                 url: "https://example.com/webhook".into(),
-                signing_secret: None,
                 event_type_ids: vec![EventTypeId::new()], // non-existent
                 version: ep.version(),
             }, &mut ctx)
@@ -1175,7 +1144,6 @@ async fn when_update_ep_stale_version(world: &mut AppWorld) {
                 org_id: OrganizationId::new(),
                 id: ep.id().clone(),
                 url: "https://new.example.com/webhook".into(),
-                signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![],
                 version: Version::new(999),
             }, &mut ctx)
@@ -1219,7 +1187,6 @@ async fn when_update_ep_non_existent(world: &mut AppWorld) {
                 org_id: OrganizationId::new(),
                 id: EndpointId::new(),
                 url: "https://example.com/webhook".into(),
-                signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version: Version::new(0),
             }, &mut ctx)
@@ -1268,7 +1235,6 @@ async fn given_ep_exists(world: &mut AppWorld, url: String) {
         ApplicationId::new(),
         None,
         url,
-        Some("whsec_secret123".into()),
         vec![EventTypeId::new()],
     )
     .unwrap();
@@ -1362,7 +1328,6 @@ async fn given_app_with_endpoints(world: &mut AppWorld, _event_type_name: String
         app_id.clone(),
         None,
         "https://a.com/hook".into(),
-        Some("whsec_a".into()),
         vec![event_type_id.clone()],
     )
     .unwrap();
@@ -1370,7 +1335,6 @@ async fn given_app_with_endpoints(world: &mut AppWorld, _event_type_name: String
         app_id.clone(),
         None,
         "https://b.com/hook".into(),
-        Some("whsec_b".into()),
         vec![event_type_id.clone()],
     )
     .unwrap();
@@ -2106,7 +2070,6 @@ async fn given_message_with_matching_endpoint(world: &mut AppWorld) {
         app_id.clone(),
         None,
         "https://ep.com/hook".into(),
-        Some("whsec_test".into()),
         vec![event_type_id.clone()],
     )
     .unwrap();
@@ -2165,7 +2128,6 @@ async fn given_message_with_existing_attempt(world: &mut AppWorld) {
         app_id.clone(),
         None,
         "https://ep.com/hook".into(),
-        Some("whsec_test".into()),
         vec![event_type_id.clone()],
     )
     .unwrap();
@@ -2538,7 +2500,6 @@ async fn given_app_with_test_event_type(world: &mut AppWorld) {
         app_id.clone(),
         None,
         "https://example.com/webhook".to_string(),
-        None,
         vec![et.id().clone()],
     )
     .unwrap();
@@ -2563,7 +2524,6 @@ async fn given_app_without_test_event_type(world: &mut AppWorld) {
         app_id.clone(),
         None,
         "https://example.com/webhook".to_string(),
-        None,
         vec![EventTypeId::new()],
     )
     .unwrap();
@@ -2639,7 +2599,6 @@ async fn given_enabled_endpoint(world: &mut AppWorld) {
         app_id.clone(),
         None,
         "https://example.com/webhook".to_string(),
-        None,
         vec![EventTypeId::new()],
     )
     .unwrap();
@@ -3098,7 +3057,6 @@ async fn given_app_with_n_endpoints(world: &mut AppWorld, count: usize) {
             app_id.clone(),
             None,
             format!("https://ep{i}.example.com/webhook"),
-            None,
             vec![EventTypeId::new()],
         )
         .unwrap();

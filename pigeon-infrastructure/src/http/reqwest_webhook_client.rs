@@ -31,11 +31,11 @@ impl ReqwestWebhookClient {
 
 #[async_trait]
 impl WebhookHttpClient for ReqwestWebhookClient {
-    async fn deliver<'a>(
+    async fn deliver(
         &self,
         url: &str,
         payload: &serde_json::Value,
-        signing_secret: Option<&'a str>,
+        signing_secrets: &[String],
     ) -> WebhookResult {
         let body = serde_json::to_vec(payload).expect("payload is valid JSON");
 
@@ -46,9 +46,12 @@ impl WebhookHttpClient for ReqwestWebhookClient {
             .post(url)
             .header("Content-Type", "application/json");
 
-        if let Some(secret) = signing_secret {
-            let signature = Self::sign(&body, secret);
-            request = request.header("X-Pigeon-Signature", signature);
+        if !signing_secrets.is_empty() {
+            let signatures: Vec<String> = signing_secrets
+                .iter()
+                .map(|secret| Self::sign(&body, secret))
+                .collect();
+            request = request.header("X-Pigeon-Signature", signatures.join(","));
         }
 
         let result = request

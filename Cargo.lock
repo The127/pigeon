@@ -2423,6 +2423,7 @@ dependencies = [
  "chrono",
  "fake",
  "pigeon-macros",
+ "rand 0.8.5",
  "serde_json",
  "thiserror 2.0.18",
  "uuid",

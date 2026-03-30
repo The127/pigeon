@@ -103,9 +103,6 @@ Fixed: `pg_endpoint_stats_read_store.rs` — `endpoint_delivery_summary` subquer
 ### Dead Letter Alert Webhooks
 Subscribe to `DeadLettered` events via outbox handler. POST to a user-configurable alert URL per application. "Your endpoint X is failing" notifications without polling. First real consumer of the outbox beyond logging.
 
-### Real-time Event Stream (SSE)
-`GET /api/v1/applications/{app_id}/events/stream` — Server-Sent Events endpoint fed by the outbox worker. Frontend can subscribe for live updates on message delivery status.
-
 ## Priority: Medium
 
 ### ~~Search & Filtering~~
@@ -118,8 +115,8 @@ Auto/Light/Dark mode with amber accent. Settings page at `/settings` with: accen
 - Mobile responsive sidebar (sheet overlay on small screens)
 - Message status filter (backend: done, UI: done)
 
-### Signing Secret Rotation
-No mechanism to rotate an endpoint's `signing_secret` without breaking in-flight deliveries. Design: dual-secret window — deliver signed with new secret, but during a configurable transition period include both old and new signatures so consumers can verify with either.
+### ~~Signing Secret Rotation~~
+Pigeon-generated secrets (Stripe model). `signing_secrets: Vec<String>` (max 2, newest first). Auto-generated on create, rotate adds new + keeps old, revoke removes old. Delivery signs with ALL active secrets (`X-Pigeon-Signature: v1=<sig1>,v1=<sig2>`). Secrets masked in responses (`whsec_...a1b2c3`), full secret shown only on create and rotate via non-closable reveal dialog. UI: rotate/revoke on endpoint detail, copy-to-clipboard.
 
 ### External Event Bus Integration
 Swap outbox handler to push events to Kafka/NATS/SQS instead of (or in addition to) logging. Enables downstream systems to react to Pigeon events.

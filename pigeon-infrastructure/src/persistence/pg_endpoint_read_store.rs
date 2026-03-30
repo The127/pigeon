@@ -28,7 +28,7 @@ impl EndpointReadStore for PgEndpointReadStore {
         org_id: &OrganizationId,
     ) -> Result<Vec<Endpoint>, ApplicationError> {
         let rows = sqlx::query_as::<_, EndpointRow>(
-            "SELECT e.id, e.app_id, e.name, e.url, e.signing_secret, e.enabled, e.created_at, \
+            "SELECT e.id, e.app_id, e.name, e.url, e.signing_secrets, e.enabled, e.created_at, \
              e.xmin::text::bigint AS version \
              FROM endpoints e \
              JOIN applications a ON a.id = e.app_id \
@@ -69,7 +69,7 @@ impl EndpointReadStore for PgEndpointReadStore {
         org_id: &OrganizationId,
     ) -> Result<Option<Endpoint>, ApplicationError> {
         let row = sqlx::query_as::<_, EndpointRow>(
-            "SELECT e.id, e.app_id, e.name, e.url, e.signing_secret, e.enabled, e.created_at, \
+            "SELECT e.id, e.app_id, e.name, e.url, e.signing_secrets, e.enabled, e.created_at, \
              e.xmin::text::bigint AS version \
              FROM endpoints e \
              JOIN applications a ON a.id = e.app_id \
@@ -110,7 +110,7 @@ impl EndpointReadStore for PgEndpointReadStore {
         limit: u64,
     ) -> Result<Vec<Endpoint>, ApplicationError> {
         let rows = sqlx::query_as::<_, EndpointRow>(
-            "SELECT e.id, e.app_id, e.name, e.url, e.signing_secret, e.enabled, e.created_at, \
+            "SELECT e.id, e.app_id, e.name, e.url, e.signing_secrets, e.enabled, e.created_at, \
              e.xmin::text::bigint AS version \
              FROM endpoints e \
              JOIN applications a ON a.id = e.app_id \
@@ -174,7 +174,7 @@ struct EndpointRow {
     app_id: uuid::Uuid,
     name: String,
     url: String,
-    signing_secret: Option<String>,
+    signing_secrets: Vec<String>,
     enabled: bool,
     created_at: chrono::DateTime<chrono::Utc>,
     version: i64,
@@ -187,7 +187,7 @@ impl EndpointRow {
             app_id: ApplicationId::from_uuid(self.app_id),
             name: self.name,
             url: self.url,
-            signing_secret: self.signing_secret,
+            signing_secrets: self.signing_secrets,
             enabled: self.enabled,
             event_type_ids,
             created_at: self.created_at,

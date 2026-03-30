@@ -18,7 +18,6 @@ pub struct UpdateEndpoint {
     pub org_id: OrganizationId,
     pub id: EndpointId,
     pub url: String,
-    pub signing_secret: Option<String>,
     pub event_type_ids: Vec<EventTypeId>,
     pub version: Version,
 }
@@ -70,7 +69,7 @@ impl CommandHandler<UpdateEndpoint> for UpdateEndpointHandler {
         }
 
         endpoint
-            .update(command.url, command.signing_secret, command.event_type_ids)
+            .update(command.url, command.event_type_ids)
             .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
         ctx.uow().endpoint_store().save(&endpoint).await?;
@@ -107,7 +106,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            Some("whsec_secret123".into()),
             vec![EventTypeId::new()],
         )
         .unwrap();
@@ -137,7 +135,6 @@ mod tests {
                 org_id: OrganizationId::new(),
                 id,
                 url: "https://new.example.com/webhook".into(),
-                signing_secret: Some("whsec_new_secret".into()),
                 event_type_ids: vec![],
                 version,
             }, &mut ctx)
@@ -172,7 +169,6 @@ mod tests {
                 org_id: OrganizationId::new(),
                 id: EndpointId::new(),
                 url: "https://example.com/webhook".into(),
-                signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version: Version::new(0),
             }, &mut ctx)
@@ -204,7 +200,6 @@ mod tests {
                 org_id: OrganizationId::new(),
                 id,
                 url: "".into(),
-                signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version,
             }, &mut ctx)
@@ -235,7 +230,6 @@ mod tests {
                 org_id: OrganizationId::new(),
                 id,
                 url: "https://example.com/webhook".into(),
-                signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version: Version::new(999),
             }, &mut ctx)

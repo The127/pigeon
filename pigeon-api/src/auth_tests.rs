@@ -112,6 +112,26 @@ impl CommandHandler<pigeon_application::commands::send_test_event::SendTestEvent
     }
 }
 #[async_trait]
+impl CommandHandler<pigeon_application::commands::rotate_signing_secret::RotateSigningSecret> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::commands::rotate_signing_secret::RotateSigningSecret,
+        _ctx: &mut RequestContext,
+    ) -> Result<pigeon_application::commands::rotate_signing_secret::RotateSigningSecretResult, ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
+impl CommandHandler<pigeon_application::commands::revoke_signing_secret::RevokeSigningSecret> for S {
+    async fn handle(
+        &self,
+        _: pigeon_application::commands::revoke_signing_secret::RevokeSigningSecret,
+        _ctx: &mut RequestContext,
+    ) -> Result<(), ApplicationError> {
+        unimplemented!()
+    }
+}
+#[async_trait]
 impl CommandHandler<pigeon_application::commands::retrigger_message::RetriggerMessage> for S {
     async fn handle(
         &self,
@@ -431,6 +451,8 @@ fn test_state() -> AppState {
         retry_attempt: Arc::new(S),
         retrigger_message: Arc::new(S),
         send_test_event: Arc::new(S),
+        rotate_signing_secret: Arc::new(S),
+        revoke_signing_secret: Arc::new(S),
         list_audit_log: Arc::new(S),
         audit_store: Arc::new(S),
         metrics_render: Arc::new(|| String::new()),

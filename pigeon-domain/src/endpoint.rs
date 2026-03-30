@@ -36,7 +36,7 @@ pub struct Endpoint {
     app_id: ApplicationId,
     name: String,
     url: String,
-    signing_secret: Option<String>,
+    signing_secrets: Vec<String>,
     enabled: bool,
     event_type_ids: Vec<EventTypeId>,
     created_at: DateTime<Utc>,
@@ -49,6 +49,28 @@ pub enum EndpointError {
     EmptyUrl,
     #[error("endpoint URL must use http or https scheme")]
     InvalidUrl,
+    #[error("endpoint already has the maximum number of signing secrets (2)")]
+    MaxSigningSecrets,
+    #[error("cannot revoke the last signing secret")]
+    LastSigningSecret,
+    #[error("signing secret index out of bounds")]
+    SecretIndexOutOfBounds,
+}
+
+/// Generate a cryptographically random signing secret.
+pub fn generate_signing_secret() -> String {
+    use rand::Rng;
+    let bytes: [u8; 32] = rand::thread_rng().gen();
+    let hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
+    format!("whsec_{hex}")
+}
+
+/// Mask a signing secret for display: `"whsec_...a1b2c3"` (last 6 chars).
+pub fn mask_signing_secret(secret: &str) -> String {
+    if secret.len() <= 10 {
+        return "whsec_...".to_string();
+    }
+    format!("whsec_...{}", &secret[secret.len() - 6..])
 }
 
 impl Endpoint {
@@ -56,7 +78,6 @@ impl Endpoint {
         app_id: ApplicationId,
         name: Option<String>,
         url: String,
-        signing_secret: Option<String>,
         event_type_ids: Vec<EventTypeId>,
     ) -> Result<Self, EndpointError> {
         if url.trim().is_empty() {
@@ -65,9 +86,6 @@ impl Endpoint {
         if !url.starts_with("http://") && !url.starts_with("https://") {
             return Err(EndpointError::InvalidUrl);
         }
-
-        let signing_secret =
-            signing_secret.filter(|s| !s.trim().is_empty());
 
         let name = match name {
             Some(n) if !n.trim().is_empty() => n,
@@ -79,7 +97,7 @@ impl Endpoint {
             app_id,
             name,
             url,
-            signing_secret,
+            signing_secrets: vec![generate_signing_secret()],
             enabled: true,
             event_type_ids,
             created_at: Utc::now(),
@@ -103,8 +121,8 @@ impl Endpoint {
         &self.url
     }
 
-    pub fn signing_secret(&self) -> Option<&str> {
-        self.signing_secret.as_deref()
+    pub fn signing_secrets(&self) -> &[String] {
+        &self.signing_secrets
     }
 
     pub fn enabled(&self) -> bool {
@@ -134,7 +152,6 @@ impl Endpoint {
     pub fn update(
         &mut self,
         url: String,
-        signing_secret: Option<String>,
         event_type_ids: Vec<EventTypeId>,
     ) -> Result<(), EndpointError> {
         if url.trim().is_empty() {
@@ -144,8 +161,30 @@ impl Endpoint {
             return Err(EndpointError::InvalidUrl);
         }
         self.url = url;
-        self.signing_secret = signing_secret.filter(|s| !s.trim().is_empty());
         self.event_type_ids = event_type_ids;
+        Ok(())
+    }
+
+    /// Generate a new signing secret and add it to the front of the list.
+    /// The newest secret is always at index 0. Max 2 secrets allowed.
+    pub fn rotate_signing_secret(&mut self) -> Result<String, EndpointError> {
+        if self.signing_secrets.len() >= 2 {
+            return Err(EndpointError::MaxSigningSecrets);
+        }
+        let secret = generate_signing_secret();
+        self.signing_secrets.insert(0, secret.clone());
+        Ok(secret)
+    }
+
+    /// Remove a signing secret by index. Cannot remove the last secret.
+    pub fn revoke_signing_secret(&mut self, index: usize) -> Result<(), EndpointError> {
+        if self.signing_secrets.len() <= 1 {
+            return Err(EndpointError::LastSigningSecret);
+        }
+        if index >= self.signing_secrets.len() {
+            return Err(EndpointError::SecretIndexOutOfBounds);
+        }
+        self.signing_secrets.remove(index);
         Ok(())
     }
 }
@@ -161,7 +200,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            Some("whsec_secret123".into()),
             vec![EventTypeId::new()],
         )
         .unwrap();
@@ -177,7 +215,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -192,7 +229,6 @@ mod tests {
             ApplicationId::new(),
             Some("".into()),
             "https://example.com/webhook".into(),
-            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -207,7 +243,6 @@ mod tests {
             ApplicationId::new(),
             Some("   ".into()),
             "https://example.com/webhook".into(),
-            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -222,7 +257,6 @@ mod tests {
             ApplicationId::new(),
             Some("my-webhook".into()),
             "https://example.com/webhook".into(),
-            Some("whsec_secret".into()),
             vec![],
         )
         .unwrap();
@@ -236,7 +270,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "".into(),
-            Some("whsec_secret123".into()),
             vec![],
         );
 
@@ -249,7 +282,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "ftp://example.com/webhook".into(),
-            None,
             vec![],
         );
         assert!(matches!(result, Err(EndpointError::InvalidUrl)));
@@ -261,7 +293,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "/webhook".into(),
-            None,
             vec![],
         );
         assert!(matches!(result, Err(EndpointError::InvalidUrl)));
@@ -270,22 +301,22 @@ mod tests {
     #[test]
     fn update_rejects_invalid_url_scheme() {
         let mut ep = any_endpoint();
-        let result = ep.update("ftp://example.com".into(), None, vec![]);
+        let result = ep.update("ftp://example.com".into(), vec![]);
         assert!(matches!(result, Err(EndpointError::InvalidUrl)));
     }
 
     #[test]
-    fn empty_signing_secret_normalized_to_none() {
+    fn new_endpoint_has_one_signing_secret() {
         let ep = Endpoint::new(
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            Some("".into()),
             vec![],
         )
         .unwrap();
 
-        assert!(ep.signing_secret().is_none());
+        assert_eq!(ep.signing_secrets().len(), 1);
+        assert!(ep.signing_secrets()[0].starts_with("whsec_"));
     }
 
     #[test]
@@ -305,7 +336,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "   ".into(),
-            Some("whsec_secret123".into()),
             vec![],
         );
 
@@ -313,31 +343,17 @@ mod tests {
     }
 
     #[test]
-    fn whitespace_signing_secret_normalized_to_none() {
+    fn new_endpoint_auto_generates_signing_secret() {
         let ep = Endpoint::new(
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            Some("   ".into()),
             vec![],
         )
         .unwrap();
 
-        assert!(ep.signing_secret().is_none());
-    }
-
-    #[test]
-    fn none_signing_secret_allowed() {
-        let ep = Endpoint::new(
-            ApplicationId::new(),
-            None,
-            "https://example.com/webhook".into(),
-            None,
-            vec![],
-        )
-        .unwrap();
-
-        assert!(ep.signing_secret().is_none());
+        assert_eq!(ep.signing_secrets().len(), 1);
+        assert!(ep.signing_secrets()[0].starts_with("whsec_"));
     }
 
     #[test]
@@ -375,7 +391,7 @@ mod tests {
             app_id: state.app_id.clone(),
             name: state.name.clone(),
             url: state.url.clone(),
-            signing_secret: state.signing_secret.clone(),
+            signing_secrets: state.signing_secrets.clone(),
             enabled: state.enabled,
             event_type_ids: state.event_type_ids.clone(),
             created_at: state.created_at,
@@ -385,7 +401,7 @@ mod tests {
         assert_eq!(*ep.id(), state.id);
         assert_eq!(*ep.app_id(), state.app_id);
         assert_eq!(ep.url(), state.url);
-        assert_eq!(ep.signing_secret(), state.signing_secret.as_deref());
+        assert_eq!(ep.signing_secrets(), &state.signing_secrets);
         assert_eq!(ep.enabled(), state.enabled);
         assert_eq!(ep.event_type_ids(), state.event_type_ids);
         assert_eq!(*ep.created_at(), state.created_at);

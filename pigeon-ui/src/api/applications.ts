@@ -44,6 +44,7 @@ export type {
   UpdateEndpointRequest,
   UpdateEventTypeRequest,
 }
+// CreateEndpointResponse is exported from where it's defined below
 
 // Aliases for generated types used by components under shorter names
 export type { TimeBucketResponse as TimeBucket } from './generated/types.gen'
@@ -211,10 +212,12 @@ export function useEndpoints(appId: Ref<string>) {
   })
 }
 
+export type CreateEndpointResponse = EndpointResponse & { signing_secret: string }
+
 export function useCreateEndpoint(appId: Ref<string>) {
   const queryClient = useQueryClient()
 
-  return useMutation<EndpointResponse, Error, CreateEndpointRequest>({
+  return useMutation<CreateEndpointResponse, Error, CreateEndpointRequest>({
     mutationFn: (body) =>
       apiFetch(`/applications/${appId.value}/endpoints`, {
         method: 'POST',
@@ -255,6 +258,41 @@ export function useDeleteEndpoint(appId: Ref<string>) {
       queryClient.invalidateQueries({ queryKey: ['applications', appId, 'endpoints'] })
       queryClient.invalidateQueries({ queryKey: ['applications', appId, 'event-types'] })
       queryClient.invalidateQueries({ queryKey: ['applications', appId, 'stats'] })
+    },
+  })
+}
+
+// --- Signing Secret Rotation ---
+
+export interface RotateSigningSecretResponse {
+  new_secret: string
+  signing_secrets_masked: string[]
+}
+
+export function useRotateSigningSecret(appId: Ref<string>) {
+  const queryClient = useQueryClient()
+
+  return useMutation<RotateSigningSecretResponse, Error, string>({
+    mutationFn: (endpointId) =>
+      apiFetch(`/applications/${appId.value}/endpoints/${endpointId}/rotate`, {
+        method: 'POST',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'endpoints'] })
+    },
+  })
+}
+
+export function useRevokeSigningSecret(appId: Ref<string>) {
+  const queryClient = useQueryClient()
+
+  return useMutation<void, Error, { endpointId: string; index: number }>({
+    mutationFn: ({ endpointId, index }) =>
+      apiFetch(`/applications/${appId.value}/endpoints/${endpointId}/secrets/${index}`, {
+        method: 'DELETE',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'endpoints'] })
     },
   })
 }

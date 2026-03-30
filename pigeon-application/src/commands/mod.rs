@@ -12,6 +12,8 @@ pub mod delete_organization;
 pub mod replay_dead_letter;
 pub mod retrigger_message;
 pub mod retry_attempt;
+pub mod revoke_signing_secret;
+pub mod rotate_signing_secret;
 pub mod send_message;
 pub mod send_test_event;
 pub mod update_application;

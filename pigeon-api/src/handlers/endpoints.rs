@@ -6,6 +6,8 @@ use uuid::Uuid;
 
 use pigeon_application::commands::create_endpoint::CreateEndpoint;
 use pigeon_application::commands::delete_endpoint::DeleteEndpoint;
+use pigeon_application::commands::revoke_signing_secret::RevokeSigningSecret;
+use pigeon_application::commands::rotate_signing_secret::RotateSigningSecret;
 use pigeon_application::commands::update_endpoint::UpdateEndpoint;
 use pigeon_application::queries::get_endpoint_by_id::GetEndpointById;
 use pigeon_application::queries::list_endpoints_by_app::ListEndpointsByApp;
@@ -46,12 +48,15 @@ pub(crate) async fn create_endpoint(
         app_id,
         name: body.name,
         url: body.url,
-        signing_secret: body.signing_secret,
         event_type_ids: body.event_type_ids.into_iter().map(EventTypeId::from_uuid).collect(),
     };
 
     let ep = dispatch(state.create_endpoint.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone()).await.map_err(ApiError)?;
-    let response = EndpointResponse::from(ep);
+
+    // Return full signing secret on create — this is the only time the user can see it
+    let signing_secret = ep.signing_secrets().first().cloned().unwrap_or_default();
+    let mut response = serde_json::to_value(EndpointResponse::from(ep)).unwrap();
+    response["signing_secret"] = serde_json::Value::String(signing_secret);
 
     Ok((StatusCode::CREATED, Json(response)))
 }
@@ -161,7 +166,6 @@ pub(crate) async fn update_endpoint(
         org_id: auth.org_id.clone(),
         id: EndpointId::from_uuid(id),
         url: body.url,
-        signing_secret: body.signing_secret,
         event_type_ids: body.event_type_ids.into_iter().map(EventTypeId::from_uuid).collect(),
         version: Version::new(body.version),
     };
@@ -199,6 +203,70 @@ pub(crate) async fn delete_endpoint(
 
     dispatch(state.delete_endpoint.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone()).await.map_err(ApiError)?;
 
+    Ok(StatusCode::NO_CONTENT)
+}
+
+/// Rotate the signing secret for an endpoint
+#[utoipa::path(
+    post,
+    path = "/api/v1/applications/{app_id}/endpoints/{id}/rotate",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("id" = Uuid, Path, description = "Endpoint ID"),
+    ),
+    responses(
+        (status = 200, description = "New signing secret generated"),
+        (status = 400, description = "Maximum secrets reached", body = ErrorBody),
+        (status = 404, description = "Endpoint not found", body = ErrorBody),
+    ),
+    tag = "endpoints"
+)]
+pub(crate) async fn rotate_signing_secret(
+    State(state): State<AppState>,
+    auth: AuthInfo,
+    Path((_app_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let command = RotateSigningSecret {
+        org_id: auth.org_id.clone(),
+        app_id: ApplicationId::from_uuid(_app_id),
+        endpoint_id: EndpointId::from_uuid(id),
+    };
+    let result = dispatch(state.rotate_signing_secret.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone()).await.map_err(ApiError)?;
+    // Return the full new secret — shown once
+    Ok(Json(serde_json::json!({
+        "new_secret": result.new_secret,
+        "signing_secrets_masked": result.endpoint.signing_secrets().iter().map(|s| pigeon_domain::endpoint::mask_signing_secret(s)).collect::<Vec<_>>(),
+    })))
+}
+
+/// Revoke (remove) a signing secret by index
+#[utoipa::path(
+    delete,
+    path = "/api/v1/applications/{app_id}/endpoints/{id}/secrets/{index}",
+    params(
+        ("app_id" = Uuid, Path, description = "Application ID"),
+        ("id" = Uuid, Path, description = "Endpoint ID"),
+        ("index" = u32, Path, description = "Secret index (0 = newest)"),
+    ),
+    responses(
+        (status = 204, description = "Secret revoked"),
+        (status = 400, description = "Cannot revoke last secret", body = ErrorBody),
+        (status = 404, description = "Endpoint not found", body = ErrorBody),
+    ),
+    tag = "endpoints"
+)]
+pub(crate) async fn revoke_signing_secret(
+    State(state): State<AppState>,
+    auth: AuthInfo,
+    Path((_app_id, id, index)): Path<(Uuid, Uuid, usize)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let command = RevokeSigningSecret {
+        org_id: auth.org_id.clone(),
+        app_id: ApplicationId::from_uuid(_app_id),
+        endpoint_id: EndpointId::from_uuid(id),
+        secret_index: index,
+    };
+    dispatch(state.revoke_signing_secret.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone()).await.map_err(ApiError)?;
     Ok(StatusCode::NO_CONTENT)
 }
 
@@ -388,7 +456,6 @@ mod tests {
                     command.app_id,
                     command.name,
                     command.url,
-                    command.signing_secret,
                     command.event_type_ids,
                 )
                 .map_err(|e| ApplicationError::Validation(e.to_string())),
@@ -527,6 +594,8 @@ mod tests {
             retry_attempt: Arc::new(StubRetryAttemptHandler),
             retrigger_message: Arc::new(StubRetriggerMessageHandler),
             send_test_event: Arc::new(StubSendTestEventHandler),
+            rotate_signing_secret: Arc::new(StubRotateSigningSecretHandler),
+            revoke_signing_secret: Arc::new(StubRevokeSigningSecretHandler),
             list_audit_log: Arc::new(StubListAuditLogHandler),
             audit_store: Arc::new(StubAuditStore),
             uow_factory: Arc::new(pigeon_application::test_support::fakes::FakeUnitOfWorkFactory::new(pigeon_application::test_support::fakes::OperationLog::new())),
@@ -580,7 +649,6 @@ mod tests {
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({
                             "url": "https://example.com/webhook",
-                            "signing_secret": "whsec_secret123",
                             "event_type_ids": []
                         }))
                         .unwrap(),
@@ -593,8 +661,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::CREATED);
         let json = body_json(response.into_body()).await;
         assert_eq!(json["url"], "https://example.com/webhook");
-        // signing_secret should NOT be in response
-        assert!(json.get("signing_secret").is_none());
+        assert!(json["signing_secrets_masked"].is_array());
     }
 
     #[tokio::test]
@@ -614,7 +681,6 @@ mod tests {
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({
                             "url": "",
-                            "signing_secret": "whsec_secret123",
                             "event_type_ids": []
                         }))
                         .unwrap(),
@@ -650,7 +716,7 @@ mod tests {
         assert_eq!(response.status(), StatusCode::OK);
         let json = body_json(response.into_body()).await;
         assert!(json["id"].is_string());
-        assert!(json.get("signing_secret").is_none());
+        assert!(json["signing_secrets_masked"].is_array());
     }
 
     #[tokio::test]
@@ -730,7 +796,6 @@ mod tests {
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({
                             "url": "https://updated.example.com/webhook",
-                            "signing_secret": "whsec_new",
                             "event_type_ids": [],
                             "version": 0
                         }))
@@ -770,7 +835,6 @@ mod tests {
                     .body(Body::from(
                         serde_json::to_string(&serde_json::json!({
                             "url": "https://updated.example.com/webhook",
-                            "signing_secret": "whsec_new",
                             "event_type_ids": [],
                             "version": 999
                         }))

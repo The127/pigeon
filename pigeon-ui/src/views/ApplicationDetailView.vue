@@ -56,6 +56,7 @@ import ErrorState from '@/components/ErrorState.vue'
 import { Textarea } from '@/components/ui/textarea'
 import StatCard from '@/components/StatCard.vue'
 import DeliveryChart from '@/components/DeliveryChart.vue'
+import SecretRevealDialog from '@/components/SecretRevealDialog.vue'
 import { Plus, Zap, Globe, ArrowLeft, MoreHorizontal, Trash2, Pencil, Send, CheckCircle2, Mail, AlertTriangle, RotateCcw, ChevronDown, ChevronRight, Activity, Inbox, CheckCircle, XCircle, Skull } from 'lucide-vue-next'
 
 const route = useRoute()
@@ -152,30 +153,36 @@ function handleDeleteEventType() {
 const epDialogOpen = ref(false)
 const epName = ref('')
 const epUrl = ref('')
-const epSecret = ref('')
 const epEventTypeIds = ref<string[]>([])
 const createEp = useCreateEndpoint(appId)
+const revealedSecret = ref('')
+const secretRevealOpen = ref(false)
 
 function handleCreateEndpoint() {
   createEp.mutate(
     {
       name: epName.value || undefined,
       url: epUrl.value,
-      signing_secret: epSecret.value || undefined,
       event_type_ids: epEventTypeIds.value,
     },
     {
-      onSuccess: () => {
+      onSuccess: (data) => {
         epDialogOpen.value = false
         epName.value = ''
         epUrl.value = ''
-        epSecret.value = ''
         epEventTypeIds.value = []
-        toast.success('Endpoint created')
+        revealedSecret.value = data.signing_secret
+        secretRevealOpen.value = true
       },
       onError: (e: Error) => toast.error(e.message),
     },
   )
+}
+
+function handleSecretRevealed() {
+  secretRevealOpen.value = false
+  revealedSecret.value = ''
+  toast.success('Endpoint created')
 }
 
 function toggleEventType(id: string) {
@@ -597,9 +604,6 @@ function handleReplay(deadLetterId: string) {
                   <FormField label="URL" html-for="ep-url" required>
                     <Input id="ep-url" v-model="epUrl" placeholder="https://example.com/webhook" />
                   </FormField>
-                  <FormField label="Signing Secret" html-for="ep-secret" description="Optional — used to sign payloads with HMAC-SHA256. Leave blank to skip signing.">
-                    <Input id="ep-secret" v-model="epSecret" placeholder="whsec_..." />
-                  </FormField>
                   <FormField v-if="eventTypesData?.items.length" label="Event Types" description="Select which events this endpoint receives.">
                     <div class="flex flex-wrap gap-2">
                       <button
@@ -990,6 +994,13 @@ function handleReplay(deadLetterId: string) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <!-- Secret Reveal Dialog -->
+      <SecretRevealDialog
+        :open="secretRevealOpen"
+        :secret="revealedSecret"
+        @confirmed="handleSecretRevealed"
+      />
     </template>
   </div>
 </template>

@@ -27,11 +27,6 @@ Feature: Endpoint CRUD
     When the create endpoint command is executed
     Then the create endpoint command should fail with a validation error
 
-  Scenario: Creating an endpoint without a signing secret
-    Given a request to create an endpoint with url "https://example.com/hook" and signing secret ""
-    When the create endpoint command is executed
-    Then the endpoint should be created with url "https://example.com/hook"
-
   Scenario: Successfully updating an endpoint
     Given an existing endpoint with url "https://example.com/webhook"
     When the update endpoint command is executed with url "https://new.example.com/webhook"

@@ -4,6 +4,8 @@ use pigeon_application::commands::create_application::CreateApplication;
 use pigeon_application::commands::replay_dead_letter::ReplayDeadLetter;
 use pigeon_application::commands::retrigger_message::RetriggerMessage;
 use pigeon_application::commands::retry_attempt::RetryAttempt;
+use pigeon_application::commands::revoke_signing_secret::RevokeSigningSecret;
+use pigeon_application::commands::rotate_signing_secret::RotateSigningSecret;
 use pigeon_application::commands::send_test_event::SendTestEvent;
 use pigeon_domain::organization::OrganizationId;
 use pigeon_application::commands::create_endpoint::CreateEndpoint;
@@ -75,6 +77,8 @@ pub struct AppState {
     pub retry_attempt: Arc<dyn CommandHandler<RetryAttempt>>,
     pub retrigger_message: Arc<dyn CommandHandler<RetriggerMessage>>,
     pub send_test_event: Arc<dyn CommandHandler<SendTestEvent>>,
+    pub rotate_signing_secret: Arc<dyn CommandHandler<RotateSigningSecret>>,
+    pub revoke_signing_secret: Arc<dyn CommandHandler<RevokeSigningSecret>>,
     pub health_checker: Arc<dyn HealthChecker>,
     pub create_organization: Arc<dyn CommandHandler<CreateOrganization>>,
     pub update_organization: Arc<dyn CommandHandler<UpdateOrganization>>,

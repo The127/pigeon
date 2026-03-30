@@ -18,7 +18,6 @@ pub struct CreateEndpoint {
     pub app_id: ApplicationId,
     pub name: Option<String>,
     pub url: String,
-    pub signing_secret: Option<String>,
     pub event_type_ids: Vec<EventTypeId>,
 }
 
@@ -61,7 +60,6 @@ impl CommandHandler<CreateEndpoint> for CreateEndpointHandler {
             command.app_id,
             command.name,
             command.url,
-            command.signing_secret,
             command.event_type_ids,
         )
         .map_err(|e| ApplicationError::Validation(e.to_string()))?;
@@ -113,7 +111,6 @@ mod tests {
                 app_id,
                 name: None,
                 url: "https://example.com/webhook".into(),
-                signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![et_id],
             }, &mut ctx)
             .await;
@@ -138,7 +135,6 @@ mod tests {
                 app_id: ApplicationId::new(),
                 name: None,
                 url: "".into(),
-                signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![],
             }, &mut ctx)
             .await;
@@ -147,7 +143,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn creates_endpoint_without_signing_secret() {
+    async fn creates_endpoint_with_auto_generated_signing_secret() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
         let handler = CreateEndpointHandler::new(empty_read_store(&log));
@@ -162,13 +158,13 @@ mod tests {
                 app_id: ApplicationId::new(),
                 name: None,
                 url: "https://example.com/webhook".into(),
-                signing_secret: None,
                 event_type_ids: vec![],
             }, &mut ctx)
             .await;
 
         let ep = result.unwrap();
-        assert!(ep.signing_secret().is_none());
+        assert_eq!(ep.signing_secrets().len(), 1);
+        assert!(ep.signing_secrets()[0].starts_with("whsec_"));
     }
 
     #[tokio::test]
@@ -187,7 +183,6 @@ mod tests {
                 app_id: ApplicationId::new(),
                 name: None,
                 url: "https://example.com/webhook".into(),
-                signing_secret: None,
                 event_type_ids: vec![EventTypeId::new()],
             }, &mut ctx)
             .await;

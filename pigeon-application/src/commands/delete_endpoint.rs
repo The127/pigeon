@@ -70,7 +70,6 @@ mod tests {
             ApplicationId::new(),
             None,
             "https://example.com/webhook".into(),
-            Some("whsec_secret123".into()),
             vec![EventTypeId::new()],
         )
         .unwrap();

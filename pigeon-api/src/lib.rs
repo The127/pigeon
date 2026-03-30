@@ -57,6 +57,8 @@ use crate::state::AppState;
         endpoints::list_endpoints,
         endpoints::update_endpoint,
         endpoints::delete_endpoint,
+        endpoints::rotate_signing_secret,
+        endpoints::revoke_signing_secret,
         messages::send_message,
         messages::list_messages,
         messages::get_message,
@@ -193,6 +195,14 @@ pub fn router(state: AppState) -> Router {
         .route(
             "/{app_id}/endpoints/{id}/test",
             post(handlers::test_event::send_test_event),
+        )
+        .route(
+            "/{app_id}/endpoints/{id}/rotate",
+            post(endpoints::rotate_signing_secret),
+        )
+        .route(
+            "/{app_id}/endpoints/{id}/secrets/{index}",
+            delete(endpoints::revoke_signing_secret),
         );
 
     // API routes protected by JWT auth middleware
@@ -340,6 +350,14 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
         .route(
             "/{app_id}/endpoints/{id}/test",
             post(handlers::test_event::send_test_event),
+        )
+        .route(
+            "/{app_id}/endpoints/{id}/rotate",
+            post(endpoints::rotate_signing_secret),
+        )
+        .route(
+            "/{app_id}/endpoints/{id}/secrets/{index}",
+            delete(endpoints::revoke_signing_secret),
         );
 
     let api_routes = Router::new()
