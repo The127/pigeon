@@ -105,7 +105,8 @@ export function useDeleteApplication() {
   return useMutation<void, Error, string>({
     mutationFn: (id) =>
       apiFetch(`/applications/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
+      queryClient.removeQueries({ queryKey: ['applications', id] })
       queryClient.invalidateQueries({ queryKey: ['applications'] })
     },
   })
@@ -176,9 +177,8 @@ export function useDeleteEventType(appId: Ref<string>) {
         method: 'DELETE',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['applications', appId, 'event-types'],
-      })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'event-types'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'stats'] })
     },
   })
 }
@@ -221,9 +221,8 @@ export function useCreateEndpoint(appId: Ref<string>) {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['applications', appId, 'endpoints'],
-      })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'endpoints'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'event-types'] })
     },
   })
 }
@@ -238,9 +237,8 @@ export function useUpdateEndpoint(appId: Ref<string>) {
         body: JSON.stringify(body),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['applications', appId, 'endpoints'],
-      })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'endpoints'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'event-types'] })
     },
   })
 }
@@ -254,9 +252,9 @@ export function useDeleteEndpoint(appId: Ref<string>) {
         method: 'DELETE',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['applications', appId, 'endpoints'],
-      })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'endpoints'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'event-types'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'stats'] })
     },
   })
 }
@@ -280,12 +278,18 @@ export function useEndpointStats(
 // --- Messages ---
 
 export function useSendMessage(appId: Ref<string>) {
+  const queryClient = useQueryClient()
+
   return useMutation<SendMessageResponse, Error, SendMessageRequest>({
     mutationFn: (body) =>
       apiFetch(`/applications/${appId.value}/messages`, {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'messages'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'stats'] })
+    },
   })
 }
 
@@ -298,9 +302,8 @@ export function useRetriggerMessage(appId: Ref<string>) {
         method: 'POST',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['applications', appId, 'messages'],
-      })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'messages'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'stats'] })
     },
   })
 }
@@ -355,9 +358,9 @@ export function useReplayDeadLetter(appId: Ref<string>) {
         method: 'POST',
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ['applications', appId, 'dead-letters'],
-      })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'dead-letters'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'messages'] })
+      queryClient.invalidateQueries({ queryKey: ['applications', appId, 'stats'] })
     },
   })
 }

@@ -12,7 +12,7 @@ pub(crate) mod test_support;
 #[cfg(test)]
 mod auth_tests;
 
-use axum::routing::{get, post};
+use axum::routing::{delete, get, post};
 use axum::Router;
 use utoipa::OpenApi;
 
@@ -78,6 +78,9 @@ use crate::state::AppState;
         oidc_configs::get_oidc_config,
         oidc_configs::list_oidc_configs,
         oidc_configs::delete_oidc_config,
+        oidc_configs::list_my_oidc_configs,
+        oidc_configs::create_my_oidc_config,
+        oidc_configs::delete_my_oidc_config,
         health::liveness,
         health::readiness,
     ),
@@ -196,6 +199,14 @@ pub fn router(state: AppState) -> Router {
     let api_routes = Router::new()
         .nest("/api/v1/applications", app_routes)
         .route("/api/v1/audit-log", get(audit::list_audit_log))
+        .route(
+            "/api/v1/oidc-configs",
+            get(oidc_configs::list_my_oidc_configs).post(oidc_configs::create_my_oidc_config),
+        )
+        .route(
+            "/api/v1/oidc-configs/{id}",
+            delete(oidc_configs::delete_my_oidc_config),
+        )
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             auth::auth_middleware,
@@ -334,6 +345,14 @@ pub(crate) fn router_without_auth(state: AppState) -> Router {
     let api_routes = Router::new()
         .nest("/api/v1/applications", app_routes)
         .route("/api/v1/audit-log", get(audit::list_audit_log))
+        .route(
+            "/api/v1/oidc-configs",
+            get(oidc_configs::list_my_oidc_configs).post(oidc_configs::create_my_oidc_config),
+        )
+        .route(
+            "/api/v1/oidc-configs/{id}",
+            delete(oidc_configs::delete_my_oidc_config),
+        )
         .layer(axum::middleware::from_fn(
             test_support::test_auth_middleware,
         ));

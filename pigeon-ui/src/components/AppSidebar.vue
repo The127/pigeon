@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRoute } from 'vue-router'
-import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, ScrollText, Settings } from 'lucide-vue-next'
+import { LayoutGrid, LogOut, PanelLeftClose, PanelLeft, ScrollText, Settings, Shield } from 'lucide-vue-next'
 import { useAuth } from '@/auth'
 import { Button } from '@/components/ui/button'
 import PigeonLogo from '@/components/PigeonLogo.vue'
@@ -20,6 +20,7 @@ const { user, logout } = useAuth()
 const nav = [
   { name: 'Applications', to: '/apps', icon: LayoutGrid },
   { name: 'Audit Log', to: '/audit-log', icon: ScrollText },
+  { name: 'OIDC Settings', to: '/oidc-settings', icon: Shield },
 ]
 
 function isActive(path: string) {

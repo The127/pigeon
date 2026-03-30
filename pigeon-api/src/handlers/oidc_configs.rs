@@ -14,7 +14,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::dto::oidc_config::{CreateOidcConfigRequest, OidcConfigResponse};
 use crate::dto::pagination::ListQuery;
 use crate::error::{ApiError, ErrorBody};
-use crate::extractors::AuthInfo;
+use crate::extractors::{AuthInfo, OrgId};
 use crate::state::AppState;
 use pigeon_application::mediator::dispatcher::dispatch;
 
@@ -144,6 +144,103 @@ pub(crate) async fn delete_oidc_config(
     State(state): State<AppState>,
     auth: AuthInfo,
     Path((_org_id, id)): Path<(Uuid, Uuid)>,
+) -> Result<impl IntoResponse, ApiError> {
+    let command = DeleteOidcConfig {
+        id: OidcConfigId::from_uuid(id),
+    };
+
+    dispatch(state.delete_oidc_config.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone())
+        .await
+        .map_err(ApiError)?;
+
+    Ok(StatusCode::NO_CONTENT)
+}
+
+// === Tenant-scoped OIDC config handlers ===
+// These use OrgId from JWT (not from URL path).
+
+/// List OIDC configs for the authenticated user's organization
+#[utoipa::path(
+    get,
+    path = "/api/v1/oidc-configs",
+    params(ListQuery),
+    responses(
+        (status = 200, description = "Paginated list of OIDC configs"),
+    ),
+    tag = "oidc-configs"
+)]
+pub(crate) async fn list_my_oidc_configs(
+    State(state): State<AppState>,
+    OrgId(org_id): OrgId,
+    Query(query): Query<ListQuery>,
+) -> Result<impl IntoResponse, ApiError> {
+    let list_query = ListOidcConfigsByOrg {
+        org_id,
+        offset: query.offset.unwrap_or(0),
+        limit: query.limit.unwrap_or(20),
+    };
+
+    let result = state
+        .list_oidc_configs
+        .handle(list_query)
+        .await
+        .map_err(ApiError)?;
+
+    let response = serde_json::json!({
+        "items": result.items.into_iter().map(OidcConfigResponse::from).collect::<Vec<_>>(),
+        "total": result.total,
+        "offset": result.offset,
+        "limit": result.limit,
+    });
+
+    Ok(Json(response))
+}
+
+/// Create an OIDC config for the authenticated user's organization
+#[utoipa::path(
+    post,
+    path = "/api/v1/oidc-configs",
+    request_body = CreateOidcConfigRequest,
+    responses(
+        (status = 201, description = "OIDC config created", body = OidcConfigResponse),
+        (status = 400, description = "Validation error", body = ErrorBody),
+    ),
+    tag = "oidc-configs"
+)]
+pub(crate) async fn create_my_oidc_config(
+    State(state): State<AppState>,
+    auth: AuthInfo,
+    Json(body): Json<CreateOidcConfigRequest>,
+) -> Result<impl IntoResponse, ApiError> {
+    let command = CreateOidcConfig {
+        org_id: auth.org_id.clone(),
+        issuer_url: body.issuer_url,
+        audience: body.audience,
+        jwks_url: body.jwks_url,
+    };
+
+    let config = dispatch(state.create_oidc_config.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone())
+        .await
+        .map_err(ApiError)?;
+
+    Ok((StatusCode::CREATED, Json(OidcConfigResponse::from(config))))
+}
+
+/// Delete an OIDC config from the authenticated user's organization
+#[utoipa::path(
+    delete,
+    path = "/api/v1/oidc-configs/{id}",
+    params(("id" = Uuid, Path, description = "OIDC Config ID")),
+    responses(
+        (status = 204, description = "OIDC config deleted"),
+        (status = 404, description = "OIDC config not found", body = ErrorBody),
+    ),
+    tag = "oidc-configs"
+)]
+pub(crate) async fn delete_my_oidc_config(
+    State(state): State<AppState>,
+    auth: AuthInfo,
+    Path(id): Path<Uuid>,
 ) -> Result<impl IntoResponse, ApiError> {
     let command = DeleteOidcConfig {
         id: OidcConfigId::from_uuid(id),

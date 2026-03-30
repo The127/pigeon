@@ -31,6 +31,11 @@ const router = createRouter({
       component: () => import('@/views/AuditLogView.vue'),
     },
     {
+      path: '/oidc-settings',
+      name: 'oidc-settings',
+      component: () => import('@/views/OidcSettingsView.vue'),
+    },
+    {
       path: '/apps',
       name: 'applications',
       component: () => import('@/views/ApplicationsView.vue'),
