@@ -6,7 +6,7 @@ hero:
   text: Webhook Delivery Service
   tagline: Send events, Pigeon delivers them. Self-hosted, multi-tenant, with signing secret rotation and automatic retries.
   image:
-    src: /pigeon.svg
+    src: /pigeon/pigeon.svg
     alt: Pigeon
   actions:
     - theme: brand
