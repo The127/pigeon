@@ -89,7 +89,7 @@ watch(config, () => {
     <ErrorState v-else-if="error" :message="error.message" />
 
     <template v-else-if="config">
-      <div class="rounded-lg border bg-card p-6 space-y-6">
+      <form @submit.prevent="handleSave" class="rounded-lg border bg-card p-6 space-y-6">
         <!-- Issuer URL -->
         <div class="space-y-1">
           <label class="text-sm font-medium text-muted-foreground">Issuer URL</label>
@@ -127,7 +127,7 @@ watch(config, () => {
         <div class="border-t pt-4 text-sm text-muted-foreground">
           Created {{ new Date(config.created_at).toLocaleDateString() }}
         </div>
-      </div>
+      </form>
     </template>
   </div>
 </template>
