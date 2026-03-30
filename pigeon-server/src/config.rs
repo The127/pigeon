@@ -1,6 +1,86 @@
 use std::time::Duration;
 
-use anyhow::Context;
+use serde::Deserialize;
+
+fn default_listen_addr() -> String {
+    "0.0.0.0:3000".to_string()
+}
+fn default_org_name() -> String {
+    "System".to_string()
+}
+fn default_org_slug() -> String {
+    "system".to_string()
+}
+fn default_jwks_cache_ttl_secs() -> u64 {
+    3600
+}
+fn default_worker_batch_size() -> u32 {
+    10
+}
+fn default_worker_poll_interval_ms() -> u64 {
+    1000
+}
+fn default_worker_max_retries() -> u32 {
+    5
+}
+fn default_worker_backoff_base_secs() -> u64 {
+    30
+}
+fn default_worker_max_backoff_secs() -> u64 {
+    3600
+}
+fn default_worker_http_timeout_secs() -> u64 {
+    30
+}
+fn default_worker_cleanup_interval_secs() -> u64 {
+    3600
+}
+fn default_worker_auto_disable_threshold() -> u64 {
+    5
+}
+
+/// Raw config deserialized from environment variables.
+/// Field names map to env vars via the PIGEON_ prefix (handled by envy).
+/// DATABASE_URL is unprefixed (standard convention).
+#[derive(Deserialize)]
+struct RawConfig {
+    // DATABASE_URL is read separately (no PIGEON_ prefix)
+    #[serde(default = "default_listen_addr")]
+    listen_addr: String,
+
+    #[serde(default)]
+    bootstrap_org_enabled: bool,
+    #[serde(default = "default_org_name")]
+    bootstrap_org_name: String,
+    #[serde(default = "default_org_slug")]
+    bootstrap_org_slug: String,
+    #[serde(default)]
+    bootstrap_oidc_issuer_url: String,
+    #[serde(default)]
+    bootstrap_oidc_audience: String,
+    #[serde(default)]
+    bootstrap_oidc_jwks_url: String,
+
+    #[serde(default = "default_jwks_cache_ttl_secs")]
+    jwks_cache_ttl_secs: u64,
+
+    #[serde(default = "default_worker_batch_size")]
+    worker_batch_size: u32,
+    #[serde(default = "default_worker_poll_interval_ms")]
+    worker_poll_interval_ms: u64,
+    #[serde(default = "default_worker_max_retries")]
+    worker_max_retries: u32,
+    #[serde(default = "default_worker_backoff_base_secs")]
+    worker_backoff_base_secs: u64,
+    #[serde(default = "default_worker_max_backoff_secs")]
+    worker_max_backoff_secs: u64,
+    #[serde(default = "default_worker_http_timeout_secs")]
+    worker_http_timeout_secs: u64,
+    #[serde(default = "default_worker_cleanup_interval_secs")]
+    worker_cleanup_interval_secs: u64,
+    #[serde(default = "default_worker_auto_disable_threshold")]
+    worker_auto_disable_threshold: u64,
+}
 
 pub(crate) struct PigeonConfig {
     pub(crate) database_url: String,
@@ -25,31 +105,15 @@ pub(crate) struct PigeonConfig {
 
 impl PigeonConfig {
     pub(crate) fn from_env() -> anyhow::Result<Self> {
-        let database_url =
-            std::env::var("DATABASE_URL").context("DATABASE_URL environment variable must be set")?;
+        let database_url = std::env::var("DATABASE_URL")
+            .map_err(|_| anyhow::anyhow!("DATABASE_URL environment variable must be set"))?;
 
-        let listen_addr = std::env::var("PIGEON_LISTEN_ADDR")
-            .unwrap_or_else(|_| "0.0.0.0:3000".to_string());
+        let raw: RawConfig = envy::prefixed("PIGEON_")
+            .from_env()
+            .map_err(|e| anyhow::anyhow!("Failed to parse configuration: {e}"))?;
 
-        let bootstrap_org_enabled = std::env::var("PIGEON_BOOTSTRAP_ORG_ENABLED")
-            .map(|v| v.eq_ignore_ascii_case("true") || v == "1")
-            .unwrap_or(false);
-
-        let bootstrap_org_name = std::env::var("PIGEON_BOOTSTRAP_ORG_NAME")
-            .unwrap_or_else(|_| "System".to_string());
-
-        let bootstrap_org_slug = std::env::var("PIGEON_BOOTSTRAP_ORG_SLUG")
-            .unwrap_or_else(|_| "system".to_string());
-
-        let bootstrap_oidc_issuer_url =
-            std::env::var("PIGEON_BOOTSTRAP_OIDC_ISSUER_URL").unwrap_or_default();
-        let bootstrap_oidc_audience =
-            std::env::var("PIGEON_BOOTSTRAP_OIDC_AUDIENCE").unwrap_or_default();
-        let bootstrap_oidc_jwks_url =
-            std::env::var("PIGEON_BOOTSTRAP_OIDC_JWKS_URL").unwrap_or_default();
-
-        if bootstrap_org_enabled
-            && (bootstrap_oidc_issuer_url.is_empty() || bootstrap_oidc_audience.is_empty())
+        if raw.bootstrap_org_enabled
+            && (raw.bootstrap_oidc_issuer_url.is_empty() || raw.bootstrap_oidc_audience.is_empty())
         {
             anyhow::bail!(
                 "PIGEON_BOOTSTRAP_OIDC_ISSUER_URL and PIGEON_BOOTSTRAP_OIDC_AUDIENCE are required \
@@ -57,69 +121,24 @@ impl PigeonConfig {
             );
         }
 
-        let jwks_cache_ttl_secs: u64 = std::env::var("PIGEON_JWKS_CACHE_TTL_SECS")
-            .unwrap_or_else(|_| "3600".to_string())
-            .parse()
-            .context("PIGEON_JWKS_CACHE_TTL_SECS must be a valid integer")?;
-
-        let worker_batch_size: u32 = std::env::var("PIGEON_WORKER_BATCH_SIZE")
-            .unwrap_or_else(|_| "10".to_string())
-            .parse()
-            .context("PIGEON_WORKER_BATCH_SIZE must be a valid integer")?;
-
-        let worker_poll_interval_ms: u64 = std::env::var("PIGEON_WORKER_POLL_INTERVAL_MS")
-            .unwrap_or_else(|_| "1000".to_string())
-            .parse()
-            .context("PIGEON_WORKER_POLL_INTERVAL_MS must be a valid integer")?;
-
-        let worker_max_retries: u32 = std::env::var("PIGEON_WORKER_MAX_RETRIES")
-            .unwrap_or_else(|_| "5".to_string())
-            .parse()
-            .context("PIGEON_WORKER_MAX_RETRIES must be a valid integer")?;
-
-        let worker_backoff_base_secs: u64 = std::env::var("PIGEON_WORKER_BACKOFF_BASE_SECS")
-            .unwrap_or_else(|_| "30".to_string())
-            .parse()
-            .context("PIGEON_WORKER_BACKOFF_BASE_SECS must be a valid integer")?;
-
-        let worker_max_backoff_secs: u64 = std::env::var("PIGEON_WORKER_MAX_BACKOFF_SECS")
-            .unwrap_or_else(|_| "3600".to_string())
-            .parse()
-            .context("PIGEON_WORKER_MAX_BACKOFF_SECS must be a valid integer")?;
-
-        let worker_http_timeout_secs: u64 = std::env::var("PIGEON_WORKER_HTTP_TIMEOUT_SECS")
-            .unwrap_or_else(|_| "30".to_string())
-            .parse()
-            .context("PIGEON_WORKER_HTTP_TIMEOUT_SECS must be a valid integer")?;
-
-        let worker_auto_disable_threshold: u64 = std::env::var("PIGEON_WORKER_AUTO_DISABLE_THRESHOLD")
-            .unwrap_or_else(|_| "5".to_string())
-            .parse()
-            .context("PIGEON_WORKER_AUTO_DISABLE_THRESHOLD must be a valid integer")?;
-
-        let worker_cleanup_interval_secs: u64 = std::env::var("PIGEON_WORKER_CLEANUP_INTERVAL_SECS")
-            .unwrap_or_else(|_| "3600".to_string())
-            .parse()
-            .context("PIGEON_WORKER_CLEANUP_INTERVAL_SECS must be a valid integer")?;
-
         Ok(Self {
             database_url,
-            listen_addr,
-            bootstrap_org_enabled,
-            bootstrap_org_name,
-            bootstrap_org_slug,
-            bootstrap_oidc_issuer_url,
-            bootstrap_oidc_audience,
-            bootstrap_oidc_jwks_url,
-            jwks_cache_ttl: Duration::from_secs(jwks_cache_ttl_secs),
-            worker_batch_size,
-            worker_poll_interval: Duration::from_millis(worker_poll_interval_ms),
-            worker_max_retries,
-            worker_backoff_base_secs,
-            worker_max_backoff_secs,
-            worker_http_timeout: Duration::from_secs(worker_http_timeout_secs),
-            worker_cleanup_interval_secs,
-            worker_auto_disable_threshold,
+            listen_addr: raw.listen_addr,
+            bootstrap_org_enabled: raw.bootstrap_org_enabled,
+            bootstrap_org_name: raw.bootstrap_org_name,
+            bootstrap_org_slug: raw.bootstrap_org_slug,
+            bootstrap_oidc_issuer_url: raw.bootstrap_oidc_issuer_url,
+            bootstrap_oidc_audience: raw.bootstrap_oidc_audience,
+            bootstrap_oidc_jwks_url: raw.bootstrap_oidc_jwks_url,
+            jwks_cache_ttl: Duration::from_secs(raw.jwks_cache_ttl_secs),
+            worker_batch_size: raw.worker_batch_size,
+            worker_poll_interval: Duration::from_millis(raw.worker_poll_interval_ms),
+            worker_max_retries: raw.worker_max_retries,
+            worker_backoff_base_secs: raw.worker_backoff_base_secs,
+            worker_max_backoff_secs: raw.worker_max_backoff_secs,
+            worker_http_timeout: Duration::from_secs(raw.worker_http_timeout_secs),
+            worker_cleanup_interval_secs: raw.worker_cleanup_interval_secs,
+            worker_auto_disable_threshold: raw.worker_auto_disable_threshold,
         })
     }
 }
@@ -130,8 +149,6 @@ mod tests {
 
     #[test]
     fn defaults_when_optional_vars_missing() {
-        // DATABASE_URL must be set for from_env to succeed, but we test the
-        // individual defaults by constructing directly.
         let config = PigeonConfig {
             database_url: "postgres://localhost/test".to_string(),
             listen_addr: "0.0.0.0:3000".to_string(),

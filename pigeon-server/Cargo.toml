@@ -9,6 +9,8 @@ pigeon-application = { path = "../pigeon-application" }
 pigeon-infrastructure = { path = "../pigeon-infrastructure" }
 pigeon-api = { path = "../pigeon-api" }
 anyhow = "1"
+envy = "0.4"
+serde = { version = "1", features = ["derive"] }
 axum = "0.8"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4", features = ["derive"] }

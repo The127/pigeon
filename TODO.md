@@ -134,8 +134,8 @@ Full codebase review and remediation:
 
 ## Priority: Low
 
-### Config Crate
-Currently raw `std::env::var` calls in `PigeonConfig`. Could use `config-rs` or `envy` for typed config with layered sources (env, file, defaults).
+### ~~Config Crate~~
+Replaced manual `std::env::var` parsing with `envy` + `serde::Deserialize`. `RawConfig` struct with `#[serde(default)]` for all optional fields, `envy::prefixed("PIGEON_")` for prefix-stripped env var mapping. `DATABASE_URL` stays unprefixed (standard convention). Same env vars, same defaults, less boilerplate.
 
 ## Out of Scope (Noted)
 
