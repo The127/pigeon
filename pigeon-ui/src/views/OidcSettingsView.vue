@@ -125,7 +125,7 @@ watch(config, () => {
 
         <!-- Metadata -->
         <div class="border-t pt-4 text-sm text-muted-foreground">
-          Created {{ new Date(config.created_at).toLocaleDateString() }}
+          Last updated {{ new Date(config.created_at).toLocaleDateString() }}
         </div>
       </form>
     </template>
