@@ -85,7 +85,7 @@ Organization and OIDC config management. Requires bootstrap org JWT.
 ## Delivery
 
 - **Fan-out**: message → one attempt per subscribed endpoint
-- **Signing**: HMAC-SHA256 with all active signing secrets. Header: `X-Pigeon-Signature: v1=<sig1>,v1=<sig2>`
+- **Signing**: HMAC-SHA256 with all active signing secrets. Header: `X-Pigeon-Signature: sha256=<sig1>,sha256=<sig2>`
 - **Retry**: exponential backoff (configurable base/max), `SELECT ... FOR UPDATE SKIP LOCKED`
 - **Dead letter**: after max retries, attempts are dead-lettered. Replayable via API.
 - **Auto-disable**: endpoints with consecutive failures above threshold are automatically disabled
@@ -111,8 +111,11 @@ All via environment variables. `PIGEON_` prefix for app config.
 | `DATABASE_URL` | required | Postgres connection string |
 | `PIGEON_LISTEN_ADDR` | `0.0.0.0:3000` | API listen address |
 | `PIGEON_BOOTSTRAP_ORG_ENABLED` | `false` | Create bootstrap org on startup |
+| `PIGEON_BOOTSTRAP_ORG_NAME` | `System` | Bootstrap org display name |
+| `PIGEON_BOOTSTRAP_ORG_SLUG` | `system` | Bootstrap org URL slug |
 | `PIGEON_BOOTSTRAP_OIDC_ISSUER_URL` | — | Required if bootstrap enabled |
 | `PIGEON_BOOTSTRAP_OIDC_AUDIENCE` | — | Required if bootstrap enabled |
+| `PIGEON_BOOTSTRAP_OIDC_JWKS_URL` | derived from issuer | JWKS endpoint override |
 | `PIGEON_JWKS_CACHE_TTL_SECS` | `3600` | JWKS cache TTL |
 | `PIGEON_WORKER_BATCH_SIZE` | `10` | Attempts dequeued per poll |
 | `PIGEON_WORKER_POLL_INTERVAL_MS` | `1000` | Idle poll interval |
