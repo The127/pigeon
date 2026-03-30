@@ -2,198 +2,52 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
 import type { Ref } from 'vue'
 import type {
   ApplicationResponse,
+  AppStatsResponse,
+  AttemptResponse,
+  AuditLogResponse,
   CreateApplicationRequest,
-  UpdateApplicationRequest,
-  PaginatedApplicationResponse,
-  EventTypeResponse,
-  CreateEventTypeRequest,
-  UpdateEventTypeRequest,
-  EndpointResponse,
   CreateEndpointRequest,
-  UpdateEndpointRequest,
+  CreateEventTypeRequest,
+  DeadLetterResponse,
+  EndpointResponse,
+  EndpointStatsResponse,
+  EventTypeResponse,
+  EventTypeStatsResponse,
+  MessageResponse,
+  PaginatedApplicationResponse,
   SendMessageRequest,
   SendMessageResponse,
+  UpdateApplicationRequest,
+  UpdateEndpointRequest,
+  UpdateEventTypeRequest,
 } from './generated/types.gen'
-
-// --- Stats ---
-
-export interface TimeBucket {
-  bucket: string
-  succeeded: number
-  failed: number
-}
-
-export interface AppStatsResponse {
-  total_messages: number
-  total_attempts: number
-  total_pending: number
-  total_succeeded: number
-  total_failed: number
-  total_dead_lettered: number
-  success_rate: number
-  time_series: TimeBucket[]
-}
-
-export function useAppStats(appId: Ref<string>, period: Ref<string>) {
-  return useQuery<AppStatsResponse>({
-    queryKey: ['applications', appId, 'stats', period],
-    queryFn: () =>
-      apiFetch(`/applications/${appId.value}/stats?period=${period.value}`),
-  })
-}
-
-// --- Event Type Stats ---
-
-export interface EventTypeStatsResponse {
-  total_messages: number
-  total_attempts: number
-  total_pending: number
-  total_succeeded: number
-  total_failed: number
-  total_dead_lettered: number
-  success_rate: number
-  subscribed_endpoints: number
-  time_series: TimeBucket[]
-  recent_messages: RecentMessage[]
-}
-
-export interface RecentMessage {
-  id: string
-  idempotency_key: string
-  created_at: string
-  attempts_created: number
-  succeeded: number
-  failed: number
-  dead_lettered: number
-}
-
-export function useEventTypeStats(
-  appId: Ref<string>,
-  eventTypeId: Ref<string>,
-  period: Ref<string>,
-) {
-  return useQuery<EventTypeStatsResponse>({
-    queryKey: ['applications', appId, 'event-types', eventTypeId, 'stats', period],
-    queryFn: () =>
-      apiFetch(
-        `/applications/${appId.value}/event-types/${eventTypeId.value}/stats?period=${period.value}`,
-      ),
-  })
-}
-
-// --- Endpoint Stats ---
-
-export interface EndpointStatsResponse {
-  total_attempts: number
-  total_pending: number
-  total_succeeded: number
-  total_failed: number
-  total_dead_lettered: number
-  success_rate: number
-  consecutive_failures: number
-  last_delivery_at: string | null
-  last_status: string | null
-  time_series: TimeBucket[]
-}
-
-export function useEndpointStats(
-  appId: Ref<string>,
-  endpointId: Ref<string>,
-  period: Ref<string>,
-) {
-  return useQuery<EndpointStatsResponse>({
-    queryKey: ['applications', appId, 'endpoints', endpointId, 'stats', period],
-    queryFn: () =>
-      apiFetch(
-        `/applications/${appId.value}/endpoints/${endpointId.value}/stats?period=${period.value}`,
-      ),
-  })
-}
-
-// --- Audit Log ---
-
-export interface AuditLogEntry {
-  id: string
-  command_name: string
-  actor: string
-  timestamp: string
-  success: boolean
-  error_message: string | null
-}
-
-export function useAuditLog(
-  offset: Ref<number>,
-  limit: Ref<number>,
-  commandFilter: Ref<string>,
-  successFilter: Ref<string>,
-) {
-  return useQuery({
-    queryKey: ['audit-log', offset, limit, commandFilter, successFilter],
-    queryFn: () => {
-      const params = new URLSearchParams({
-        offset: String(offset.value),
-        limit: String(limit.value),
-      })
-      if (commandFilter.value) params.set('command', commandFilter.value)
-      if (successFilter.value) params.set('success', successFilter.value)
-      return apiFetch<{ items: AuditLogEntry[]; total: number; offset: number; limit: number }>(
-        `/audit-log?${params}`,
-      )
-    },
-  })
-}
-
-// --- Types not yet in generated client (pending server restart) ---
-
-// Endpoint types with name field (pending server restart + client regen)
-export interface EndpointWithName {
-  id: string
-  app_id: string
-  name: string
-  url: string
-  enabled: boolean
-  event_type_ids: string[]
-  created_at: string
-  version: number
-}
-
-export interface MessageResponse {
-  id: string
-  app_id: string
-  event_type_id: string
-  payload: unknown
-  idempotency_key: string
-  created_at: string
-  attempts_created: number
-  succeeded: number
-  failed: number
-  dead_lettered: number
-}
-
-export interface AttemptResponse {
-  id: string
-  message_id: string
-  endpoint_id: string
-  status: string
-  response_code: number | null
-  response_body: string | null
-  attempted_at: string | null
-  next_attempt_at: string | null
-  attempt_number: number
-  duration_ms: number | null
-}
-
-export interface DeadLetterResponse {
-  id: string
-  message_id: string
-  endpoint_id: string
-  app_id: string
-  last_response_code: number | null
-  last_response_body: string | null
-  dead_lettered_at: string
-  replayed_at: string | null
-}
 import { apiFetch } from './client'
+
+// Re-export generated types used by views
+export type {
+  ApplicationResponse,
+  AppStatsResponse,
+  AttemptResponse,
+  AuditLogResponse,
+  CreateApplicationRequest,
+  CreateEndpointRequest,
+  CreateEventTypeRequest,
+  DeadLetterResponse,
+  EndpointResponse,
+  EndpointStatsResponse,
+  EventTypeResponse,
+  EventTypeStatsResponse,
+  MessageResponse,
+  SendMessageRequest,
+  SendMessageResponse,
+  UpdateApplicationRequest,
+  UpdateEndpointRequest,
+  UpdateEventTypeRequest,
+}
+
+// Aliases for generated types used by components under shorter names
+export type { TimeBucketResponse as TimeBucket } from './generated/types.gen'
+export type { RecentMessageResponse as RecentMessage } from './generated/types.gen'
 
 // --- Applications ---
 
@@ -254,6 +108,16 @@ export function useDeleteApplication() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['applications'] })
     },
+  })
+}
+
+// --- Stats ---
+
+export function useAppStats(appId: Ref<string>, period: Ref<string>) {
+  return useQuery<AppStatsResponse>({
+    queryKey: ['applications', appId, 'stats', period],
+    queryFn: () =>
+      apiFetch(`/applications/${appId.value}/stats?period=${period.value}`),
   })
 }
 
@@ -319,13 +183,29 @@ export function useDeleteEventType(appId: Ref<string>) {
   })
 }
 
+// --- Event Type Stats ---
+
+export function useEventTypeStats(
+  appId: Ref<string>,
+  eventTypeId: Ref<string>,
+  period: Ref<string>,
+) {
+  return useQuery<EventTypeStatsResponse>({
+    queryKey: ['applications', appId, 'event-types', eventTypeId, 'stats', period],
+    queryFn: () =>
+      apiFetch(
+        `/applications/${appId.value}/event-types/${eventTypeId.value}/stats?period=${period.value}`,
+      ),
+  })
+}
+
 // --- Endpoints ---
 
 export function useEndpoints(appId: Ref<string>) {
   return useQuery({
     queryKey: ['applications', appId, 'endpoints'],
     queryFn: () =>
-      apiFetch<{ items: EndpointWithName[]; total: number }>(
+      apiFetch<{ items: EndpointResponse[]; total: number }>(
         `/applications/${appId.value}/endpoints?limit=100`,
       ),
   })
@@ -334,7 +214,7 @@ export function useEndpoints(appId: Ref<string>) {
 export function useCreateEndpoint(appId: Ref<string>) {
   const queryClient = useQueryClient()
 
-  return useMutation<EndpointWithName, Error, Omit<CreateEndpointRequest, 'signing_secret'> & { name?: string; signing_secret?: string }>({
+  return useMutation<EndpointResponse, Error, CreateEndpointRequest>({
     mutationFn: (body) =>
       apiFetch(`/applications/${appId.value}/endpoints`, {
         method: 'POST',
@@ -378,6 +258,22 @@ export function useDeleteEndpoint(appId: Ref<string>) {
         queryKey: ['applications', appId, 'endpoints'],
       })
     },
+  })
+}
+
+// --- Endpoint Stats ---
+
+export function useEndpointStats(
+  appId: Ref<string>,
+  endpointId: Ref<string>,
+  period: Ref<string>,
+) {
+  return useQuery<EndpointStatsResponse>({
+    queryKey: ['applications', appId, 'endpoints', endpointId, 'stats', period],
+    queryFn: () =>
+      apiFetch(
+        `/applications/${appId.value}/endpoints/${endpointId.value}/stats?period=${period.value}`,
+      ),
   })
 }
 
@@ -462,6 +358,30 @@ export function useReplayDeadLetter(appId: Ref<string>) {
       queryClient.invalidateQueries({
         queryKey: ['applications', appId, 'dead-letters'],
       })
+    },
+  })
+}
+
+// --- Audit Log ---
+
+export function useAuditLog(
+  offset: Ref<number>,
+  limit: Ref<number>,
+  commandFilter: Ref<string>,
+  successFilter: Ref<string>,
+) {
+  return useQuery({
+    queryKey: ['audit-log', offset, limit, commandFilter, successFilter],
+    queryFn: () => {
+      const params = new URLSearchParams({
+        offset: String(offset.value),
+        limit: String(limit.value),
+      })
+      if (commandFilter.value) params.set('command', commandFilter.value)
+      if (successFilter.value) params.set('success', successFilter.value)
+      return apiFetch<{ items: AuditLogResponse[]; total: number; offset: number; limit: number }>(
+        `/audit-log?${params}`,
+      )
     },
   })
 }
