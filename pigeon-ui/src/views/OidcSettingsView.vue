@@ -1,173 +1,133 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-import { useOidcConfigs, useCreateOidcConfig, useDeleteOidcConfig } from '@/api/oidc-configs'
-import type { OidcConfigResponse } from '@/api/oidc-configs'
+import { ref, watch } from 'vue'
+import { useOidcConfig, useUpdateOidcConfig } from '@/api/oidc-configs'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog'
 import PageHeader from '@/components/PageHeader.vue'
 import LoadingState from '@/components/LoadingState.vue'
 import ErrorState from '@/components/ErrorState.vue'
-import EmptyState from '@/components/EmptyState.vue'
-import { Shield, Plus, Trash2 } from 'lucide-vue-next'
+import { Pencil, X, Save } from 'lucide-vue-next'
 import { useToast } from '@/composables/useToast'
 
-const { data, isLoading, error } = useOidcConfigs()
-const createConfig = useCreateOidcConfig()
-const deleteConfig = useDeleteOidcConfig()
+const { data: config, isLoading, error } = useOidcConfig()
+const updateConfig = useUpdateOidcConfig()
 const toast = useToast()
 
-const showCreateDialog = ref(false)
-const newIssuerUrl = ref('')
-const newAudience = ref('')
-const newJwksUrl = ref('')
+const editing = ref(false)
+const editIssuerUrl = ref('')
+const editAudience = ref('')
+const editJwksUrl = ref('')
 
-function handleCreate() {
-  createConfig.mutate(
+function startEditing() {
+  if (!config.value) return
+  editIssuerUrl.value = config.value.issuer_url
+  editAudience.value = config.value.audience
+  editJwksUrl.value = config.value.jwks_url
+  editing.value = true
+}
+
+function cancelEditing() {
+  editing.value = false
+}
+
+function handleSave() {
+  if (!config.value) return
+  updateConfig.mutate(
     {
-      issuer_url: newIssuerUrl.value,
-      audience: newAudience.value,
-      jwks_url: newJwksUrl.value,
+      oldId: config.value.id,
+      issuer_url: editIssuerUrl.value,
+      audience: editAudience.value,
+      jwks_url: editJwksUrl.value,
     },
     {
       onSuccess: () => {
-        toast.success('OIDC configuration created')
-        showCreateDialog.value = false
-        newIssuerUrl.value = ''
-        newAudience.value = ''
-        newJwksUrl.value = ''
+        toast.success('OIDC configuration updated')
+        editing.value = false
       },
       onError: (e) => toast.error(e.message),
     },
   )
 }
 
-function handleDelete(config: OidcConfigResponse) {
-  if (!confirm(`Delete OIDC config for ${config.audience}?`)) return
-  deleteConfig.mutate(config.id, {
-    onSuccess: () => toast.success('OIDC configuration deleted'),
-    onError: (e) => toast.error(e.message),
-  })
-}
+watch(config, () => {
+  if (editing.value) return
+})
 </script>
 
 <template>
   <div class="space-y-6">
     <PageHeader
       title="OIDC Settings"
-      description="Manage OpenID Connect configurations for your organization."
+      description="OpenID Connect configuration for your organization."
     >
       <template #actions>
-        <Dialog v-model:open="showCreateDialog">
-          <DialogTrigger as-child>
-            <Button size="sm">
-              <Plus class="mr-2 h-4 w-4" />
-              Add Configuration
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add OIDC Configuration</DialogTitle>
-            </DialogHeader>
-            <div class="space-y-4 py-4">
-              <div class="space-y-2">
-                <label class="text-sm font-medium">Issuer URL</label>
-                <Input
-                  v-model="newIssuerUrl"
-                  placeholder="https://auth.example.com"
-                />
-              </div>
-              <div class="space-y-2">
-                <label class="text-sm font-medium">Audience</label>
-                <Input
-                  v-model="newAudience"
-                  placeholder="my-api"
-                />
-              </div>
-              <div class="space-y-2">
-                <label class="text-sm font-medium">JWKS URL</label>
-                <Input
-                  v-model="newJwksUrl"
-                  placeholder="https://auth.example.com/.well-known/jwks.json"
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                @click="handleCreate"
-                :disabled="createConfig.isPending.value || !newIssuerUrl || !newAudience || !newJwksUrl"
-              >
-                Create
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+        <template v-if="config && !editing">
+          <Button size="sm" variant="outline" @click="startEditing">
+            <Pencil class="mr-2 h-4 w-4" />
+            Edit
+          </Button>
+        </template>
+        <template v-if="editing">
+          <Button size="sm" variant="ghost" @click="cancelEditing">
+            <X class="mr-2 h-4 w-4" />
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            @click="handleSave"
+            :disabled="updateConfig.isPending.value || !editIssuerUrl || !editAudience || !editJwksUrl"
+          >
+            <Save class="mr-2 h-4 w-4" />
+            Save
+          </Button>
+        </template>
       </template>
     </PageHeader>
 
-    <LoadingState v-if="isLoading" message="Loading OIDC configurations..." />
+    <LoadingState v-if="isLoading" message="Loading OIDC configuration..." />
 
     <ErrorState v-else-if="error" :message="error.message" />
 
-    <EmptyState
-      v-else-if="!data?.items.length"
-      :icon="Shield"
-      title="No OIDC configurations"
-      description="Add an OpenID Connect provider to enable authentication."
-    />
+    <template v-else-if="config">
+      <div class="rounded-lg border bg-card p-6 space-y-6">
+        <!-- Issuer URL -->
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-muted-foreground">Issuer URL</label>
+          <Input
+            v-if="editing"
+            v-model="editIssuerUrl"
+            placeholder="https://auth.example.com"
+          />
+          <p v-else class="font-mono text-sm">{{ config.issuer_url }}</p>
+        </div>
 
-    <Table v-else>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Issuer URL</TableHead>
-          <TableHead>Audience</TableHead>
-          <TableHead>JWKS URL</TableHead>
-          <TableHead>Created</TableHead>
-          <TableHead class="w-[60px]" />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        <TableRow v-for="config in data.items" :key="config.id">
-          <TableCell class="font-mono text-sm">
-            {{ config.issuer_url }}
-          </TableCell>
-          <TableCell class="font-mono text-sm">
-            {{ config.audience }}
-          </TableCell>
-          <TableCell class="max-w-xs truncate font-mono text-sm text-muted-foreground">
-            {{ config.jwks_url }}
-          </TableCell>
-          <TableCell class="text-muted-foreground whitespace-nowrap">
-            {{ new Date(config.created_at).toLocaleDateString() }}
-          </TableCell>
-          <TableCell>
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-8 w-8 text-muted-foreground hover:text-destructive"
-              :disabled="(data?.items.length ?? 0) <= 1"
-              @click="handleDelete(config)"
-            >
-              <Trash2 class="h-4 w-4" />
-            </Button>
-          </TableCell>
-        </TableRow>
-      </TableBody>
-    </Table>
+        <!-- Audience -->
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-muted-foreground">Audience</label>
+          <Input
+            v-if="editing"
+            v-model="editAudience"
+            placeholder="my-api"
+          />
+          <p v-else class="font-mono text-sm">{{ config.audience }}</p>
+        </div>
+
+        <!-- JWKS URL -->
+        <div class="space-y-1">
+          <label class="text-sm font-medium text-muted-foreground">JWKS URL</label>
+          <Input
+            v-if="editing"
+            v-model="editJwksUrl"
+            placeholder="https://auth.example.com/.well-known/jwks.json"
+          />
+          <p v-else class="font-mono text-sm break-all">{{ config.jwks_url }}</p>
+        </div>
+
+        <!-- Metadata -->
+        <div class="border-t pt-4 text-sm text-muted-foreground">
+          Created {{ new Date(config.created_at).toLocaleDateString() }}
+        </div>
+      </div>
+    </template>
   </div>
 </template>

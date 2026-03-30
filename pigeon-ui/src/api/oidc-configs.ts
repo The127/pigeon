@@ -1,45 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/vue-query'
-import type {
-  CreateOidcConfigRequest,
-  OidcConfigResponse,
-} from './generated/types.gen'
+import type { OidcConfigResponse } from './generated/types.gen'
 import { apiFetch } from './client'
 
-export type { OidcConfigResponse, CreateOidcConfigRequest }
+export type { OidcConfigResponse }
 
-export function useOidcConfigs() {
-  return useQuery({
-    queryKey: ['oidc-configs'],
-    queryFn: () =>
-      apiFetch<{ items: OidcConfigResponse[]; total: number; offset: number; limit: number }>(
-        '/oidc-configs?limit=100',
-      ),
-  })
-}
-
-export function useCreateOidcConfig() {
-  const queryClient = useQueryClient()
-
-  return useMutation<OidcConfigResponse, Error, CreateOidcConfigRequest>({
-    mutationFn: (body) =>
-      apiFetch('/oidc-configs', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['oidc-configs'] })
+export function useOidcConfig() {
+  return useQuery<OidcConfigResponse | null>({
+    queryKey: ['oidc-config'],
+    queryFn: async () => {
+      const result = await apiFetch<{ items: OidcConfigResponse[] }>('/oidc-configs?limit=1')
+      return result.items[0] ?? null
     },
   })
 }
 
-export function useDeleteOidcConfig() {
+export function useUpdateOidcConfig() {
   const queryClient = useQueryClient()
 
-  return useMutation<void, Error, string>({
-    mutationFn: (id) =>
-      apiFetch(`/oidc-configs/${id}`, { method: 'DELETE' }),
+  return useMutation<
+    OidcConfigResponse,
+    Error,
+    { oldId: string; issuer_url: string; audience: string; jwks_url: string }
+  >({
+    mutationFn: async ({ oldId, issuer_url, audience, jwks_url }) => {
+      // OIDC configs are immutable — replace by creating new then deleting old
+      const created = await apiFetch<OidcConfigResponse>('/oidc-configs', {
+        method: 'POST',
+        body: JSON.stringify({ issuer_url, audience, jwks_url }),
+      })
+      await apiFetch(`/oidc-configs/${oldId}`, { method: 'DELETE' })
+      return created
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['oidc-configs'] })
+      queryClient.invalidateQueries({ queryKey: ['oidc-config'] })
     },
   })
 }
