@@ -48,7 +48,7 @@ Dead-lettered messages are not lost. You can:
 
 ## Idempotency
 
-Messages accept an optional `idempotency_key`. Sending the same key twice returns the existing message without creating duplicate attempts. Keys expire after 24 hours (configurable).
+Messages accept an optional `idempotency_key`. Sending the same key twice returns the existing message without creating duplicate attempts. Keys expire after 24 hours.
 
 ## Auto-disable
 

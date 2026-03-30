@@ -6,6 +6,11 @@
 
 <p align="center">Self-hosted webhook delivery service. Send events, Pigeon delivers them.</p>
 
+<p align="center">
+  <a href="https://the127.github.io/pigeon/">Documentation</a> ·
+  <a href="https://github.com/The127/pigeon/releases">Releases</a>
+</p>
+
 ---
 
 ## What it does

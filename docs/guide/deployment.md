@@ -64,5 +64,5 @@ volumes:
 
 ## Requirements
 
-- **Postgres 15+** — uses `xmin` system column for optimistic concurrency
+- **Postgres 14+** — tested with PostgreSQL 17, uses standard features (`xmin`, `TEXT[]`, `ON DELETE CASCADE`)
 - **OIDC provider** — any OpenID Connect provider that issues JWTs (Keycloak, Auth0, Keyline, etc.)

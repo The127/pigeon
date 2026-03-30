@@ -28,7 +28,7 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies `/api`, `/admin`, `/health`, and `/metrics` to `localhost:3000`.
+The Vite dev server proxies `/api`, `/admin`, and `/health` to `localhost:3000`.
 
 ## Generate OpenAPI client
 
