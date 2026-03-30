@@ -90,6 +90,7 @@ pub struct AppState {
     pub jwks_provider: Arc<dyn JwksProvider>,
     pub list_audit_log: Arc<dyn QueryHandler<ListAuditLog>>,
     pub audit_store: Arc<dyn pigeon_application::ports::audit_store::AuditStore>,
+    pub uow_factory: Arc<dyn pigeon_application::ports::unit_of_work::UnitOfWorkFactory>,
     pub metrics_render: Arc<dyn Fn() -> String + Send + Sync>,
     pub admin_org_id: Option<OrganizationId>,
 }

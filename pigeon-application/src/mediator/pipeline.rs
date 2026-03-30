@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -5,37 +6,94 @@ use async_trait::async_trait;
 use pigeon_domain::organization::OrganizationId;
 
 use crate::error::ApplicationError;
+use crate::ports::unit_of_work::UnitOfWork;
 
+/// Request-scoped context threaded through the pipeline.
+///
+/// Created by `dispatch()`, populated by behaviors (TransactionBehavior sets the UoW),
+/// and consumed by command handlers (via `ctx.uow()`).
+///
+/// Ownership is passed through the pipeline — each layer takes the context,
+/// uses it, and returns it alongside the result. This avoids mutable borrow
+/// conflicts between behaviors that need to read context after calling next.
 pub struct RequestContext {
     pub command_name: &'static str,
     pub actor: String,
     pub org_id: OrganizationId,
+    uow: Option<Box<dyn UnitOfWork>>,
+    output: Option<Box<dyn Any + Send>>,
 }
 
-/// Type-erased next step in the pipeline. Returns `Result<(), _>` because
-/// the mediator captures the typed command output in a separate slot.
-/// Behaviors only observe success or failure.
+impl RequestContext {
+    pub fn new(command_name: &'static str, actor: String, org_id: OrganizationId) -> Self {
+        Self {
+            command_name,
+            actor,
+            org_id,
+            uow: None,
+            output: None,
+        }
+    }
+
+    /// Returns a mutable reference to the UoW managed by TransactionBehavior.
+    ///
+    /// # Panics
+    /// Panics if called outside a TransactionBehavior pipeline — this is a programming
+    /// error, not a runtime condition, so a panic with a clear message is appropriate.
+    pub fn uow(&mut self) -> &mut dyn UnitOfWork {
+        self.uow
+            .as_deref_mut()
+            .expect("UoW not available — handler called outside TransactionBehavior pipeline")
+    }
+
+    /// Set the UoW. Called by TransactionBehavior after begin().
+    ///
+    /// Also available to integration tests via the `test-support` feature.
+    #[cfg(not(feature = "test-support"))]
+    pub(crate) fn set_uow(&mut self, uow: Box<dyn UnitOfWork>) {
+        self.uow = Some(uow);
+    }
+
+    /// Set the UoW. Called by TransactionBehavior after begin().
+    #[cfg(feature = "test-support")]
+    pub fn set_uow(&mut self, uow: Box<dyn UnitOfWork>) {
+        self.uow = Some(uow);
+    }
+
+    /// Take the UoW for commit/rollback. Called by TransactionBehavior after handler returns.
+    pub(crate) fn take_uow(&mut self) -> Option<Box<dyn UnitOfWork>> {
+        self.uow.take()
+    }
+
+    /// Store the handler's typed output (type-erased). Called by the handler closure in dispatch().
+    pub(crate) fn set_output<T: Any + Send>(&mut self, value: T) {
+        self.output = Some(Box::new(value));
+    }
+
+    /// Extract the handler's typed output. Called by dispatch() after the pipeline completes.
+    pub(crate) fn take_output<T: Any + Send>(&mut self) -> Option<T> {
+        let boxed = self.output.take()?;
+        boxed.downcast::<T>().ok().map(|b| *b)
+    }
+}
+
+/// Next step in the pipeline. Takes ownership of RequestContext, returns it alongside
+/// the result. Ownership transfer avoids mutable borrow conflicts — behaviors can read
+/// context fields after calling next without fighting the borrow checker.
 pub type NextFn = Box<
-    dyn FnOnce() -> Pin<Box<dyn Future<Output = Result<(), ApplicationError>> + Send>> + Send,
+    dyn FnOnce(
+            RequestContext,
+        ) -> Pin<Box<dyn Future<Output = (RequestContext, Result<(), ApplicationError>)> + Send>>
+        + Send,
 >;
 
 #[async_trait]
 pub trait PipelineBehavior: Send + Sync {
     async fn handle(
         &self,
-        context: &mut RequestContext,
+        context: RequestContext,
         next: NextFn,
-    ) -> Result<(), ApplicationError>;
-}
-
-/// Executes a single behavior around a handler.
-/// For composing multiple behaviors, nest calls from inside out.
-pub async fn execute_with_behavior(
-    behavior: &dyn PipelineBehavior,
-    context: &mut RequestContext,
-    handler: NextFn,
-) -> Result<(), ApplicationError> {
-    behavior.handle(context, handler).await
+    ) -> (RequestContext, Result<(), ApplicationError>);
 }
 
 #[cfg(test)]
@@ -56,31 +114,31 @@ mod tests {
         let txn = TransactionBehavior::new(factory);
         let audit = AuditBehavior::new(audit_store);
 
-        // Nest from inside out: txn wraps audit wraps handler
-        let handler: NextFn = Box::new(|| Box::pin(async { Ok(()) }));
+        let ctx = RequestContext::new(
+            "TestCommand",
+            "user_1".into(),
+            OrganizationId::new(),
+        );
 
-        // audit wraps handler
-        let mut ctx = RequestContext {
-            command_name: "TestCommand",
-            actor: "user_1".into(),
-            org_id: OrganizationId::new(),
-        };
-        let audit_next: NextFn = {
-            Box::new(move || {
-                Box::pin(async move { audit.handle(&mut ctx, handler).await })
-            })
-        };
-
-        // txn wraps audit+handler
-        let mut outer_ctx = RequestContext {
-            command_name: "TestCommand",
-            actor: "user_1".into(),
-            org_id: OrganizationId::new(),
-        };
-        let result = txn.handle(&mut outer_ctx, audit_next).await;
+        let (_, result) = txn
+            .handle(
+                ctx,
+                Box::new(move |ctx: RequestContext| {
+                    Box::pin(async move {
+                        audit
+                            .handle(
+                                ctx,
+                                Box::new(|ctx: RequestContext| {
+                                    Box::pin(async { (ctx, Ok(())) })
+                                }),
+                            )
+                            .await
+                    })
+                }),
+            )
+            .await;
 
         assert!(result.is_ok());
-        // begin -> (handler ok) -> audit records -> commit
         assert_eq!(
             log.entries(),
             vec![
@@ -92,7 +150,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn composed_pipeline_rolls_back_and_skips_audit_on_failure() {
+    async fn composed_pipeline_rolls_back_and_audits_on_failure() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
         let audit_store = Arc::new(FakeAuditStore::new(log.clone()));
@@ -100,56 +158,40 @@ mod tests {
         let txn = TransactionBehavior::new(factory);
         let audit = AuditBehavior::new(audit_store);
 
-        let handler: NextFn = Box::new(|| {
-            Box::pin(async { Err(ApplicationError::Internal("handler failed".into())) })
-        });
+        let ctx = RequestContext::new(
+            "TestCommand",
+            "user_1".into(),
+            OrganizationId::new(),
+        );
 
-        let mut ctx = RequestContext {
-            command_name: "TestCommand",
-            actor: "user_1".into(),
-            org_id: OrganizationId::new(),
-        };
-        let audit_next: NextFn = {
-            Box::new(move || {
-                Box::pin(async move { audit.handle(&mut ctx, handler).await })
-            })
-        };
-
-        let mut outer_ctx = RequestContext {
-            command_name: "TestCommand",
-            actor: "user_1".into(),
-            org_id: OrganizationId::new(),
-        };
-        let result = txn.handle(&mut outer_ctx, audit_next).await;
+        let (_, result) = txn
+            .handle(
+                ctx,
+                Box::new(move |ctx: RequestContext| {
+                    Box::pin(async move {
+                        audit
+                            .handle(
+                                ctx,
+                                Box::new(|ctx: RequestContext| {
+                                    Box::pin(async {
+                                        (ctx, Err(ApplicationError::Internal("handler failed".into())))
+                                    })
+                                }),
+                            )
+                            .await
+                    })
+                }),
+            )
+            .await;
 
         assert!(result.is_err());
-        // begin -> handler fails -> audit records failure -> rollback
         assert_eq!(
             log.entries(),
-            vec!["uow_factory:begin", "audit:record:TestCommand:failure", "uow:rollback"]
-        );
-    }
-
-    #[tokio::test]
-    async fn single_behavior_wraps_handler() {
-        let log = OperationLog::new();
-        let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let txn = TransactionBehavior::new(factory);
-
-        let handler: NextFn = Box::new(|| Box::pin(async { Ok(()) }));
-
-        let mut ctx = RequestContext {
-            command_name: "TestCommand",
-            actor: "user_1".into(),
-            org_id: OrganizationId::new(),
-        };
-
-        let result = execute_with_behavior(&txn, &mut ctx, handler).await;
-
-        assert!(result.is_ok());
-        assert_eq!(
-            log.entries(),
-            vec!["uow_factory:begin", "uow:commit"]
+            vec![
+                "uow_factory:begin",
+                "audit:record:TestCommand:failure",
+                "uow:rollback",
+            ]
         );
     }
 }

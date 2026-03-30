@@ -21,10 +21,10 @@ impl AuditBehavior {
 impl PipelineBehavior for AuditBehavior {
     async fn handle(
         &self,
-        context: &mut RequestContext,
+        context: RequestContext,
         next: NextFn,
-    ) -> Result<(), ApplicationError> {
-        let result = next().await;
+    ) -> (RequestContext, Result<(), ApplicationError>) {
+        let (context, result) = next(context).await;
 
         let (success, error_message) = match &result {
             Ok(()) => (true, None),
@@ -44,7 +44,7 @@ impl PipelineBehavior for AuditBehavior {
             })
             .await;
 
-        result
+        (context, result)
     }
 }
 
@@ -55,20 +55,16 @@ mod tests {
     use pigeon_domain::organization::OrganizationId;
 
     fn make_ctx() -> RequestContext {
-        RequestContext {
-            command_name: "CreateApplication",
-            actor: "user_42".into(),
-            org_id: OrganizationId::new(),
-        }
+        RequestContext::new("CreateApplication", "user_42".into(), OrganizationId::new())
     }
 
     fn success_next() -> NextFn {
-        Box::new(|| Box::pin(async { Ok(()) }))
+        Box::new(|ctx: RequestContext| Box::pin(async { (ctx, Ok(())) }))
     }
 
     fn failing_next() -> NextFn {
-        Box::new(|| {
-            Box::pin(async { Err(ApplicationError::Internal("boom".into())) })
+        Box::new(|ctx: RequestContext| {
+            Box::pin(async { (ctx, Err(ApplicationError::Internal("boom".into()))) })
         })
     }
 
@@ -78,7 +74,7 @@ mod tests {
         let audit_store = Arc::new(FakeAuditStore::new(log.clone()));
         let behavior = AuditBehavior::new(audit_store);
 
-        let result = behavior.handle(&mut make_ctx(), success_next()).await;
+        let (_, result) = behavior.handle(make_ctx(), success_next()).await;
 
         assert!(result.is_ok());
         assert_eq!(log.entries(), vec!["audit:record:CreateApplication:success"]);
@@ -90,7 +86,7 @@ mod tests {
         let audit_store = Arc::new(FakeAuditStore::new(log.clone()));
         let behavior = AuditBehavior::new(audit_store);
 
-        let result = behavior.handle(&mut make_ctx(), failing_next()).await;
+        let (_, result) = behavior.handle(make_ctx(), failing_next()).await;
 
         assert!(result.is_err());
         assert_eq!(log.entries(), vec!["audit:record:CreateApplication:failure"]);
@@ -102,7 +98,7 @@ mod tests {
         let audit_store = Arc::new(FakeAuditStore::new(log));
         let behavior = AuditBehavior::new(audit_store);
 
-        let result = behavior.handle(&mut make_ctx(), failing_next()).await;
+        let (_, result) = behavior.handle(make_ctx(), failing_next()).await;
 
         assert!(matches!(result, Err(ApplicationError::Internal(_))));
     }

@@ -41,7 +41,7 @@ pub(crate) async fn create_application(
         uid: body.uid,
     };
 
-    let app = dispatch(&*state.create_application, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
+    let app = dispatch(state.create_application.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone()).await.map_err(ApiError)?;
     let response = ApplicationResponse::from(app);
 
     Ok((StatusCode::CREATED, Json(response)))
@@ -138,7 +138,7 @@ pub(crate) async fn update_application(
         version: Version::new(body.version),
     };
 
-    let app = dispatch(&*state.update_application, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
+    let app = dispatch(state.update_application.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone()).await.map_err(ApiError)?;
 
     Ok(Json(ApplicationResponse::from(app)))
 }
@@ -164,7 +164,7 @@ pub(crate) async fn delete_application(
         id: ApplicationId::from_uuid(id),
     };
 
-    dispatch(&*state.delete_application, command, &auth.user_id, &auth.org_id, &*state.audit_store).await.map_err(ApiError)?;
+    dispatch(state.delete_application.clone(), command, &auth.user_id, &auth.org_id, state.uow_factory.clone(), state.audit_store.clone()).await.map_err(ApiError)?;
 
     Ok(StatusCode::NO_CONTENT)
 }
@@ -177,6 +177,7 @@ mod tests {
     use axum::http::Request;
     use axum::Router;
     use pigeon_application::commands::create_endpoint::CreateEndpoint;
+    use pigeon_application::mediator::pipeline::RequestContext;
     use pigeon_application::commands::create_event_type::CreateEventType;
     use pigeon_application::commands::delete_endpoint::DeleteEndpoint;
     use pigeon_application::commands::delete_event_type::DeleteEventType;
@@ -210,7 +211,7 @@ mod tests {
 
     #[async_trait]
     impl CommandHandler<CreateApplication> for FakeCreateHandler {
-        async fn handle(&self, command: CreateApplication) -> Result<Application, ApplicationError> {
+        async fn handle(&self, command: CreateApplication, _ctx: &mut RequestContext) -> Result<Application, ApplicationError> {
             match &self.result {
                 Ok(_) => {
                     Application::new(command.org_id, command.name, command.uid)
@@ -232,7 +233,7 @@ mod tests {
 
     #[async_trait]
     impl CommandHandler<UpdateApplication> for FakeUpdateHandler {
-        async fn handle(&self, _command: UpdateApplication) -> Result<Application, ApplicationError> {
+        async fn handle(&self, _command: UpdateApplication, _ctx: &mut RequestContext) -> Result<Application, ApplicationError> {
             match &self.result {
                 Ok(app) => Ok(app.clone()),
                 Err(e) => Err(match e {
@@ -251,7 +252,7 @@ mod tests {
 
     #[async_trait]
     impl CommandHandler<DeleteApplication> for FakeDeleteHandler {
-        async fn handle(&self, _command: DeleteApplication) -> Result<(), ApplicationError> {
+        async fn handle(&self, _command: DeleteApplication, _ctx: &mut RequestContext) -> Result<(), ApplicationError> {
             match &self.result {
                 Ok(()) => Ok(()),
                 Err(e) => Err(match e {
@@ -271,7 +272,7 @@ mod tests {
         async fn handle(
             &self,
             _query: GetApplicationById,
-        ) -> Result<Option<Application>, ApplicationError> {
+) -> Result<Option<Application>, ApplicationError> {
             match &self.result {
                 Ok(app) => Ok(app.clone()),
                 Err(e) => Err(match e {
@@ -291,7 +292,7 @@ mod tests {
         async fn handle(
             &self,
             _query: ListApplications,
-        ) -> Result<PaginatedResult<Application>, ApplicationError> {
+) -> Result<PaginatedResult<Application>, ApplicationError> {
             match &self.result {
                 Ok(r) => Ok(r.clone()),
                 Err(e) => Err(match e {
@@ -306,7 +307,7 @@ mod tests {
     struct StubSendMessageHandler;
     #[async_trait]
     impl CommandHandler<SendMessage> for StubSendMessageHandler {
-        async fn handle(&self, _c: SendMessage) -> Result<SendMessageResult, ApplicationError> {
+        async fn handle(&self, _c: SendMessage, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<SendMessageResult, ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -316,7 +317,7 @@ mod tests {
     struct StubCreateEtHandler;
     #[async_trait]
     impl CommandHandler<CreateEventType> for StubCreateEtHandler {
-        async fn handle(&self, _c: CreateEventType) -> Result<EventType, ApplicationError> {
+        async fn handle(&self, _c: CreateEventType, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<EventType, ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -324,7 +325,7 @@ mod tests {
     struct StubUpdateEtHandler;
     #[async_trait]
     impl CommandHandler<UpdateEventType> for StubUpdateEtHandler {
-        async fn handle(&self, _c: UpdateEventType) -> Result<EventType, ApplicationError> {
+        async fn handle(&self, _c: UpdateEventType, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<EventType, ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -332,7 +333,7 @@ mod tests {
     struct StubDeleteEtHandler;
     #[async_trait]
     impl CommandHandler<DeleteEventType> for StubDeleteEtHandler {
-        async fn handle(&self, _c: DeleteEventType) -> Result<(), ApplicationError> {
+        async fn handle(&self, _c: DeleteEventType, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<(), ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -343,7 +344,7 @@ mod tests {
         async fn handle(
             &self,
             _q: GetEventTypeById,
-        ) -> Result<Option<EventType>, ApplicationError> {
+) -> Result<Option<EventType>, ApplicationError> {
             Ok(None)
         }
     }
@@ -354,7 +355,7 @@ mod tests {
         async fn handle(
             &self,
             _q: ListEventTypesByApp,
-        ) -> Result<PaginatedResult<EventType>, ApplicationError> {
+) -> Result<PaginatedResult<EventType>, ApplicationError> {
             Ok(PaginatedResult {
                 items: vec![],
                 total: 0,
@@ -367,7 +368,7 @@ mod tests {
     struct StubCreateEpHandler;
     #[async_trait]
     impl CommandHandler<CreateEndpoint> for StubCreateEpHandler {
-        async fn handle(&self, _c: CreateEndpoint) -> Result<Endpoint, ApplicationError> {
+        async fn handle(&self, _c: CreateEndpoint, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<Endpoint, ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -375,7 +376,7 @@ mod tests {
     struct StubUpdateEpHandler;
     #[async_trait]
     impl CommandHandler<UpdateEndpoint> for StubUpdateEpHandler {
-        async fn handle(&self, _c: UpdateEndpoint) -> Result<Endpoint, ApplicationError> {
+        async fn handle(&self, _c: UpdateEndpoint, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<Endpoint, ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -383,7 +384,7 @@ mod tests {
     struct StubDeleteEpHandler;
     #[async_trait]
     impl CommandHandler<DeleteEndpoint> for StubDeleteEpHandler {
-        async fn handle(&self, _c: DeleteEndpoint) -> Result<(), ApplicationError> {
+        async fn handle(&self, _c: DeleteEndpoint, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<(), ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -419,7 +420,7 @@ mod tests {
     struct StubCreateOrgHandler;
     #[async_trait]
     impl CommandHandler<CreateOrganization> for StubCreateOrgHandler {
-        async fn handle(&self, _c: CreateOrganization) -> Result<Organization, ApplicationError> {
+        async fn handle(&self, _c: CreateOrganization, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<Organization, ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -427,7 +428,7 @@ mod tests {
     struct StubUpdateOrgHandler;
     #[async_trait]
     impl CommandHandler<UpdateOrganization> for StubUpdateOrgHandler {
-        async fn handle(&self, _c: UpdateOrganization) -> Result<Organization, ApplicationError> {
+        async fn handle(&self, _c: UpdateOrganization, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<Organization, ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -435,7 +436,7 @@ mod tests {
     struct StubDeleteOrgHandler;
     #[async_trait]
     impl CommandHandler<DeleteOrganization> for StubDeleteOrgHandler {
-        async fn handle(&self, _c: DeleteOrganization) -> Result<(), ApplicationError> {
+        async fn handle(&self, _c: DeleteOrganization, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<(), ApplicationError> {
             Err(ApplicationError::Internal("stub".into()))
         }
     }
@@ -514,6 +515,7 @@ mod tests {
             send_test_event: Arc::new(StubSendTestEventHandler),
             list_audit_log: Arc::new(StubListAuditLogHandler),
             audit_store: Arc::new(StubAuditStore),
+            uow_factory: Arc::new(pigeon_application::test_support::fakes::FakeUnitOfWorkFactory::new(pigeon_application::test_support::fakes::OperationLog::new())),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

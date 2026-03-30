@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -10,7 +9,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct ReplayDeadLetter {
@@ -26,13 +25,12 @@ impl Command for ReplayDeadLetter {
     }
 }
 
-pub struct ReplayDeadLetterHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct ReplayDeadLetterHandler;
 
 impl ReplayDeadLetterHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
@@ -41,10 +39,10 @@ impl CommandHandler<ReplayDeadLetter> for ReplayDeadLetterHandler {
     async fn handle(
         &self,
         command: ReplayDeadLetter,
+        ctx: &mut RequestContext,
     ) -> Result<DeadLetter, ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
 
-        let mut dead_letter = uow
+        let mut dead_letter = ctx.uow()
             .dead_letter_store()
             .find_by_id(&command.dead_letter_id, &command.org_id)
             .await?
@@ -64,14 +62,13 @@ impl CommandHandler<ReplayDeadLetter> for ReplayDeadLetterHandler {
             Utc::now(),
         );
 
-        uow.dead_letter_store().save(&dead_letter).await?;
-        uow.attempt_store().insert(&attempt).await?;
-        uow.emit_event(DomainEvent::DeadLetterReplayed {
+        ctx.uow().dead_letter_store().save(&dead_letter).await?;
+        ctx.uow().attempt_store().insert(&attempt).await?;
+        ctx.uow().emit_event(DomainEvent::DeadLetterReplayed {
             dead_letter_id: dead_letter.id().clone(),
             message_id: dead_letter.message_id().clone(),
             endpoint_id: dead_letter.endpoint_id().clone(),
         });
-        uow.commit().await?;
 
         Ok(dead_letter)
     }

@@ -92,7 +92,8 @@ impl EventTypeStatsReadStore for PgEventTypeStatsReadStore {
                    AND dl.dead_lettered_at >= $4) AS total_dead_lettered, \
                 (SELECT COUNT(*) FROM endpoint_events ee \
                  JOIN endpoints e ON e.id = ee.endpoint_id \
-                 WHERE ee.event_type_id = $2 AND e.app_id = $1 AND e.enabled = true) AS subscribed_endpoints",
+                 JOIN applications a ON a.id = e.app_id \
+                 WHERE ee.event_type_id = $2 AND e.app_id = $1 AND a.org_id = $3 AND e.enabled = true) AS subscribed_endpoints",
         )
         .bind(app_id.as_uuid())
         .bind(event_type_id.as_uuid())

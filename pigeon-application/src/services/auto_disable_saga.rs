@@ -5,9 +5,12 @@ use tracing::{info, warn};
 
 use crate::commands::disable_endpoint::DisableEndpoint;
 use crate::mediator::handler::CommandHandler;
+use crate::mediator::pipeline::RequestContext;
 use crate::ports::stores::DeadLetterReadStore;
+use crate::ports::unit_of_work::UnitOfWorkFactory;
 use crate::services::outbox_worker::EventSubscriber;
 use pigeon_domain::event::DomainEvent;
+use pigeon_domain::organization::OrganizationId;
 
 /// Saga that auto-disables endpoints after N consecutive dead letters.
 ///
@@ -18,6 +21,7 @@ use pigeon_domain::event::DomainEvent;
 pub struct AutoDisableEndpointSaga {
     dead_letter_read_store: Arc<dyn DeadLetterReadStore>,
     disable_handler: Arc<dyn CommandHandler<DisableEndpoint>>,
+    uow_factory: Arc<dyn UnitOfWorkFactory>,
     threshold: u64,
 }
 
@@ -25,11 +29,13 @@ impl AutoDisableEndpointSaga {
     pub fn new(
         dead_letter_read_store: Arc<dyn DeadLetterReadStore>,
         disable_handler: Arc<dyn CommandHandler<DisableEndpoint>>,
+        uow_factory: Arc<dyn UnitOfWorkFactory>,
         threshold: u64,
     ) -> Self {
         Self {
             dead_letter_read_store,
             disable_handler,
+            uow_factory,
             threshold,
         }
     }
@@ -79,8 +85,35 @@ impl EventSubscriber for AutoDisableEndpointSaga {
             endpoint_id: endpoint_id.clone(),
         };
 
-        if let Err(e) = self.disable_handler.handle(command).await {
-            warn!(error = %e, "Failed to auto-disable endpoint");
+        let uow = match self.uow_factory.begin().await {
+            Ok(uow) => uow,
+            Err(e) => {
+                warn!(error = %e, "Failed to begin UoW for auto-disable");
+                return;
+            }
+        };
+
+        let mut ctx = RequestContext::new(
+            "DisableEndpoint",
+            "system:auto-disable-saga".into(),
+            OrganizationId::new(), // internal saga, no tenant context
+        );
+        ctx.set_uow(uow);
+
+        match self.disable_handler.handle(command, &mut ctx).await {
+            Ok(()) => {
+                if let Some(uow) = ctx.take_uow() {
+                    if let Err(e) = uow.commit().await {
+                        warn!(error = %e, "Failed to commit auto-disable");
+                    }
+                }
+            }
+            Err(e) => {
+                if let Some(uow) = ctx.take_uow() {
+                    let _ = uow.rollback().await;
+                }
+                warn!(error = %e, "Failed to auto-disable endpoint");
+            }
         }
     }
 }

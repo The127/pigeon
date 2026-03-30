@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::application::{Application, ApplicationId};
@@ -8,7 +7,7 @@ use pigeon_domain::version::Version;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct UpdateApplication {
@@ -26,22 +25,20 @@ impl Command for UpdateApplication {
     }
 }
 
-pub struct UpdateApplicationHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct UpdateApplicationHandler;
 
 impl UpdateApplicationHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<UpdateApplication> for UpdateApplicationHandler {
-    async fn handle(&self, command: UpdateApplication) -> Result<Application, ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: UpdateApplication, ctx: &mut RequestContext) -> Result<Application, ApplicationError> {
 
-        let mut app = uow
+        let mut app = ctx.uow()
             .application_store()
             .find_by_id(&command.id, &command.org_id)
             .await?
@@ -54,8 +51,7 @@ impl CommandHandler<UpdateApplication> for UpdateApplicationHandler {
         app.rename(command.name)
             .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
-        uow.application_store().save(&app).await?;
-        uow.commit().await?;
+        ctx.uow().application_store().save(&app).await?;
 
         Ok(app)
     }
@@ -63,7 +59,10 @@ impl CommandHandler<UpdateApplication> for UpdateApplicationHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
     use pigeon_domain::application::Application;
     use pigeon_domain::organization::OrganizationId;
@@ -82,7 +81,6 @@ mod tests {
         let id = app.id().clone();
         let version = app.version();
 
-        // Pre-seed the store
         {
             let mut uow = factory.begin().await.unwrap();
             uow.application_store().insert(&app).await.unwrap();
@@ -90,14 +88,18 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateApplicationHandler::new(factory);
+        let handler = UpdateApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), org_id.clone());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateApplication {
                 org_id,
                 id,
                 name: "new-name".into(),
                 version,
-            })
+            }, &mut ctx)
             .await;
 
         let updated = result.unwrap();
@@ -108,7 +110,6 @@ mod tests {
                 "uow_factory:begin",
                 "application_store:find_by_id",
                 "application_store:save",
-                "uow:commit",
             ]
         );
     }
@@ -118,14 +119,18 @@ mod tests {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = UpdateApplicationHandler::new(factory);
+        let handler = UpdateApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateApplication {
                 org_id: OrganizationId::new(),
                 id: ApplicationId::new(),
                 name: "new-name".into(),
                 version: Version::new(0),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));
@@ -144,14 +149,18 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateApplicationHandler::new(factory);
+        let handler = UpdateApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateApplication {
                 org_id: OrganizationId::new(), // different org
                 id,
                 name: "new-name".into(),
                 version,
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));
@@ -170,14 +179,18 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateApplicationHandler::new(factory);
+        let handler = UpdateApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), org_id.clone());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateApplication {
                 org_id,
                 id,
                 name: "".into(),
                 version,
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::Validation(_))));
@@ -195,14 +208,18 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateApplicationHandler::new(factory);
+        let handler = UpdateApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), org_id.clone());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateApplication {
                 org_id,
                 id,
                 name: "new-name".into(),
                 version: Version::new(999),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::Conflict)));

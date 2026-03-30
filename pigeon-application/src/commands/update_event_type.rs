@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::event_type::{EventType, EventTypeId};
@@ -9,7 +8,7 @@ use serde_json::Value;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct UpdateEventType {
@@ -28,22 +27,20 @@ impl Command for UpdateEventType {
     }
 }
 
-pub struct UpdateEventTypeHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct UpdateEventTypeHandler;
 
 impl UpdateEventTypeHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<UpdateEventType> for UpdateEventTypeHandler {
-    async fn handle(&self, command: UpdateEventType) -> Result<EventType, ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: UpdateEventType, ctx: &mut RequestContext) -> Result<EventType, ApplicationError> {
 
-        let mut event_type = uow
+        let mut event_type = ctx.uow()
             .event_type_store()
             .find_by_id(&command.id, &command.org_id)
             .await?
@@ -57,8 +54,7 @@ impl CommandHandler<UpdateEventType> for UpdateEventTypeHandler {
             .update(command.name, command.schema)
             .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
-        uow.event_type_store().save(&event_type).await?;
-        uow.commit().await?;
+        ctx.uow().event_type_store().save(&event_type).await?;
 
         Ok(event_type)
     }
@@ -66,10 +62,14 @@ impl CommandHandler<UpdateEventType> for UpdateEventTypeHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
     use pigeon_domain::application::ApplicationId;
     use pigeon_domain::event_type::EventType;
+    use pigeon_domain::organization::OrganizationId;
 
     fn setup_with_event_type() -> (OperationLog, Arc<FakeUnitOfWorkFactory>, EventType) {
         let log = OperationLog::new();
@@ -91,15 +91,19 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateEventTypeHandler::new(factory);
+        let handler = UpdateEventTypeHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateEventType {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 id,
                 name: "new.event".into(),
                 schema: None,
                 version,
-            })
+            }, &mut ctx)
             .await;
 
         let updated = result.unwrap();
@@ -110,7 +114,6 @@ mod tests {
                 "uow_factory:begin",
                 "event_type_store:find_by_id",
                 "event_type_store:save",
-                "uow:commit",
             ]
         );
     }
@@ -120,15 +123,19 @@ mod tests {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = UpdateEventTypeHandler::new(factory);
+        let handler = UpdateEventTypeHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateEventType {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 id: EventTypeId::new(),
                 name: "new.event".into(),
                 schema: None,
                 version: Version::new(0),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));
@@ -147,15 +154,19 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateEventTypeHandler::new(factory);
+        let handler = UpdateEventTypeHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateEventType {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 id,
                 name: "".into(),
                 schema: None,
                 version,
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::Validation(_))));
@@ -173,15 +184,19 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = UpdateEventTypeHandler::new(factory);
+        let handler = UpdateEventTypeHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(UpdateEventType {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 id,
                 name: "new.event".into(),
                 schema: None,
                 version: Version::new(999),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::Conflict)));

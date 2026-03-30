@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::oidc_config::OidcConfigId;
@@ -6,7 +5,7 @@ use pigeon_domain::oidc_config::OidcConfigId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct DeleteOidcConfig {
@@ -21,28 +20,26 @@ impl Command for DeleteOidcConfig {
     }
 }
 
-pub struct DeleteOidcConfigHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct DeleteOidcConfigHandler;
 
 impl DeleteOidcConfigHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<DeleteOidcConfig> for DeleteOidcConfigHandler {
-    async fn handle(&self, command: DeleteOidcConfig) -> Result<(), ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: DeleteOidcConfig, ctx: &mut RequestContext) -> Result<(), ApplicationError> {
 
-        let existing = uow
+        let existing = ctx.uow()
             .oidc_config_store()
             .find_by_id(&command.id)
             .await?
             .ok_or(ApplicationError::NotFound)?;
 
-        let count = uow
+        let count = ctx.uow()
             .oidc_config_store()
             .count_by_org(existing.org_id())
             .await?;
@@ -53,8 +50,7 @@ impl CommandHandler<DeleteOidcConfig> for DeleteOidcConfigHandler {
             ));
         }
 
-        uow.oidc_config_store().delete(&command.id).await?;
-        uow.commit().await?;
+        ctx.uow().oidc_config_store().delete(&command.id).await?;
 
         Ok(())
     }
@@ -62,7 +58,10 @@ impl CommandHandler<DeleteOidcConfig> for DeleteOidcConfigHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
     use pigeon_domain::oidc_config::OidcConfig;
     use pigeon_domain::organization::OrganizationId;
@@ -97,8 +96,12 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = DeleteOidcConfigHandler::new(factory);
-        let result = handler.handle(DeleteOidcConfig { id }).await;
+        let handler = DeleteOidcConfigHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
+        let result = handler.handle(DeleteOidcConfig { id }, &mut ctx).await;
 
         assert!(result.is_ok());
         assert_eq!(
@@ -108,7 +111,6 @@ mod tests {
                 "oidc_config_store:find_by_id",
                 "oidc_config_store:count_by_org",
                 "oidc_config_store:delete",
-                "uow:commit",
             ]
         );
     }
@@ -135,8 +137,12 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = DeleteOidcConfigHandler::new(factory);
-        let result = handler.handle(DeleteOidcConfig { id }).await;
+        let handler = DeleteOidcConfigHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
+        let result = handler.handle(DeleteOidcConfig { id }, &mut ctx).await;
 
         assert!(matches!(result, Err(ApplicationError::Validation(_))));
     }
@@ -146,11 +152,15 @@ mod tests {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = DeleteOidcConfigHandler::new(factory);
+        let handler = DeleteOidcConfigHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(DeleteOidcConfig {
                 id: OidcConfigId::new(),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));

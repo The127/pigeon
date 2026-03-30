@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::application::ApplicationId;
@@ -8,7 +7,7 @@ use pigeon_domain::event::DomainEvent;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 /// Internal command used by sagas — not exposed via API.
 /// Disables an endpoint by app_id + endpoint_id (no org_id needed).
@@ -26,22 +25,20 @@ impl Command for DisableEndpoint {
     }
 }
 
-pub struct DisableEndpointHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct DisableEndpointHandler;
 
 impl DisableEndpointHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<DisableEndpoint> for DisableEndpointHandler {
-    async fn handle(&self, command: DisableEndpoint) -> Result<(), ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: DisableEndpoint, ctx: &mut RequestContext) -> Result<(), ApplicationError> {
 
-        let mut endpoint = uow
+        let mut endpoint = ctx.uow()
             .endpoint_store()
             .find_by_app_and_id(&command.endpoint_id, &command.app_id)
             .await?
@@ -52,13 +49,12 @@ impl CommandHandler<DisableEndpoint> for DisableEndpointHandler {
         }
 
         endpoint.disable();
-        uow.endpoint_store().save(&endpoint).await?;
-        uow.emit_event(DomainEvent::EndpointUpdated {
+        ctx.uow().endpoint_store().save(&endpoint).await?;
+        ctx.uow().emit_event(DomainEvent::EndpointUpdated {
             endpoint_id: endpoint.id().clone(),
             app_id: endpoint.app_id().clone(),
             enabled: false,
         });
-        uow.commit().await?;
 
         Ok(())
     }

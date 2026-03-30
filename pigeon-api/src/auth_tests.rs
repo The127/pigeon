@@ -26,6 +26,7 @@ use pigeon_application::commands::update_event_type::UpdateEventType;
 use pigeon_application::commands::update_organization::UpdateOrganization;
 use pigeon_application::error::ApplicationError;
 use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
+use pigeon_application::mediator::pipeline::RequestContext;
 use pigeon_application::queries::get_application_by_id::GetApplicationById;
 use pigeon_application::queries::get_endpoint_by_id::GetEndpointById;
 use pigeon_application::queries::get_event_type_by_id::GetEventTypeById;
@@ -58,25 +59,25 @@ struct S;
 
 #[async_trait]
 impl CommandHandler<CreateApplication> for S {
-    async fn handle(&self, _: CreateApplication) -> Result<Application, ApplicationError> {
+    async fn handle(&self, _: CreateApplication, _ctx: &mut RequestContext) -> Result<Application, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<UpdateApplication> for S {
-    async fn handle(&self, _: UpdateApplication) -> Result<Application, ApplicationError> {
+    async fn handle(&self, _: UpdateApplication, _ctx: &mut RequestContext) -> Result<Application, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<DeleteApplication> for S {
-    async fn handle(&self, _: DeleteApplication) -> Result<(), ApplicationError> {
+    async fn handle(&self, _: DeleteApplication, _ctx: &mut RequestContext) -> Result<(), ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<SendMessage> for S {
-    async fn handle(&self, _: SendMessage) -> Result<SendMessageResult, ApplicationError> {
+    async fn handle(&self, _: SendMessage, _ctx: &mut RequestContext) -> Result<SendMessageResult, ApplicationError> {
         unimplemented!()
     }
 }
@@ -85,7 +86,8 @@ impl CommandHandler<pigeon_application::commands::replay_dead_letter::ReplayDead
     async fn handle(
         &self,
         _: pigeon_application::commands::replay_dead_letter::ReplayDeadLetter,
-    ) -> Result<pigeon_domain::dead_letter::DeadLetter, ApplicationError> {
+        _ctx: &mut RequestContext,
+) -> Result<pigeon_domain::dead_letter::DeadLetter, ApplicationError> {
         unimplemented!()
     }
 }
@@ -94,7 +96,8 @@ impl CommandHandler<pigeon_application::commands::retry_attempt::RetryAttempt> f
     async fn handle(
         &self,
         _: pigeon_application::commands::retry_attempt::RetryAttempt,
-    ) -> Result<pigeon_domain::attempt::Attempt, ApplicationError> {
+        _ctx: &mut RequestContext,
+) -> Result<pigeon_domain::attempt::Attempt, ApplicationError> {
         unimplemented!()
     }
 }
@@ -103,7 +106,8 @@ impl CommandHandler<pigeon_application::commands::send_test_event::SendTestEvent
     async fn handle(
         &self,
         _: pigeon_application::commands::send_test_event::SendTestEvent,
-    ) -> Result<pigeon_application::commands::send_test_event::SendTestEventResult, ApplicationError> {
+        _ctx: &mut RequestContext,
+) -> Result<pigeon_application::commands::send_test_event::SendTestEventResult, ApplicationError> {
         unimplemented!()
     }
 }
@@ -112,7 +116,8 @@ impl CommandHandler<pigeon_application::commands::retrigger_message::RetriggerMe
     async fn handle(
         &self,
         _: pigeon_application::commands::retrigger_message::RetriggerMessage,
-    ) -> Result<pigeon_application::commands::retrigger_message::RetriggerMessageResult, ApplicationError> {
+                    _ctx: &mut RequestContext,
+) -> Result<pigeon_application::commands::retrigger_message::RetriggerMessageResult, ApplicationError> {
         unimplemented!()
     }
 }
@@ -127,25 +132,25 @@ impl QueryHandler<ListApplications> for S {
     async fn handle(
         &self,
         _: ListApplications,
-    ) -> Result<PaginatedResult<Application>, ApplicationError> {
+) -> Result<PaginatedResult<Application>, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<CreateEventType> for S {
-    async fn handle(&self, _: CreateEventType) -> Result<EventType, ApplicationError> {
+    async fn handle(&self, _: CreateEventType, _ctx: &mut RequestContext) -> Result<EventType, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<UpdateEventType> for S {
-    async fn handle(&self, _: UpdateEventType) -> Result<EventType, ApplicationError> {
+    async fn handle(&self, _: UpdateEventType, _ctx: &mut RequestContext) -> Result<EventType, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<DeleteEventType> for S {
-    async fn handle(&self, _: DeleteEventType) -> Result<(), ApplicationError> {
+    async fn handle(&self, _: DeleteEventType, _ctx: &mut RequestContext) -> Result<(), ApplicationError> {
         unimplemented!()
     }
 }
@@ -154,7 +159,7 @@ impl QueryHandler<GetEventTypeById> for S {
     async fn handle(
         &self,
         _: GetEventTypeById,
-    ) -> Result<Option<EventType>, ApplicationError> {
+) -> Result<Option<EventType>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -163,25 +168,25 @@ impl QueryHandler<ListEventTypesByApp> for S {
     async fn handle(
         &self,
         _: ListEventTypesByApp,
-    ) -> Result<PaginatedResult<EventType>, ApplicationError> {
+) -> Result<PaginatedResult<EventType>, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<CreateEndpoint> for S {
-    async fn handle(&self, _: CreateEndpoint) -> Result<Endpoint, ApplicationError> {
+    async fn handle(&self, _: CreateEndpoint, _ctx: &mut RequestContext) -> Result<Endpoint, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<UpdateEndpoint> for S {
-    async fn handle(&self, _: UpdateEndpoint) -> Result<Endpoint, ApplicationError> {
+    async fn handle(&self, _: UpdateEndpoint, _ctx: &mut RequestContext) -> Result<Endpoint, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<DeleteEndpoint> for S {
-    async fn handle(&self, _: DeleteEndpoint) -> Result<(), ApplicationError> {
+    async fn handle(&self, _: DeleteEndpoint, _ctx: &mut RequestContext) -> Result<(), ApplicationError> {
         unimplemented!()
     }
 }
@@ -196,7 +201,7 @@ impl QueryHandler<ListEndpointsByApp> for S {
     async fn handle(
         &self,
         _: ListEndpointsByApp,
-    ) -> Result<PaginatedResult<Endpoint>, ApplicationError> {
+) -> Result<PaginatedResult<Endpoint>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -254,7 +259,7 @@ impl QueryHandler<pigeon_application::queries::get_message_by_id::GetMessageById
     async fn handle(
         &self,
         _: pigeon_application::queries::get_message_by_id::GetMessageById,
-    ) -> Result<Option<pigeon_application::ports::message_status::MessageWithStatus>, ApplicationError> {
+) -> Result<Option<pigeon_application::ports::message_status::MessageWithStatus>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -263,7 +268,7 @@ impl QueryHandler<pigeon_application::queries::list_messages_by_app::ListMessage
     async fn handle(
         &self,
         _: pigeon_application::queries::list_messages_by_app::ListMessagesByApp,
-    ) -> Result<PaginatedResult<pigeon_application::ports::message_status::MessageWithStatus>, ApplicationError> {
+) -> Result<PaginatedResult<pigeon_application::ports::message_status::MessageWithStatus>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -272,7 +277,7 @@ impl QueryHandler<pigeon_application::queries::list_attempts_by_message::ListAtt
     async fn handle(
         &self,
         _: pigeon_application::queries::list_attempts_by_message::ListAttemptsByMessage,
-    ) -> Result<Vec<pigeon_domain::attempt::Attempt>, ApplicationError> {
+) -> Result<Vec<pigeon_domain::attempt::Attempt>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -281,7 +286,7 @@ impl QueryHandler<pigeon_application::queries::get_dead_letter_by_id::GetDeadLet
     async fn handle(
         &self,
         _: pigeon_application::queries::get_dead_letter_by_id::GetDeadLetterById,
-    ) -> Result<Option<pigeon_domain::dead_letter::DeadLetter>, ApplicationError> {
+) -> Result<Option<pigeon_domain::dead_letter::DeadLetter>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -290,7 +295,7 @@ impl QueryHandler<pigeon_application::queries::list_dead_letters_by_app::ListDea
     async fn handle(
         &self,
         _: pigeon_application::queries::list_dead_letters_by_app::ListDeadLettersByApp,
-    ) -> Result<PaginatedResult<pigeon_domain::dead_letter::DeadLetter>, ApplicationError> {
+) -> Result<PaginatedResult<pigeon_domain::dead_letter::DeadLetter>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -311,19 +316,20 @@ impl CommandHandler<pigeon_application::commands::create_organization::CreateOrg
     async fn handle(
         &self,
         _: pigeon_application::commands::create_organization::CreateOrganization,
-    ) -> Result<Organization, ApplicationError> {
+                    _ctx: &mut RequestContext,
+) -> Result<Organization, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<UpdateOrganization> for S {
-    async fn handle(&self, _: UpdateOrganization) -> Result<Organization, ApplicationError> {
+    async fn handle(&self, _: UpdateOrganization, _ctx: &mut RequestContext) -> Result<Organization, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<DeleteOrganization> for S {
-    async fn handle(&self, _: DeleteOrganization) -> Result<(), ApplicationError> {
+    async fn handle(&self, _: DeleteOrganization, _ctx: &mut RequestContext) -> Result<(), ApplicationError> {
         unimplemented!()
     }
 }
@@ -332,7 +338,7 @@ impl QueryHandler<GetOrganizationById> for S {
     async fn handle(
         &self,
         _: GetOrganizationById,
-    ) -> Result<Option<Organization>, ApplicationError> {
+) -> Result<Option<Organization>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -341,19 +347,19 @@ impl QueryHandler<ListOrganizations> for S {
     async fn handle(
         &self,
         _: ListOrganizations,
-    ) -> Result<PaginatedResult<Organization>, ApplicationError> {
+) -> Result<PaginatedResult<Organization>, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<CreateOidcConfig> for S {
-    async fn handle(&self, _: CreateOidcConfig) -> Result<OidcConfig, ApplicationError> {
+    async fn handle(&self, _: CreateOidcConfig, _ctx: &mut RequestContext) -> Result<OidcConfig, ApplicationError> {
         unimplemented!()
     }
 }
 #[async_trait]
 impl CommandHandler<DeleteOidcConfig> for S {
-    async fn handle(&self, _: DeleteOidcConfig) -> Result<(), ApplicationError> {
+    async fn handle(&self, _: DeleteOidcConfig, _ctx: &mut RequestContext) -> Result<(), ApplicationError> {
         unimplemented!()
     }
 }
@@ -368,7 +374,7 @@ impl QueryHandler<ListOidcConfigsByOrg> for S {
     async fn handle(
         &self,
         _: ListOidcConfigsByOrg,
-    ) -> Result<PaginatedResult<OidcConfig>, ApplicationError> {
+) -> Result<PaginatedResult<OidcConfig>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -377,7 +383,7 @@ impl QueryHandler<pigeon_application::queries::list_audit_log::ListAuditLog> for
     async fn handle(
         &self,
         _: pigeon_application::queries::list_audit_log::ListAuditLog,
-    ) -> Result<PaginatedResult<pigeon_application::ports::audit_read_store::AuditLogEntry>, ApplicationError> {
+) -> Result<PaginatedResult<pigeon_application::ports::audit_read_store::AuditLogEntry>, ApplicationError> {
         unimplemented!()
     }
 }
@@ -428,6 +434,7 @@ fn test_state() -> AppState {
         list_audit_log: Arc::new(S),
         audit_store: Arc::new(S),
         metrics_render: Arc::new(|| String::new()),
+        uow_factory: Arc::new(pigeon_application::test_support::fakes::FakeUnitOfWorkFactory::new(pigeon_application::test_support::fakes::OperationLog::new())),
         admin_org_id: None,
     }
 }

@@ -60,6 +60,7 @@ mod tests {
     use axum::http::{Request, StatusCode};
     use pigeon_application::error::ApplicationError;
     use pigeon_application::mediator::handler::{CommandHandler, QueryHandler};
+    use pigeon_application::mediator::pipeline::RequestContext;
     use pigeon_application::ports::health::HealthChecker;
     use pigeon_application::queries::PaginatedResult;
     use pigeon_domain::application::Application;
@@ -95,7 +96,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::create_application::CreateApplication,
-        ) -> Result<Application, ApplicationError> {
+                        _ctx: &mut RequestContext,
+) -> Result<Application, ApplicationError> {
             unimplemented!()
         }
     }
@@ -108,7 +110,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::update_application::UpdateApplication,
-        ) -> Result<Application, ApplicationError> {
+                        _ctx: &mut RequestContext,
+) -> Result<Application, ApplicationError> {
             unimplemented!()
         }
     }
@@ -121,7 +124,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::delete_application::DeleteApplication,
-        ) -> Result<(), ApplicationError> {
+                        _ctx: &mut RequestContext,
+) -> Result<(), ApplicationError> {
             unimplemented!()
         }
     }
@@ -134,7 +138,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::get_application_by_id::GetApplicationById,
-        ) -> Result<Option<Application>, ApplicationError> {
+) -> Result<Option<Application>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -147,7 +151,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::list_applications::ListApplications,
-        ) -> Result<PaginatedResult<Application>, ApplicationError> {
+) -> Result<PaginatedResult<Application>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -160,7 +164,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::send_message::SendMessage,
-        ) -> Result<
+    _ctx: &mut RequestContext,
+) -> Result<
             pigeon_application::commands::send_message::SendMessageResult,
             ApplicationError,
         > {
@@ -176,7 +181,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::create_event_type::CreateEventType,
-        ) -> Result<EventType, ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<EventType, ApplicationError> {
             unimplemented!()
         }
     }
@@ -189,7 +195,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::update_event_type::UpdateEventType,
-        ) -> Result<EventType, ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<EventType, ApplicationError> {
             unimplemented!()
         }
     }
@@ -202,7 +209,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::delete_event_type::DeleteEventType,
-        ) -> Result<(), ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<(), ApplicationError> {
             unimplemented!()
         }
     }
@@ -215,7 +223,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::get_event_type_by_id::GetEventTypeById,
-        ) -> Result<Option<EventType>, ApplicationError> {
+) -> Result<Option<EventType>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -228,7 +236,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::list_event_types_by_app::ListEventTypesByApp,
-        ) -> Result<PaginatedResult<EventType>, ApplicationError> {
+) -> Result<PaginatedResult<EventType>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -241,7 +249,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::create_endpoint::CreateEndpoint,
-        ) -> Result<Endpoint, ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<Endpoint, ApplicationError> {
             unimplemented!()
         }
     }
@@ -254,7 +263,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::update_endpoint::UpdateEndpoint,
-        ) -> Result<Endpoint, ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<Endpoint, ApplicationError> {
             unimplemented!()
         }
     }
@@ -267,7 +277,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::delete_endpoint::DeleteEndpoint,
-        ) -> Result<(), ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<(), ApplicationError> {
             unimplemented!()
         }
     }
@@ -280,7 +291,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::get_endpoint_by_id::GetEndpointById,
-        ) -> Result<Option<Endpoint>, ApplicationError> {
+) -> Result<Option<Endpoint>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -293,7 +304,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::list_endpoints_by_app::ListEndpointsByApp,
-        ) -> Result<PaginatedResult<Endpoint>, ApplicationError> {
+) -> Result<PaginatedResult<Endpoint>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -306,7 +317,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::create_organization::CreateOrganization,
-        ) -> Result<Organization, ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<Organization, ApplicationError> {
             unimplemented!()
         }
     }
@@ -319,7 +331,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::update_organization::UpdateOrganization,
-        ) -> Result<Organization, ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<Organization, ApplicationError> {
             unimplemented!()
         }
     }
@@ -332,7 +345,8 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::commands::delete_organization::DeleteOrganization,
-        ) -> Result<(), ApplicationError> {
+    _ctx: &mut RequestContext,
+) -> Result<(), ApplicationError> {
             unimplemented!()
         }
     }
@@ -345,7 +359,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::get_organization_by_id::GetOrganizationById,
-        ) -> Result<Option<Organization>, ApplicationError> {
+) -> Result<Option<Organization>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -358,7 +372,7 @@ mod tests {
         async fn handle(
             &self,
             _: pigeon_application::queries::list_organizations::ListOrganizations,
-        ) -> Result<PaginatedResult<Organization>, ApplicationError> {
+) -> Result<PaginatedResult<Organization>, ApplicationError> {
             unimplemented!()
         }
     }
@@ -409,6 +423,7 @@ mod tests {
             send_test_event: Arc::new(StubSendTestEventHandler),
             list_audit_log: Arc::new(StubListAuditLogHandler),
             audit_store: Arc::new(StubAuditStore),
+            uow_factory: Arc::new(pigeon_application::test_support::fakes::FakeUnitOfWorkFactory::new(pigeon_application::test_support::fakes::OperationLog::new())),
             metrics_render: Arc::new(|| String::new()),
             admin_org_id: None,
         }

@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::organization::OrganizationId;
@@ -6,7 +5,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct DeleteOrganization {
@@ -21,22 +20,20 @@ impl Command for DeleteOrganization {
     }
 }
 
-pub struct DeleteOrganizationHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct DeleteOrganizationHandler;
 
 impl DeleteOrganizationHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<DeleteOrganization> for DeleteOrganizationHandler {
-    async fn handle(&self, command: DeleteOrganization) -> Result<(), ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: DeleteOrganization, ctx: &mut RequestContext) -> Result<(), ApplicationError> {
 
-        let existing = uow
+        let existing = ctx.uow()
             .organization_store()
             .find_by_id(&command.id)
             .await?;
@@ -45,8 +42,7 @@ impl CommandHandler<DeleteOrganization> for DeleteOrganizationHandler {
             return Err(ApplicationError::NotFound);
         }
 
-        uow.organization_store().delete(&command.id).await?;
-        uow.commit().await?;
+        ctx.uow().organization_store().delete(&command.id).await?;
 
         Ok(())
     }
@@ -54,7 +50,10 @@ impl CommandHandler<DeleteOrganization> for DeleteOrganizationHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
     use pigeon_domain::organization::Organization;
 
@@ -72,9 +71,13 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = DeleteOrganizationHandler::new(factory);
+        let handler = DeleteOrganizationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
-            .handle(DeleteOrganization { id })
+            .handle(DeleteOrganization { id }, &mut ctx)
             .await;
 
         assert!(result.is_ok());
@@ -84,7 +87,6 @@ mod tests {
                 "uow_factory:begin",
                 "organization_store:find_by_id",
                 "organization_store:delete",
-                "uow:commit",
             ]
         );
     }
@@ -94,11 +96,15 @@ mod tests {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = DeleteOrganizationHandler::new(factory);
+        let handler = DeleteOrganizationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(DeleteOrganization {
                 id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));

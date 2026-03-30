@@ -100,7 +100,8 @@ async fn when_dead_lettered(world: &mut AutoDisableWorld) {
 
     let saga = AutoDisableEndpointSaga::new(
         Arc::new(mock_read_store),
-        Arc::new(DisableEndpointHandler::new(factory)),
+        Arc::new(DisableEndpointHandler::new()),
+        factory,
         world.threshold,
     );
 

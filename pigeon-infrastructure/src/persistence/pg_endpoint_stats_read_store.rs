@@ -75,11 +75,17 @@ impl EndpointStatsReadStore for PgEndpointStatsReadStore {
                  WHERE dl.endpoint_id = $1 AND a.org_id = $2 \
                    AND dl.dead_lettered_at >= $3) AS total_dead_lettered, \
                 COALESCE((SELECT eds.consecutive_failures FROM endpoint_delivery_summary eds \
-                 WHERE eds.endpoint_id = $1), 0) AS consecutive_failures, \
+                 JOIN endpoints e ON e.id = eds.endpoint_id \
+                 JOIN applications a ON a.id = e.app_id \
+                 WHERE eds.endpoint_id = $1 AND a.org_id = $2), 0) AS consecutive_failures, \
                 (SELECT eds.last_delivery_at FROM endpoint_delivery_summary eds \
-                 WHERE eds.endpoint_id = $1) AS last_delivery_at, \
+                 JOIN endpoints e ON e.id = eds.endpoint_id \
+                 JOIN applications a ON a.id = e.app_id \
+                 WHERE eds.endpoint_id = $1 AND a.org_id = $2) AS last_delivery_at, \
                 (SELECT eds.last_status FROM endpoint_delivery_summary eds \
-                 WHERE eds.endpoint_id = $1) AS last_status",
+                 JOIN endpoints e ON e.id = eds.endpoint_id \
+                 JOIN applications a ON a.id = e.app_id \
+                 WHERE eds.endpoint_id = $1 AND a.org_id = $2) AS last_status",
         )
         .bind(endpoint_id.as_uuid())
         .bind(org_id.as_uuid())

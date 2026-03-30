@@ -9,8 +9,8 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
+use crate::mediator::pipeline::RequestContext;
 use crate::ports::stores::EventTypeReadStore;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
 pub struct CreateEndpoint {
@@ -31,22 +31,20 @@ impl Command for CreateEndpoint {
 }
 
 pub struct CreateEndpointHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
     event_type_read_store: Arc<dyn EventTypeReadStore>,
 }
 
 impl CreateEndpointHandler {
     pub fn new(
-        uow_factory: Arc<dyn UnitOfWorkFactory>,
         event_type_read_store: Arc<dyn EventTypeReadStore>,
     ) -> Self {
-        Self { uow_factory, event_type_read_store }
+        Self { event_type_read_store }
     }
 }
 
 #[async_trait]
 impl CommandHandler<CreateEndpoint> for CreateEndpointHandler {
-    async fn handle(&self, command: CreateEndpoint) -> Result<Endpoint, ApplicationError> {
+    async fn handle(&self, command: CreateEndpoint, ctx: &mut RequestContext) -> Result<Endpoint, ApplicationError> {
         for et_id in &command.event_type_ids {
             if self.event_type_read_store
                 .find_by_id(et_id, &command.org_id)
@@ -68,9 +66,7 @@ impl CommandHandler<CreateEndpoint> for CreateEndpointHandler {
         )
         .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
-        let mut uow = self.uow_factory.begin().await?;
-        uow.endpoint_store().insert(&endpoint).await?;
-        uow.commit().await?;
+        ctx.uow().endpoint_store().insert(&endpoint).await?;
 
         Ok(endpoint)
     }
@@ -79,10 +75,13 @@ impl CommandHandler<CreateEndpoint> for CreateEndpointHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{
         FakeEventTypeReadStore, FakeUnitOfWorkFactory, OperationLog, SharedEventTypeData,
     };
     use pigeon_domain::event_type::EventType;
+    use pigeon_domain::organization::OrganizationId;
 
     fn read_store_with(log: &OperationLog, event_types: Vec<EventType>) -> Arc<dyn EventTypeReadStore> {
         let data = SharedEventTypeData::default();
@@ -97,12 +96,16 @@ mod tests {
     #[tokio::test]
     async fn creates_endpoint_successfully() {
         let log = OperationLog::new();
-        let org_id = pigeon_domain::organization::OrganizationId::new();
+        let org_id = OrganizationId::new();
         let app_id = ApplicationId::new();
         let et = EventType::new(app_id.clone(), "user.created".into(), None).unwrap();
         let et_id = et.id().clone();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateEndpointHandler::new(factory, read_store_with(&log, vec![et]));
+        let handler = CreateEndpointHandler::new(read_store_with(&log, vec![et]));
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), org_id.clone());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(CreateEndpoint {
@@ -112,7 +115,7 @@ mod tests {
                 url: "https://example.com/webhook".into(),
                 signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![et_id],
-            })
+            }, &mut ctx)
             .await;
 
         let ep = result.unwrap();
@@ -123,17 +126,21 @@ mod tests {
     async fn rejects_empty_url() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateEndpointHandler::new(factory, empty_read_store(&log));
+        let handler = CreateEndpointHandler::new(empty_read_store(&log));
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(CreateEndpoint {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id: ApplicationId::new(),
                 name: None,
                 url: "".into(),
                 signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![],
-            })
+            }, &mut ctx)
             .await;
 
         assert!(result.is_err());
@@ -143,17 +150,21 @@ mod tests {
     async fn creates_endpoint_without_signing_secret() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateEndpointHandler::new(factory, empty_read_store(&log));
+        let handler = CreateEndpointHandler::new(empty_read_store(&log));
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(CreateEndpoint {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id: ApplicationId::new(),
                 name: None,
                 url: "https://example.com/webhook".into(),
                 signing_secret: None,
                 event_type_ids: vec![],
-            })
+            }, &mut ctx)
             .await;
 
         let ep = result.unwrap();
@@ -164,17 +175,21 @@ mod tests {
     async fn rejects_nonexistent_event_type() {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = CreateEndpointHandler::new(factory, empty_read_store(&log));
+        let handler = CreateEndpointHandler::new(empty_read_store(&log));
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(CreateEndpoint {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id: ApplicationId::new(),
                 name: None,
                 url: "https://example.com/webhook".into(),
                 signing_secret: None,
                 event_type_ids: vec![EventTypeId::new()],
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::Validation(_))));

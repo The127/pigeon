@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::endpoint::EndpointId;
@@ -7,7 +6,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct DeleteEndpoint {
@@ -23,22 +22,20 @@ impl Command for DeleteEndpoint {
     }
 }
 
-pub struct DeleteEndpointHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct DeleteEndpointHandler;
 
 impl DeleteEndpointHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<DeleteEndpoint> for DeleteEndpointHandler {
-    async fn handle(&self, command: DeleteEndpoint) -> Result<(), ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: DeleteEndpoint, ctx: &mut RequestContext) -> Result<(), ApplicationError> {
 
-        let existing = uow
+        let existing = ctx.uow()
             .endpoint_store()
             .find_by_id(&command.id, &command.org_id)
             .await?;
@@ -47,8 +44,7 @@ impl CommandHandler<DeleteEndpoint> for DeleteEndpointHandler {
             return Err(ApplicationError::NotFound);
         }
 
-        uow.endpoint_store().delete(&command.id).await?;
-        uow.commit().await?;
+        ctx.uow().endpoint_store().delete(&command.id).await?;
 
         Ok(())
     }
@@ -56,11 +52,15 @@ impl CommandHandler<DeleteEndpoint> for DeleteEndpointHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
     use pigeon_domain::application::ApplicationId;
     use pigeon_domain::endpoint::Endpoint;
     use pigeon_domain::event_type::EventTypeId;
+    use pigeon_domain::organization::OrganizationId;
 
     #[tokio::test]
     async fn deletes_endpoint_successfully() {
@@ -83,9 +83,13 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = DeleteEndpointHandler::new(factory);
+        let handler = DeleteEndpointHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
-            .handle(DeleteEndpoint { org_id: pigeon_domain::organization::OrganizationId::new(), id })
+            .handle(DeleteEndpoint { org_id: OrganizationId::new(), id }, &mut ctx)
             .await;
 
         assert!(result.is_ok());
@@ -95,7 +99,6 @@ mod tests {
                 "uow_factory:begin",
                 "endpoint_store:find_by_id",
                 "endpoint_store:delete",
-                "uow:commit",
             ]
         );
     }
@@ -105,12 +108,16 @@ mod tests {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = DeleteEndpointHandler::new(factory);
+        let handler = DeleteEndpointHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(DeleteEndpoint {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 id: EndpointId::new(),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));

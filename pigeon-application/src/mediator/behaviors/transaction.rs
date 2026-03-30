@@ -20,21 +20,35 @@ impl TransactionBehavior {
 impl PipelineBehavior for TransactionBehavior {
     async fn handle(
         &self,
-        _context: &mut RequestContext,
+        mut context: RequestContext,
         next: NextFn,
-    ) -> Result<(), ApplicationError> {
-        let uow = self.uow_factory.begin().await?;
+    ) -> (RequestContext, Result<(), ApplicationError>) {
+        let uow = match self.uow_factory.begin().await {
+            Ok(uow) => uow,
+            Err(e) => return (context, Err(e)),
+        };
+        context.set_uow(uow);
 
-        let result = next().await;
+        let (mut context, result) = next(context).await;
+
+        let uow = match context.take_uow() {
+            Some(uow) => uow,
+            None => {
+                return (
+                    context,
+                    Err(ApplicationError::Internal("UoW missing after handler".into())),
+                )
+            }
+        };
 
         match result {
             Ok(()) => {
-                uow.commit().await?;
-                Ok(())
+                let commit_result = uow.commit().await;
+                (context, commit_result)
             }
             Err(e) => {
                 let _ = uow.rollback().await;
-                Err(e)
+                (context, Err(e))
             }
         }
     }
@@ -47,20 +61,16 @@ mod tests {
     use pigeon_domain::organization::OrganizationId;
 
     fn make_ctx() -> RequestContext {
-        RequestContext {
-            command_name: "TestCommand",
-            actor: "user_1".into(),
-            org_id: OrganizationId::new(),
-        }
+        RequestContext::new("TestCommand", "user_1".into(), OrganizationId::new())
     }
 
     fn success_next() -> NextFn {
-        Box::new(|| Box::pin(async { Ok(()) }))
+        Box::new(|ctx: RequestContext| Box::pin(async { (ctx, Ok(())) }))
     }
 
     fn failing_next() -> NextFn {
-        Box::new(|| {
-            Box::pin(async { Err(ApplicationError::Internal("handler failed".into())) })
+        Box::new(|ctx: RequestContext| {
+            Box::pin(async { (ctx, Err(ApplicationError::Internal("handler failed".into()))) })
         })
     }
 
@@ -70,13 +80,10 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
         let behavior = TransactionBehavior::new(factory);
 
-        let result = behavior.handle(&mut make_ctx(), success_next()).await;
+        let (_, result) = behavior.handle(make_ctx(), success_next()).await;
 
         assert!(result.is_ok());
-        assert_eq!(
-            log.entries(),
-            vec!["uow_factory:begin", "uow:commit"]
-        );
+        assert_eq!(log.entries(), vec!["uow_factory:begin", "uow:commit"]);
     }
 
     #[tokio::test]
@@ -85,13 +92,10 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
         let behavior = TransactionBehavior::new(factory);
 
-        let result = behavior.handle(&mut make_ctx(), failing_next()).await;
+        let (_, result) = behavior.handle(make_ctx(), failing_next()).await;
 
         assert!(result.is_err());
-        assert_eq!(
-            log.entries(),
-            vec!["uow_factory:begin", "uow:rollback"]
-        );
+        assert_eq!(log.entries(), vec!["uow_factory:begin", "uow:rollback"]);
     }
 
     #[tokio::test]
@@ -100,8 +104,27 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
         let behavior = TransactionBehavior::new(factory);
 
-        let result = behavior.handle(&mut make_ctx(), failing_next()).await;
+        let (_, result) = behavior.handle(make_ctx(), failing_next()).await;
 
         assert!(matches!(result, Err(ApplicationError::Internal(_))));
+    }
+
+    #[tokio::test]
+    async fn handler_can_access_uow_from_context() {
+        let log = OperationLog::new();
+        let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
+        let behavior = TransactionBehavior::new(factory);
+
+        let handler: NextFn = Box::new(|mut ctx: RequestContext| {
+            Box::pin(async move {
+                let _store = ctx.uow().application_store();
+                (ctx, Ok(()))
+            })
+        });
+
+        let (_, result) = behavior.handle(make_ctx(), handler).await;
+
+        assert!(result.is_ok());
+        assert_eq!(log.entries(), vec!["uow_factory:begin", "uow:commit"]);
     }
 }

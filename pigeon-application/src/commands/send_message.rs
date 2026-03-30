@@ -13,8 +13,8 @@ use serde_json::Value;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
+use crate::mediator::pipeline::RequestContext;
 use crate::ports::stores::EndpointReadStore;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
 pub struct SendMessage {
@@ -41,19 +41,16 @@ pub struct SendMessageResult {
 }
 
 pub struct SendMessageHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
     endpoint_read_store: Arc<dyn EndpointReadStore>,
     idempotency_ttl: Duration,
 }
 
 impl SendMessageHandler {
     pub fn new(
-        uow_factory: Arc<dyn UnitOfWorkFactory>,
         endpoint_read_store: Arc<dyn EndpointReadStore>,
         idempotency_ttl: Duration,
     ) -> Self {
         Self {
-            uow_factory,
             endpoint_read_store,
             idempotency_ttl,
         }
@@ -62,7 +59,7 @@ impl SendMessageHandler {
 
 #[async_trait]
 impl CommandHandler<SendMessage> for SendMessageHandler {
-    async fn handle(&self, command: SendMessage) -> Result<SendMessageResult, ApplicationError> {
+    async fn handle(&self, command: SendMessage, ctx: &mut RequestContext) -> Result<SendMessageResult, ApplicationError> {
         let message = Message::new(
             command.app_id.clone(),
             command.event_type_id.clone(),
@@ -72,12 +69,10 @@ impl CommandHandler<SendMessage> for SendMessageHandler {
         )
         .map_err(|e| ApplicationError::Validation(e.to_string()))?;
 
-        let mut uow = self.uow_factory.begin().await?;
 
-        let result = uow.message_store().insert_or_get_existing(&message, &command.org_id).await?;
+        let result = ctx.uow().message_store().insert_or_get_existing(&message, &command.org_id).await?;
 
         if result.was_existing {
-            uow.commit().await?;
             return Ok(SendMessageResult {
                 message: result.message,
                 attempts_created: 0,
@@ -102,17 +97,16 @@ impl CommandHandler<SendMessage> for SendMessageHandler {
                 endpoint.id().clone(),
                 Utc::now(),
             );
-            uow.attempt_store().insert(&attempt).await?;
+            ctx.uow().attempt_store().insert(&attempt).await?;
         }
 
-        uow.emit_event(DomainEvent::MessageCreated {
+        ctx.uow().emit_event(DomainEvent::MessageCreated {
             message_id: result.message.id().clone(),
             app_id: command.app_id,
             event_type_id: command.event_type_id,
             attempts_created: attempts_created as u32,
         });
 
-        uow.commit().await?;
 
         Ok(SendMessageResult {
             message: result.message,
@@ -125,10 +119,13 @@ impl CommandHandler<SendMessage> for SendMessageHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{
         FakeEndpointReadStore, FakeUnitOfWorkFactory, OperationLog, SharedMessageData,
     };
     use pigeon_domain::endpoint::Endpoint;
+    use pigeon_domain::organization::OrganizationId;
     use serde_json::json;
 
     fn default_ttl() -> Duration {
@@ -163,16 +160,20 @@ mod tests {
             vec![ep1, ep2],
         ));
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = SendMessageHandler::new(factory, endpoint_store, default_ttl());
+        let handler = SendMessageHandler::new(endpoint_store, default_ttl());
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(SendMessage {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id,
                 event_type_id,
                 payload: json!({"user": "u1"}),
                 idempotency_key: Some("key-1".into()),
-            })
+            }, &mut ctx)
             .await
             .unwrap();
 
@@ -188,7 +189,6 @@ mod tests {
         let app_id = ApplicationId::new();
         let event_type_id = EventTypeId::new();
 
-        // Pre-seed a message with the same idempotency key
         let existing = Message::new(
             app_id.clone(),
             event_type_id.clone(),
@@ -206,22 +206,25 @@ mod tests {
             log.clone(),
             msg_data,
         ));
-        let handler = SendMessageHandler::new(factory, endpoint_store, default_ttl());
+        let handler = SendMessageHandler::new(endpoint_store, default_ttl());
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(SendMessage {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id,
                 event_type_id,
                 payload: json!({"user": "u1"}),
                 idempotency_key: Some("dup-key".into()),
-            })
+            }, &mut ctx)
             .await
             .unwrap();
 
         assert!(result.was_duplicate);
         assert_eq!(result.attempts_created, 0);
-        // Should NOT have inserted any attempts
         assert!(!log.entries().contains(&"attempt_store:insert".to_string()));
     }
 
@@ -233,16 +236,20 @@ mod tests {
 
         let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), vec![]));
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = SendMessageHandler::new(factory, endpoint_store, default_ttl());
+        let handler = SendMessageHandler::new(endpoint_store, default_ttl());
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(SendMessage {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id,
                 event_type_id,
                 payload: json!({"data": true}),
                 idempotency_key: None,
-            })
+            }, &mut ctx)
             .await
             .unwrap();
 
@@ -255,21 +262,23 @@ mod tests {
         let log = OperationLog::new();
         let endpoint_store = Arc::new(FakeEndpointReadStore::new(log.clone(), vec![]));
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = SendMessageHandler::new(factory, endpoint_store, default_ttl());
+        let handler = SendMessageHandler::new(endpoint_store, default_ttl());
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(SendMessage {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id: ApplicationId::new(),
                 event_type_id: EventTypeId::new(),
                 payload: json!("not an object"),
                 idempotency_key: None,
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::Validation(_))));
-        // UoW should never be started for a validation failure
-        assert!(log.entries().is_empty());
     }
 
     #[tokio::test]
@@ -294,16 +303,20 @@ mod tests {
         let endpoint_store =
             Arc::new(FakeEndpointReadStore::new(log.clone(), endpoints));
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-        let handler = SendMessageHandler::new(factory, endpoint_store, default_ttl());
+        let handler = SendMessageHandler::new(endpoint_store, default_ttl());
+
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
 
         let result = handler
             .handle(SendMessage {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 app_id,
                 event_type_id,
                 payload: json!({"data": true}),
                 idempotency_key: None,
-            })
+            }, &mut ctx)
             .await
             .unwrap();
 

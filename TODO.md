@@ -93,6 +93,11 @@ Route `/apps/:id/endpoints/:epId` with stats dashboard, edit dialog (name, URL, 
 ### ~~Toast Notifications~~
 Stacking toasts with fan-out on hover (inspired by Keyline UI). Pause-on-hover, progress bar, slide animation. Wired to all mutations across the app.
 
+## ~~Priority: High (Architecture)~~
+
+### ~~Stats Queries: Missing org_id Scoping~~
+Fixed: `pg_endpoint_stats_read_store.rs` — `endpoint_delivery_summary` subqueries (consecutive_failures, last_delivery_at, last_status) now JOIN through `endpoints → applications WHERE org_id`. `pg_event_type_stats_read_store.rs` — subscribed_endpoints subquery now JOINs through `applications WHERE org_id`.
+
 ## Priority: High (Outbox-unlocked)
 
 ### Dead Letter Alert Webhooks
@@ -121,6 +126,14 @@ Swap outbox handler to push events to Kafka/NATS/SQS instead of (or in addition 
 
 ### ~~Audit Log~~
 Every command goes through `dispatch()` which records an audit entry (command name, actor, org_id, success/failure, error message). `PgAuditStore` writes to `audit_log` table. Read API: `GET /api/v1/audit-log` with pagination. UI page at `/audit-log` with table, pagination, human-readable command names, and success/failure badges.
+
+### ~~Codebase Audit — Architecture & Test Coverage~~
+Full codebase review and remediation:
+- **Visibility**: `pub(crate)` enforced on all 37 API handler functions, response structs, `AuthContext`, `ApiError`. Dead `HttpJwksProvider` removed.
+- **Domain validation**: URL scheme validation (http/https) on endpoints, empty UID rejection on applications, duplicate event type name check, organization slug uniqueness, event type existence check on endpoint create/update.
+- **Multitenancy**: `ApplicationReadStore::find_by_id` now requires `org_id` (SQL-level enforcement). `verify_app_ownership` removed — eliminates load-then-check pattern and TOCTOU gap.
+- **Pipeline behaviors**: `TransactionBehavior` and `AuditBehavior` fully wired into `dispatch()`. `CommandHandler` trait takes `&mut RequestContext` — handlers use `ctx.uow()` instead of managing their own transactions. Ownership-based context threading (`NextFn` takes `RequestContext` by value, returns it alongside result) avoids mutable borrow conflicts.
+- **Test coverage**: 37 BDD feature files (140 scenarios, 121 passing), 13 new API handler tests, comprehensive query handler BDD coverage. TODO comments document remaining domain validation gaps (send_message entity existence).
 
 ## Priority: Low
 

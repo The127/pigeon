@@ -10,8 +10,8 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
+use crate::mediator::pipeline::RequestContext;
 use crate::ports::stores::{AttemptReadStore, EndpointReadStore, MessageReadStore};
-use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
 pub struct RetriggerMessage {
@@ -34,7 +34,6 @@ pub struct RetriggerMessageResult {
 }
 
 pub struct RetriggerMessageHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
     message_read_store: Arc<dyn MessageReadStore>,
     endpoint_read_store: Arc<dyn EndpointReadStore>,
     attempt_read_store: Arc<dyn AttemptReadStore>,
@@ -42,13 +41,11 @@ pub struct RetriggerMessageHandler {
 
 impl RetriggerMessageHandler {
     pub fn new(
-        uow_factory: Arc<dyn UnitOfWorkFactory>,
         message_read_store: Arc<dyn MessageReadStore>,
         endpoint_read_store: Arc<dyn EndpointReadStore>,
         attempt_read_store: Arc<dyn AttemptReadStore>,
     ) -> Self {
         Self {
-            uow_factory,
             message_read_store,
             endpoint_read_store,
             attempt_read_store,
@@ -61,6 +58,7 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
     async fn handle(
         &self,
         command: RetriggerMessage,
+        ctx: &mut RequestContext,
     ) -> Result<RetriggerMessageResult, ApplicationError> {
         let message_with_status = self
             .message_read_store
@@ -101,20 +99,18 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
 
         let attempts_created = new_endpoints.len();
 
-        let mut uow = self.uow_factory.begin().await?;
         for endpoint in &new_endpoints {
             let attempt = Attempt::new(
                 message.id().clone(),
                 endpoint.id().clone(),
                 Utc::now(),
             );
-            uow.attempt_store().insert(&attempt).await?;
+            ctx.uow().attempt_store().insert(&attempt).await?;
         }
-        uow.emit_event(DomainEvent::MessageRetriggered {
+        ctx.uow().emit_event(DomainEvent::MessageRetriggered {
             message_id: message.id().clone(),
             attempts_created: attempts_created as u32,
         });
-        uow.commit().await?;
 
         Ok(RetriggerMessageResult {
             message,
@@ -126,8 +122,10 @@ impl CommandHandler<RetriggerMessage> for RetriggerMessageHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
     use crate::ports::message_status::MessageWithStatus;
     use crate::ports::stores::{MockAttemptReadStore, MockMessageReadStore};
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{
         FakeEndpointReadStore, FakeUnitOfWorkFactory, OperationLog,
     };
@@ -173,17 +171,20 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
 
         let handler = RetriggerMessageHandler::new(
-            factory,
             Arc::new(msg_store),
             endpoint_store,
             empty_attempt_store(),
         );
 
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(RetriggerMessage {
                 message_id,
                 org_id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await
             .unwrap();
 
@@ -203,17 +204,20 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
 
         let handler = RetriggerMessageHandler::new(
-            factory,
             Arc::new(msg_store),
             endpoint_store,
             empty_attempt_store(),
         );
 
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(RetriggerMessage {
                 message_id: MessageId::new(),
                 org_id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));
@@ -235,22 +239,23 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
 
         let handler = RetriggerMessageHandler::new(
-            factory,
             Arc::new(msg_store),
             endpoint_store,
             empty_attempt_store(),
         );
 
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(RetriggerMessage {
                 message_id,
                 org_id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::Validation(_))));
-        // No UoW should have been started
-        assert!(!log.entries().contains(&"uow_factory:begin".to_string()));
     }
 
     #[tokio::test]
@@ -284,17 +289,20 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
 
         let handler = RetriggerMessageHandler::new(
-            factory,
             Arc::new(msg_store),
             endpoint_store,
             empty_attempt_store(),
         );
 
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(RetriggerMessage {
                 message_id,
                 org_id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await
             .unwrap();
 
@@ -331,7 +339,6 @@ mod tests {
         .unwrap();
         let ep_id = ep.id().clone();
 
-        // Simulate an existing attempt for this endpoint
         let existing_attempt = Attempt::reconstitute(AttemptState {
             id: pigeon_domain::attempt::AttemptId::new(),
             message_id: message_id.clone(),
@@ -355,22 +362,22 @@ mod tests {
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
 
         let handler = RetriggerMessageHandler::new(
-            factory,
             Arc::new(msg_store),
             endpoint_store,
             Arc::new(att_store),
         );
 
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(RetriggerMessage {
                 message_id,
                 org_id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await;
 
-        // Should fail because the only matching endpoint already has an attempt
         assert!(matches!(result, Err(ApplicationError::Validation(_))));
-        // No UoW should have been started
-        assert!(!log.entries().contains(&"uow_factory:begin".to_string()));
     }
 }

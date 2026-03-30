@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -8,7 +7,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct RetryAttempt {
@@ -24,22 +23,20 @@ impl Command for RetryAttempt {
     }
 }
 
-pub struct RetryAttemptHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct RetryAttemptHandler;
 
 impl RetryAttemptHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<RetryAttempt> for RetryAttemptHandler {
-    async fn handle(&self, command: RetryAttempt) -> Result<Attempt, ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: RetryAttempt, ctx: &mut RequestContext) -> Result<Attempt, ApplicationError> {
 
-        let mut attempt = uow
+        let mut attempt = ctx.uow()
             .attempt_store()
             .find_by_id(&command.attempt_id, &command.org_id)
             .await?
@@ -53,8 +50,7 @@ impl CommandHandler<RetryAttempt> for RetryAttemptHandler {
 
         attempt.mark_for_retry(Utc::now());
 
-        uow.attempt_store().save(&attempt).await?;
-        uow.commit().await?;
+        ctx.uow().attempt_store().save(&attempt).await?;
 
         Ok(attempt)
     }

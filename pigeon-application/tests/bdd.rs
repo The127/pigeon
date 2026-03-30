@@ -93,6 +93,7 @@ use pigeon_application::queries::list_applications::{
     ListApplications, ListApplicationsHandler,
 };
 use pigeon_application::queries::PaginatedResult;
+use pigeon_application::mediator::pipeline::RequestContext;
 use pigeon_application::ports::unit_of_work::UnitOfWorkFactory;
 use pigeon_application::test_support::fakes::{
     FakeApplicationReadStore, FakeEndpointReadStore, FakeEventTypeReadStore,
@@ -248,9 +249,12 @@ async fn given_request(world: &mut AppWorld, name: String, uid: String) {
 async fn when_executed(world: &mut AppWorld) {
     let log = world.log.as_ref().unwrap().clone();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
-    let handler = CreateApplicationHandler::new(factory);
+    let handler = CreateApplicationHandler::new();
     let command = world.command.take().unwrap();
-    world.result = Some(handler.handle(command).await);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
+    world.result = Some(handler.handle(command, &mut ctx).await);
 }
 
 #[then(regex = r#"the application should be created with name "([^"]*)""#)]
@@ -318,7 +322,10 @@ async fn when_update_executed(world: &mut AppWorld, name: String) {
         log.clone(),
         world.app_data.as_ref().unwrap().clone(),
     ));
-    let handler = UpdateApplicationHandler::new(factory);
+    let handler = UpdateApplicationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), org_id.clone());
+    ctx.set_uow(uow);
 
     world.update_result = Some(
         handler
@@ -327,7 +334,7 @@ async fn when_update_executed(world: &mut AppWorld, name: String) {
                 id: app.id().clone(),
                 name,
                 version: app.version(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -342,7 +349,10 @@ async fn when_update_stale_version(world: &mut AppWorld) {
         log.clone(),
         world.app_data.as_ref().unwrap().clone(),
     ));
-    let handler = UpdateApplicationHandler::new(factory);
+    let handler = UpdateApplicationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), org_id.clone());
+    ctx.set_uow(uow);
 
     world.update_result = Some(
         handler
@@ -351,7 +361,7 @@ async fn when_update_stale_version(world: &mut AppWorld) {
                 id: app.id().clone(),
                 name: "new-name".into(),
                 version: Version::new(999),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -361,7 +371,10 @@ async fn when_update_stale_version(world: &mut AppWorld) {
 async fn when_update_nonexistent(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-    let handler = UpdateApplicationHandler::new(factory);
+    let handler = UpdateApplicationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_result = Some(
         handler
@@ -370,7 +383,7 @@ async fn when_update_nonexistent(world: &mut AppWorld) {
                 id: ApplicationId::new(),
                 name: "new-name".into(),
                 version: Version::new(0),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -448,14 +461,17 @@ async fn when_delete_executed(world: &mut AppWorld) {
         log.clone(),
         world.app_data.as_ref().unwrap().clone(),
     ));
-    let handler = DeleteApplicationHandler::new(factory);
+    let handler = DeleteApplicationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_result = Some(
         handler
             .handle(DeleteApplication {
                 org_id,
                 id: app.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -465,14 +481,17 @@ async fn when_delete_executed(world: &mut AppWorld) {
 async fn when_delete_nonexistent(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-    let handler = DeleteApplicationHandler::new(factory);
+    let handler = DeleteApplicationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_result = Some(
         handler
             .handle(DeleteApplication {
                 org_id: OrganizationId::new(),
                 id: ApplicationId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -652,9 +671,12 @@ async fn when_create_et_executed(world: &mut AppWorld) {
     let et_data = world.et_data.take().unwrap_or_default();
     let et_store = Arc::new(FakeEventTypeReadStore::new(log.clone(), et_data));
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
-    let handler = CreateEventTypeHandler::new(factory, et_store);
+    let handler = CreateEventTypeHandler::new(et_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     let command = world.create_event_type_command.take().unwrap();
-    world.create_event_type_result = Some(handler.handle(command).await);
+    world.create_event_type_result = Some(handler.handle(command, &mut ctx).await);
 }
 
 #[then(regex = r#"the event type should be created with name "([^"]*)""#)]
@@ -718,7 +740,10 @@ async fn when_create_et_with_name(world: &mut AppWorld, name: String) {
     let et_data = world.et_data.take().unwrap_or_default();
     let et_store = Arc::new(FakeEventTypeReadStore::new(log.clone(), et_data));
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
-    let handler = CreateEventTypeHandler::new(factory, et_store);
+    let handler = CreateEventTypeHandler::new(et_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.create_event_type_result = Some(
         handler
@@ -727,7 +752,7 @@ async fn when_create_et_with_name(world: &mut AppWorld, name: String) {
                 app_id,
                 name,
                 schema: None,
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -759,7 +784,10 @@ async fn when_update_et_executed(world: &mut AppWorld, name: String) {
         log.clone(),
         world.et_data.as_ref().unwrap().clone(),
     ));
-    let handler = UpdateEventTypeHandler::new(factory);
+    let handler = UpdateEventTypeHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_event_type_result = Some(
         handler
@@ -769,7 +797,7 @@ async fn when_update_et_executed(world: &mut AppWorld, name: String) {
                 name,
                 schema: None,
                 version: et.version(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -783,7 +811,10 @@ async fn when_update_et_stale_version(world: &mut AppWorld) {
         log.clone(),
         world.et_data.as_ref().unwrap().clone(),
     ));
-    let handler = UpdateEventTypeHandler::new(factory);
+    let handler = UpdateEventTypeHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_event_type_result = Some(
         handler
@@ -793,7 +824,7 @@ async fn when_update_et_stale_version(world: &mut AppWorld) {
                 name: "new.event".into(),
                 schema: None,
                 version: Version::new(999),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -865,14 +896,17 @@ async fn when_delete_et_executed(world: &mut AppWorld) {
         log.clone(),
         world.et_data.as_ref().unwrap().clone(),
     ));
-    let handler = DeleteEventTypeHandler::new(factory);
+    let handler = DeleteEventTypeHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_event_type_result = Some(
         handler
             .handle(DeleteEventType {
                 org_id: OrganizationId::new(),
                 id: et.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -882,14 +916,17 @@ async fn when_delete_et_executed(world: &mut AppWorld) {
 async fn when_delete_et_nonexistent(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-    let handler = DeleteEventTypeHandler::new(factory);
+    let handler = DeleteEventTypeHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_event_type_result = Some(
         handler
             .handle(DeleteEventType {
                 org_id: OrganizationId::new(),
                 id: EventTypeId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -986,9 +1023,12 @@ async fn when_create_ep_executed(world: &mut AppWorld) {
     let et_data = world.et_data.take().unwrap_or_default();
     let et_store = Arc::new(FakeEventTypeReadStore::new(log.clone(), et_data));
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
-    let handler = CreateEndpointHandler::new(factory, et_store);
+    let handler = CreateEndpointHandler::new(et_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     let command = world.create_endpoint_command.take().unwrap();
-    world.create_endpoint_result = Some(handler.handle(command).await);
+    world.create_endpoint_result = Some(handler.handle(command, &mut ctx).await);
 }
 
 #[then(regex = r#"the endpoint should be created with url "([^"]*)""#)]
@@ -1066,7 +1106,10 @@ async fn when_update_ep_executed(world: &mut AppWorld, url: String) {
         world.ep_data.as_ref().unwrap().clone(),
     ));
     let et_store: Arc<dyn EventTypeReadStore> = Arc::new(FakeEventTypeReadStore::new(log.clone(), SharedEventTypeData::default()));
-    let handler = UpdateEndpointHandler::new(factory, et_store);
+    let handler = UpdateEndpointHandler::new(et_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_endpoint_result = Some(
         handler
@@ -1077,7 +1120,7 @@ async fn when_update_ep_executed(world: &mut AppWorld, url: String) {
                 signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![],
                 version: ep.version(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1092,7 +1135,10 @@ async fn when_update_ep_with_nonexistent_et(world: &mut AppWorld) {
         world.ep_data.as_ref().unwrap().clone(),
     ));
     let et_store: Arc<dyn EventTypeReadStore> = Arc::new(FakeEventTypeReadStore::new(log.clone(), SharedEventTypeData::default()));
-    let handler = UpdateEndpointHandler::new(factory, et_store);
+    let handler = UpdateEndpointHandler::new(et_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_endpoint_result = Some(
         handler
@@ -1103,7 +1149,7 @@ async fn when_update_ep_with_nonexistent_et(world: &mut AppWorld) {
                 signing_secret: None,
                 event_type_ids: vec![EventTypeId::new()], // non-existent
                 version: ep.version(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1118,7 +1164,10 @@ async fn when_update_ep_stale_version(world: &mut AppWorld) {
         world.ep_data.as_ref().unwrap().clone(),
     ));
     let et_store: Arc<dyn EventTypeReadStore> = Arc::new(FakeEventTypeReadStore::new(log.clone(), SharedEventTypeData::default()));
-    let handler = UpdateEndpointHandler::new(factory, et_store);
+    let handler = UpdateEndpointHandler::new(et_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_endpoint_result = Some(
         handler
@@ -1129,7 +1178,7 @@ async fn when_update_ep_stale_version(world: &mut AppWorld) {
                 signing_secret: Some("whsec_secret123".into()),
                 event_type_ids: vec![],
                 version: Version::new(999),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1159,7 +1208,10 @@ async fn when_update_ep_non_existent(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
     let et_store: Arc<dyn EventTypeReadStore> = Arc::new(FakeEventTypeReadStore::new(log.clone(), SharedEventTypeData::default()));
-    let handler = UpdateEndpointHandler::new(factory, et_store);
+    let handler = UpdateEndpointHandler::new(et_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_endpoint_result = Some(
         handler
@@ -1170,7 +1222,7 @@ async fn when_update_ep_non_existent(world: &mut AppWorld) {
                 signing_secret: Some("whsec_secret".into()),
                 event_type_ids: vec![],
                 version: Version::new(0),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1240,14 +1292,17 @@ async fn when_delete_ep_executed(world: &mut AppWorld) {
         log.clone(),
         world.ep_data.as_ref().unwrap().clone(),
     ));
-    let handler = DeleteEndpointHandler::new(factory);
+    let handler = DeleteEndpointHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_endpoint_result = Some(
         handler
             .handle(DeleteEndpoint {
                 org_id: OrganizationId::new(),
                 id: ep.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1257,14 +1312,17 @@ async fn when_delete_ep_executed(world: &mut AppWorld) {
 async fn when_delete_ep_nonexistent(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-    let handler = DeleteEndpointHandler::new(factory);
+    let handler = DeleteEndpointHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_endpoint_result = Some(
         handler
             .handle(DeleteEndpoint {
                 org_id: OrganizationId::new(),
                 id: EndpointId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1374,10 +1432,12 @@ async fn when_send_message_with_event_type(world: &mut AppWorld, _event_type_nam
     ));
     let endpoint_store = Arc::new(FakeEndpointReadStore::new(log, endpoints));
     let handler = SendMessageHandler::new(
-        factory,
         endpoint_store,
         chrono::Duration::hours(24),
     );
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.send_message_result = Some(
         handler
@@ -1387,7 +1447,7 @@ async fn when_send_message_with_event_type(world: &mut AppWorld, _event_type_nam
                 event_type_id,
                 payload: json!({"data": true}),
                 idempotency_key: None,
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -1406,10 +1466,12 @@ async fn when_send_message_with_idempotency_key(world: &mut AppWorld, key: Strin
     ));
     let endpoint_store = Arc::new(FakeEndpointReadStore::new(log, endpoints));
     let handler = SendMessageHandler::new(
-        factory,
         endpoint_store,
         chrono::Duration::hours(24),
     );
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.send_message_result = Some(
         handler
@@ -1419,7 +1481,7 @@ async fn when_send_message_with_idempotency_key(world: &mut AppWorld, key: Strin
                 event_type_id,
                 payload: json!({"data": true}),
                 idempotency_key: Some(key),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -1458,10 +1520,12 @@ async fn when_send_message_non_object_payload(world: &mut AppWorld) {
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
     let endpoint_store = Arc::new(FakeEndpointReadStore::new(log, endpoints));
     let handler = SendMessageHandler::new(
-        factory,
         endpoint_store,
         chrono::Duration::hours(24),
     );
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.send_message_result = Some(
         handler
@@ -1471,7 +1535,7 @@ async fn when_send_message_non_object_payload(world: &mut AppWorld) {
                 event_type_id,
                 payload: json!("not an object"),
                 idempotency_key: None,
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -1524,8 +1588,11 @@ async fn when_create_org_executed(world: &mut AppWorld) {
         oidc_jwks_url: jwks_url,
     };
 
-    let handler = CreateOrganizationHandler::new(factory.clone(), org_store);
-    world.create_org_result = Some(handler.handle(command).await);
+    let handler = CreateOrganizationHandler::new(org_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
+    world.create_org_result = Some(handler.handle(command, &mut ctx).await);
     world.create_org_oidc_data = Some(factory.oidc_config_data().clone());
 }
 
@@ -1589,7 +1656,10 @@ async fn when_create_org_with_slug(world: &mut AppWorld, slug: String) {
     let org_data = world.org_data.take().unwrap_or_default();
     let org_store = Arc::new(FakeOrganizationReadStore::new(log.clone(), org_data));
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
-    let handler = CreateOrganizationHandler::new(factory, org_store);
+    let handler = CreateOrganizationHandler::new(org_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.create_org_result = Some(
         handler
@@ -1599,7 +1669,7 @@ async fn when_create_org_with_slug(world: &mut AppWorld, slug: String) {
                 oidc_issuer_url: "https://auth.example.com".into(),
                 oidc_audience: "pigeon-api".into(),
                 oidc_jwks_url: "https://auth.example.com/.well-known/jwks.json".into(),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -1629,7 +1699,10 @@ async fn when_update_org_executed(world: &mut AppWorld, name: String) {
     let org = world.existing_org.as_ref().unwrap();
     let org_data = world.org_data.as_ref().unwrap().clone();
     let factory = Arc::new(FakeUnitOfWorkFactory::with_organization_data(log.clone(), org_data));
-    let handler = UpdateOrganizationHandler::new(factory);
+    let handler = UpdateOrganizationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_org_result = Some(
         handler
@@ -1637,7 +1710,7 @@ async fn when_update_org_executed(world: &mut AppWorld, name: String) {
                 id: org.id().clone(),
                 name,
                 version: org.version(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1652,7 +1725,10 @@ async fn when_update_org_stale_version(world: &mut AppWorld) {
         log.clone(),
         org_data,
     ));
-    let handler = UpdateOrganizationHandler::new(factory);
+    let handler = UpdateOrganizationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_org_result = Some(
         handler
@@ -1660,7 +1736,7 @@ async fn when_update_org_stale_version(world: &mut AppWorld) {
                 id: org.id().clone(),
                 name: "new-name".into(),
                 version: Version::new(999),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1670,7 +1746,10 @@ async fn when_update_org_stale_version(world: &mut AppWorld) {
 async fn when_update_org_nonexistent(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-    let handler = UpdateOrganizationHandler::new(factory);
+    let handler = UpdateOrganizationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.update_org_result = Some(
         handler
@@ -1678,7 +1757,7 @@ async fn when_update_org_nonexistent(world: &mut AppWorld) {
                 id: OrganizationId::new(),
                 name: "new-name".into(),
                 version: Version::new(0),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1756,13 +1835,16 @@ async fn when_delete_org_executed(world: &mut AppWorld) {
         log.clone(),
         org_data,
     ));
-    let handler = DeleteOrganizationHandler::new(factory);
+    let handler = DeleteOrganizationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_org_result = Some(
         handler
             .handle(DeleteOrganization {
                 id: org.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1772,13 +1854,16 @@ async fn when_delete_org_executed(world: &mut AppWorld) {
 async fn when_delete_org_nonexistent(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-    let handler = DeleteOrganizationHandler::new(factory);
+    let handler = DeleteOrganizationHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_org_result = Some(
         handler
             .handle(DeleteOrganization {
                 id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1820,7 +1905,10 @@ async fn when_create_oidc_config(world: &mut AppWorld, issuer: String, audience:
     let log = world.log.as_ref().unwrap().clone();
     let org_id = world.org_id.as_ref().unwrap().clone();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
-    let handler = CreateOidcConfigHandler::new(factory);
+    let handler = CreateOidcConfigHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     let jwks_url = if issuer.is_empty() {
         String::new()
@@ -1835,7 +1923,7 @@ async fn when_create_oidc_config(world: &mut AppWorld, issuer: String, audience:
                 issuer_url: issuer,
                 audience,
                 jwks_url,
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -1937,13 +2025,16 @@ async fn when_delete_oidc_config(world: &mut AppWorld) {
         log.clone(),
         world.oidc_data.as_ref().unwrap().clone(),
     ));
-    let handler = DeleteOidcConfigHandler::new(factory);
+    let handler = DeleteOidcConfigHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_oidc_config_result = Some(
         handler
             .handle(DeleteOidcConfig {
                 id: config.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -1968,13 +2059,16 @@ async fn then_oidc_deletion_validation_error(world: &mut AppWorld) {
 async fn when_delete_nonexistent_oidc_config(world: &mut AppWorld) {
     let log = OperationLog::new();
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
-    let handler = DeleteOidcConfigHandler::new(factory);
+    let handler = DeleteOidcConfigHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.delete_oidc_config_result = Some(
         handler
             .handle(DeleteOidcConfig {
                 id: OidcConfigId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -2141,15 +2235,17 @@ async fn when_retrigger_executed(world: &mut AppWorld) {
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
     let handler = RetriggerMessageHandler::new(
-        factory,
         Arc::new(mock_msg_store),
         endpoint_store,
         Arc::new(mock_att_store),
     );
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.retrigger_result = Some(
         handler
-            .handle(RetriggerMessage { message_id, org_id })
+            .handle(RetriggerMessage { message_id, org_id }, &mut ctx)
             .await,
     );
 }
@@ -2172,18 +2268,20 @@ async fn when_retrigger_nonexistent(world: &mut AppWorld) {
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
 
     let handler = RetriggerMessageHandler::new(
-        factory,
         Arc::new(mock_msg_store),
         endpoint_store,
         Arc::new(mock_att_store),
     );
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
 
     world.retrigger_result = Some(
         handler
             .handle(RetriggerMessage {
                 message_id: pigeon_domain::message::MessageId::new(),
                 org_id: OrganizationId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
     world.log = Some(log);
@@ -2256,13 +2354,16 @@ async fn when_replay_dead_letter(world: &mut AppWorld) {
     let dl_data = world.dl_data.take().unwrap();
     let factory = Arc::new(FakeUnitOfWorkFactory::with_dead_letter_data(log, dl_data));
 
-    let handler = ReplayDeadLetterHandler::new(factory);
+    let handler = ReplayDeadLetterHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     world.replay_dead_letter_result = Some(
         handler
             .handle(ReplayDeadLetter {
                 org_id: OrganizationId::new(),
                 dead_letter_id: dl.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -2273,13 +2374,16 @@ async fn when_replay_nonexistent_dead_letter(world: &mut AppWorld) {
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
     world.log = Some(log);
 
-    let handler = ReplayDeadLetterHandler::new(factory);
+    let handler = ReplayDeadLetterHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     world.replay_dead_letter_result = Some(
         handler
             .handle(ReplayDeadLetter {
                 org_id: OrganizationId::new(),
                 dead_letter_id: pigeon_domain::dead_letter::DeadLetterId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -2357,13 +2461,16 @@ async fn when_retry_attempt(world: &mut AppWorld) {
     let att_data = world.att_data.take().unwrap();
     let factory = Arc::new(FakeUnitOfWorkFactory::with_attempt_data(log, att_data));
 
-    let handler = RetryAttemptHandler::new(factory);
+    let handler = RetryAttemptHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     world.retry_attempt_result = Some(
         handler
             .handle(RetryAttempt {
                 org_id: OrganizationId::new(),
                 attempt_id: attempt.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -2374,13 +2481,16 @@ async fn when_retry_nonexistent_attempt(world: &mut AppWorld) {
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
     world.log = Some(log);
 
-    let handler = RetryAttemptHandler::new(factory);
+    let handler = RetryAttemptHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     world.retry_attempt_result = Some(
         handler
             .handle(RetryAttempt {
                 org_id: OrganizationId::new(),
                 attempt_id: pigeon_domain::attempt::AttemptId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -2476,14 +2586,17 @@ async fn when_send_test_event(world: &mut AppWorld) {
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
     let et_read_store = Arc::new(FakeEventTypeReadStore::new(log, et_data));
 
-    let handler = SendTestEventHandler::new(factory, et_read_store);
+    let handler = SendTestEventHandler::new(et_read_store);
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     world.send_test_event_result = Some(
         handler
             .handle(SendTestEvent {
                 org_id,
                 app_id,
                 endpoint_id: endpoint.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -2563,13 +2676,16 @@ async fn when_disable_endpoint(world: &mut AppWorld) {
 
     let factory = Arc::new(FakeUnitOfWorkFactory::with_endpoint_data(log, ep_data));
 
-    let handler = DisableEndpointHandler::new(factory);
+    let handler = DisableEndpointHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     world.disable_endpoint_result = Some(
         handler
             .handle(DisableEndpoint {
                 app_id,
                 endpoint_id: ep.id().clone(),
-            })
+            }, &mut ctx)
             .await,
     );
 }
@@ -2580,13 +2696,16 @@ async fn when_disable_nonexistent_endpoint(world: &mut AppWorld) {
     let factory = Arc::new(FakeUnitOfWorkFactory::new(log.clone()));
     world.log = Some(log);
 
-    let handler = DisableEndpointHandler::new(factory);
+    let handler = DisableEndpointHandler::new();
+    let uow = factory.begin().await.unwrap();
+    let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+    ctx.set_uow(uow);
     world.disable_endpoint_result = Some(
         handler
             .handle(DisableEndpoint {
                 app_id: ApplicationId::new(),
                 endpoint_id: EndpointId::new(),
-            })
+            }, &mut ctx)
             .await,
     );
 }

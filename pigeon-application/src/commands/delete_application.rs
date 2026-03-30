@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::application::ApplicationId;
@@ -7,7 +6,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct DeleteApplication {
@@ -23,29 +22,26 @@ impl Command for DeleteApplication {
     }
 }
 
-pub struct DeleteApplicationHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct DeleteApplicationHandler;
 
 impl DeleteApplicationHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<DeleteApplication> for DeleteApplicationHandler {
-    async fn handle(&self, command: DeleteApplication) -> Result<(), ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: DeleteApplication, ctx: &mut RequestContext) -> Result<(), ApplicationError> {
 
-        let _existing = uow
+        let _existing = ctx.uow()
             .application_store()
             .find_by_id(&command.id, &command.org_id)
             .await?
             .ok_or(ApplicationError::NotFound)?;
 
-        uow.application_store().delete(&command.id).await?;
-        uow.commit().await?;
+        ctx.uow().application_store().delete(&command.id).await?;
 
         Ok(())
     }
@@ -53,7 +49,10 @@ impl CommandHandler<DeleteApplication> for DeleteApplicationHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
     use pigeon_domain::application::Application;
     use pigeon_domain::organization::OrganizationId;
@@ -73,9 +72,13 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = DeleteApplicationHandler::new(factory);
+        let handler = DeleteApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), org_id.clone());
+        ctx.set_uow(uow);
+
         let result = handler
-            .handle(DeleteApplication { org_id, id })
+            .handle(DeleteApplication { org_id, id }, &mut ctx)
             .await;
 
         assert!(result.is_ok());
@@ -85,7 +88,6 @@ mod tests {
                 "uow_factory:begin",
                 "application_store:find_by_id",
                 "application_store:delete",
-                "uow:commit",
             ]
         );
     }
@@ -95,12 +97,16 @@ mod tests {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = DeleteApplicationHandler::new(factory);
+        let handler = DeleteApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(DeleteApplication {
                 org_id: OrganizationId::new(),
                 id: ApplicationId::new(),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));
@@ -121,12 +127,16 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = DeleteApplicationHandler::new(factory);
+        let handler = DeleteApplicationHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(DeleteApplication {
                 org_id: OrganizationId::new(), // different org
                 id,
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));

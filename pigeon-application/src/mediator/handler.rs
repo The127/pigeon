@@ -3,11 +3,12 @@ use async_trait::async_trait;
 use crate::error::ApplicationError;
 
 use super::command::Command;
+use super::pipeline::RequestContext;
 use super::query::Query;
 
 #[async_trait]
 pub trait CommandHandler<C: Command>: Send + Sync {
-    async fn handle(&self, command: C) -> Result<C::Output, ApplicationError>;
+    async fn handle(&self, command: C, ctx: &mut RequestContext) -> Result<C::Output, ApplicationError>;
 }
 
 #[async_trait]

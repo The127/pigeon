@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use async_trait::async_trait;
 use pigeon_domain::event_type::EventTypeId;
@@ -7,7 +6,7 @@ use pigeon_domain::organization::OrganizationId;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
+use crate::mediator::pipeline::RequestContext;
 
 #[derive(Debug)]
 pub struct DeleteEventType {
@@ -23,22 +22,20 @@ impl Command for DeleteEventType {
     }
 }
 
-pub struct DeleteEventTypeHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
-}
+#[derive(Default)]
+pub struct DeleteEventTypeHandler;
 
 impl DeleteEventTypeHandler {
-    pub fn new(uow_factory: Arc<dyn UnitOfWorkFactory>) -> Self {
-        Self { uow_factory }
+    pub fn new() -> Self {
+        Self
     }
 }
 
 #[async_trait]
 impl CommandHandler<DeleteEventType> for DeleteEventTypeHandler {
-    async fn handle(&self, command: DeleteEventType) -> Result<(), ApplicationError> {
-        let mut uow = self.uow_factory.begin().await?;
+    async fn handle(&self, command: DeleteEventType, ctx: &mut RequestContext) -> Result<(), ApplicationError> {
 
-        let existing = uow
+        let existing = ctx.uow()
             .event_type_store()
             .find_by_id(&command.id, &command.org_id)
             .await?
@@ -50,8 +47,7 @@ impl CommandHandler<DeleteEventType> for DeleteEventTypeHandler {
             ));
         }
 
-        uow.event_type_store().delete(&command.id).await?;
-        uow.commit().await?;
+        ctx.uow().event_type_store().delete(&command.id).await?;
 
         Ok(())
     }
@@ -59,10 +55,14 @@ impl CommandHandler<DeleteEventType> for DeleteEventTypeHandler {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
     use super::*;
+    use crate::mediator::pipeline::RequestContext;
+    use crate::ports::unit_of_work::UnitOfWorkFactory;
     use crate::test_support::fakes::{FakeUnitOfWorkFactory, OperationLog};
     use pigeon_domain::application::ApplicationId;
     use pigeon_domain::event_type::EventType;
+    use pigeon_domain::organization::OrganizationId;
 
     #[tokio::test]
     async fn deletes_event_type_successfully() {
@@ -78,9 +78,13 @@ mod tests {
         }
         log.entries.lock().unwrap().clear();
 
-        let handler = DeleteEventTypeHandler::new(factory);
+        let handler = DeleteEventTypeHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
-            .handle(DeleteEventType { org_id: pigeon_domain::organization::OrganizationId::new(), id })
+            .handle(DeleteEventType { org_id: OrganizationId::new(), id }, &mut ctx)
             .await;
 
         assert!(result.is_ok());
@@ -90,7 +94,6 @@ mod tests {
                 "uow_factory:begin",
                 "event_type_store:find_by_id",
                 "event_type_store:delete",
-                "uow:commit",
             ]
         );
     }
@@ -100,12 +103,16 @@ mod tests {
         let log = OperationLog::new();
         let factory = Arc::new(FakeUnitOfWorkFactory::new(log));
 
-        let handler = DeleteEventTypeHandler::new(factory);
+        let handler = DeleteEventTypeHandler::new();
+        let uow = factory.begin().await.unwrap();
+        let mut ctx = RequestContext::new("Test", "test".into(), OrganizationId::new());
+        ctx.set_uow(uow);
+
         let result = handler
             .handle(DeleteEventType {
-                org_id: pigeon_domain::organization::OrganizationId::new(),
+                org_id: OrganizationId::new(),
                 id: EventTypeId::new(),
-            })
+            }, &mut ctx)
             .await;
 
         assert!(matches!(result, Err(ApplicationError::NotFound)));

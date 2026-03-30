@@ -13,8 +13,8 @@ use serde_json::json;
 use crate::error::ApplicationError;
 use crate::mediator::command::Command;
 use crate::mediator::handler::CommandHandler;
+use crate::mediator::pipeline::RequestContext;
 use crate::ports::stores::EventTypeReadStore;
-use crate::ports::unit_of_work::UnitOfWorkFactory;
 
 #[derive(Debug)]
 pub struct SendTestEvent {
@@ -37,17 +37,14 @@ pub struct SendTestEventResult {
 }
 
 pub struct SendTestEventHandler {
-    uow_factory: Arc<dyn UnitOfWorkFactory>,
     event_type_read_store: Arc<dyn EventTypeReadStore>,
 }
 
 impl SendTestEventHandler {
     pub fn new(
-        uow_factory: Arc<dyn UnitOfWorkFactory>,
         event_type_read_store: Arc<dyn EventTypeReadStore>,
     ) -> Self {
         Self {
-            uow_factory,
             event_type_read_store,
         }
     }
@@ -58,6 +55,7 @@ impl CommandHandler<SendTestEvent> for SendTestEventHandler {
     async fn handle(
         &self,
         command: SendTestEvent,
+        ctx: &mut RequestContext,
     ) -> Result<SendTestEventResult, ApplicationError> {
         let test_event_type = self
             .event_type_read_store
@@ -90,12 +88,10 @@ impl CommandHandler<SendTestEvent> for SendTestEventHandler {
             Utc::now(),
         );
 
-        let mut uow = self.uow_factory.begin().await?;
-        uow.message_store()
+        ctx.uow().message_store()
             .insert_or_get_existing(&message, &command.org_id)
             .await?;
-        uow.attempt_store().insert(&attempt).await?;
-        uow.commit().await?;
+        ctx.uow().attempt_store().insert(&attempt).await?;
 
         Ok(SendTestEventResult { message })
     }

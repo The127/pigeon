@@ -161,7 +161,7 @@ impl QueryHandler<ListDeadLettersByApp> for StubListDeadLettersHandler {
 pub(crate) struct StubCreateOidcConfigHandler;
 #[async_trait]
 impl CommandHandler<CreateOidcConfig> for StubCreateOidcConfigHandler {
-    async fn handle(&self, _c: CreateOidcConfig) -> Result<OidcConfig, ApplicationError> {
+    async fn handle(&self, _c: CreateOidcConfig, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<OidcConfig, ApplicationError> {
         Err(ApplicationError::Internal("stub".into()))
     }
 }
@@ -169,7 +169,7 @@ impl CommandHandler<CreateOidcConfig> for StubCreateOidcConfigHandler {
 pub(crate) struct StubDeleteOidcConfigHandler;
 #[async_trait]
 impl CommandHandler<DeleteOidcConfig> for StubDeleteOidcConfigHandler {
-    async fn handle(&self, _c: DeleteOidcConfig) -> Result<(), ApplicationError> {
+    async fn handle(&self, _c: DeleteOidcConfig, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<(), ApplicationError> {
         Err(ApplicationError::Internal("stub".into()))
     }
 }
@@ -310,7 +310,7 @@ pub(crate) async fn test_auth_middleware(
 pub(crate) struct StubReplayDeadLetterHandler;
 #[async_trait]
 impl CommandHandler<ReplayDeadLetter> for StubReplayDeadLetterHandler {
-    async fn handle(&self, _c: ReplayDeadLetter) -> Result<DeadLetter, ApplicationError> {
+    async fn handle(&self, _c: ReplayDeadLetter, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<DeadLetter, ApplicationError> {
         Err(ApplicationError::Internal("stub".into()))
     }
 }
@@ -318,7 +318,7 @@ impl CommandHandler<ReplayDeadLetter> for StubReplayDeadLetterHandler {
 pub(crate) struct StubRetryAttemptHandler;
 #[async_trait]
 impl CommandHandler<RetryAttempt> for StubRetryAttemptHandler {
-    async fn handle(&self, _c: RetryAttempt) -> Result<Attempt, ApplicationError> {
+    async fn handle(&self, _c: RetryAttempt, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<Attempt, ApplicationError> {
         Err(ApplicationError::Internal("stub".into()))
     }
 }
@@ -326,7 +326,7 @@ impl CommandHandler<RetryAttempt> for StubRetryAttemptHandler {
 pub(crate) struct StubRetriggerMessageHandler;
 #[async_trait]
 impl CommandHandler<RetriggerMessage> for StubRetriggerMessageHandler {
-    async fn handle(&self, _c: RetriggerMessage) -> Result<pigeon_application::commands::retrigger_message::RetriggerMessageResult, ApplicationError> {
+    async fn handle(&self, _c: RetriggerMessage, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<pigeon_application::commands::retrigger_message::RetriggerMessageResult, ApplicationError> {
         Err(ApplicationError::Internal("stub".into()))
     }
 }
@@ -334,7 +334,7 @@ impl CommandHandler<RetriggerMessage> for StubRetriggerMessageHandler {
 pub(crate) struct StubSendTestEventHandler;
 #[async_trait]
 impl CommandHandler<SendTestEvent> for StubSendTestEventHandler {
-    async fn handle(&self, _c: SendTestEvent) -> Result<SendTestEventResult, ApplicationError> {
+    async fn handle(&self, _c: SendTestEvent, _ctx: &mut pigeon_application::mediator::pipeline::RequestContext) -> Result<SendTestEventResult, ApplicationError> {
         Err(ApplicationError::Internal("stub".into()))
     }
 }
