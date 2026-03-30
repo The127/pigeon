@@ -1,0 +1,51 @@
+# --- Build stage ---
+FROM rust:1.85-bookworm AS builder
+
+WORKDIR /app
+
+# Copy workspace manifests first for dependency caching
+COPY Cargo.toml Cargo.lock ./
+COPY pigeon-macros/Cargo.toml pigeon-macros/Cargo.toml
+COPY pigeon-domain/Cargo.toml pigeon-domain/Cargo.toml
+COPY pigeon-application/Cargo.toml pigeon-application/Cargo.toml
+COPY pigeon-infrastructure/Cargo.toml pigeon-infrastructure/Cargo.toml
+COPY pigeon-api/Cargo.toml pigeon-api/Cargo.toml
+COPY pigeon-server/Cargo.toml pigeon-server/Cargo.toml
+
+# Create stub lib.rs files so cargo can resolve the workspace
+RUN mkdir -p pigeon-macros/src pigeon-domain/src pigeon-application/src \
+    pigeon-infrastructure/src pigeon-api/src pigeon-server/src && \
+    echo "fn main() {}" > pigeon-server/src/main.rs && \
+    for d in pigeon-macros pigeon-domain pigeon-application pigeon-infrastructure pigeon-api; do \
+      echo "" > $d/src/lib.rs; \
+    done
+
+# Build dependencies only (cached layer)
+RUN cargo build --release -p pigeon-server 2>/dev/null || true
+
+# Copy actual source
+COPY pigeon-macros pigeon-macros
+COPY pigeon-domain pigeon-domain
+COPY pigeon-application pigeon-application
+COPY pigeon-infrastructure pigeon-infrastructure
+COPY pigeon-api pigeon-api
+COPY pigeon-server pigeon-server
+
+# Touch source files to invalidate the cache for our code only
+RUN find pigeon-*/src -name '*.rs' -exec touch {} +
+
+RUN cargo build --release -p pigeon-server
+
+# --- Runtime stage ---
+FROM debian:bookworm-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/target/release/pigeon-server /usr/local/bin/pigeon
+
+EXPOSE 3000
+
+# Default: run API + worker together. Override with `pigeon api` or `pigeon worker`.
+ENTRYPOINT ["pigeon"]
+CMD ["serve"]
